@@ -3,7 +3,7 @@ package com.boimin.beatradar.ui
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core. FastOutSlowInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -40,7 +40,6 @@ import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -68,7 +67,6 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -81,6 +79,7 @@ import com.boimin.beatradar.capture.MonitorStatus
 import com.boimin.beatradar.data.NameSuggestion
 import com.boimin.beatradar.data.Settings
 import com.boimin.beatradar.ui.theme.Brand
+import com.boimin.beatradar.ui.theme.brandSwitchColors
 import kotlinx.coroutines.launch
 import kotlin.math.floor
 import kotlin.math.pow
@@ -348,11 +347,18 @@ private fun BeatCircle(
                 state.active -> MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
                 else -> MaterialTheme.colorScheme.outline
             }
+            // Matched: the dial fills Coral, like the "Saved" moment in the design.
+            val dialColor by animateColorAsState(
+                if (state.matched) Brand.Coral else MaterialTheme.colorScheme.surfaceContainer,
+                label = "dial",
+            )
+            val onDial = if (state.matched) Brand.OnCoral else MaterialTheme.colorScheme.onSurface
+            val onDialMuted = if (state.matched) Brand.OnCoral.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
             Surface(
                 onClick = onToggle,
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                contentColor = MaterialTheme.colorScheme.onSurface,
+                color = dialColor,
+                contentColor = onDial,
                 modifier = Modifier
                     .size(164.dp)
                     .border(2.dp, borderColor, CircleShape),
@@ -381,7 +387,7 @@ private fun BeatCircle(
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 1.5.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = onDialMuted,
                                 )
                                 Text(
                                     state.bpm.roundToInt().toString(),
@@ -389,20 +395,28 @@ private fun BeatCircle(
                                     lineHeight = 52.sp,
                                     fontWeight = FontWeight.ExtraBold,
                                     letterSpacing = (-2).sp,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                    color = onDial,
                                     modifier = Modifier.alpha(numberAlpha),
                                 )
                                 Spacer(Modifier.height(4.dp))
                                 DialStatusBadge(state, settings, inTarget)
                             }
                             else -> {
-                                Icon(
-                                    painterResource(R.drawable.ic_mic),
-                                    contentDescription = if (state.active) "Stop listening" else "Start listening",
-                                    tint = if (state.active) accent else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(38.dp),
-                                )
-                                Spacer(Modifier.height(6.dp))
+                                Box(
+                                    Modifier
+                                        .size(56.dp)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        painterResource(R.drawable.ic_mic),
+                                        contentDescription = if (state.active) "Stop listening" else "Start listening",
+                                        tint = if (state.active) accent else MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(30.dp),
+                                    )
+                                }
+                                Spacer(Modifier.height(8.dp))
                                 Text(
                                     when (state.status) {
                                         MonitorStatus.LISTENING -> "LISTENING…"
@@ -429,13 +443,13 @@ private fun DialStatusBadge(state: MonitorState, settings: Settings, inTarget: B
     val (label, bg, fg) = when {
         state.matched && state.alreadyListed -> Triple(
             "✓ In Log · 10s",
-            Brand.Coral.copy(alpha = 0.16f),
-            Brand.Coral,
+            Brand.OnCoral.copy(alpha = 0.22f),
+            Brand.OnCoral,
         )
         state.matched -> Triple(
             "✓ Saved · 10s",
-            Brand.Coral.copy(alpha = 0.16f),
-            Brand.Coral,
+            Brand.OnCoral.copy(alpha = 0.22f),
+            Brand.OnCoral,
         )
         inTarget -> Triple(
             "Hold ${seconds}s / 10s",
@@ -798,22 +812,22 @@ private fun NowPlayingCard(
                 Spacer(Modifier.width(8.dp))
                 Box(
                     Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Brand.Success.copy(alpha = 0.15f))
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.primary)
                         .clickable(onClick = onAcceptSuggestion)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
                 ) {
-                    Text("Yes", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Brand.Success)
+                    Text("Yes", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
                 }
                 Spacer(Modifier.width(4.dp))
                 Box(
                     Modifier
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         .clickable(onClick = onRejectSuggestion)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
                 ) {
-                    Text("No", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("No", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -864,15 +878,15 @@ private fun RangeCard(settings: Settings, onSettingsChange: ((Settings) -> Setti
                 Box(
                     Modifier
                         .clip(RoundedCornerShape(6.dp))
-                        .background(Brand.Coral.copy(alpha = 0.14f))
-                        .clickable { showCustomDialog = true }
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                        .clickable(onClickLabel = "Type a custom range") { showCustomDialog = true }
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                 ) {
                     Text(
-                        "${range.start.roundToInt()} – ${range.endInclusive.roundToInt()} BPM",
+                        "${range.start.roundToInt()}–${range.endInclusive.roundToInt()} BPM",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = Brand.Coral,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
                 Spacer(Modifier.width(8.dp))
@@ -880,10 +894,7 @@ private fun RangeCard(settings: Settings, onSettingsChange: ((Settings) -> Setti
             Switch(
                 checked = settings.rangeEnabled,
                 onCheckedChange = { on -> onSettingsChange { it.copy(rangeEnabled = on) } },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.White,
-                    checkedTrackColor = MaterialTheme.colorScheme.primary,
-                ),
+                colors = brandSwitchColors(),
             )
         }
         AnimatedVisibility(settings.rangeEnabled) {
@@ -900,9 +911,11 @@ private fun RangeCard(settings: Settings, onSettingsChange: ((Settings) -> Setti
                         onSettingsChange { it.copy(minBpm = lo, maxBpm = hi) }
                     },
                     colors = SliderDefaults.colors(
-                        thumbColor = Brand.Coral,
-                        activeTrackColor = Brand.Coral,
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
                         inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        activeTickColor = Color.Transparent,
+                        inactiveTickColor = Color.Transparent,
                     ),
                 )
                 Spacer(Modifier.height(4.dp))

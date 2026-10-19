@@ -1,6 +1,9 @@
 package com.boimin.beatradar.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
@@ -11,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SegmentedButton
@@ -30,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.foundation.clickable
@@ -47,6 +50,7 @@ import com.boimin.beatradar.R
 import com.boimin.beatradar.data.Settings
 import com.boimin.beatradar.net.Me
 import com.boimin.beatradar.data.ThemeMode
+import com.boimin.beatradar.ui.theme.brandSwitchColors
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,111 +70,109 @@ fun SettingsSheet(
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 32.dp)) {
             Text("Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
 
-            AccountSection(account)
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(16.dp))
+            SectionLabel("Account")
+            SettingsCard { AccountSection(account) }
 
             SectionLabel("Appearance")
-            val themes = listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark")
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                themes.forEachIndexed { i, (mode, label) ->
-                    SegmentedButton(
-                        selected = settings.theme == mode,
-                        onClick = { onChange { it.copy(theme = mode) } },
-                        shape = SegmentedButtonDefaults.itemShape(i, themes.size),
-                    ) { Text(label) }
+            SettingsCard(Modifier.padding(vertical = 8.dp)) {
+                val themes = listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark")
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    themes.forEachIndexed { i, (mode, label) ->
+                        SegmentedButton(
+                            selected = settings.theme == mode,
+                            onClick = { onChange { it.copy(theme = mode) } },
+                            shape = SegmentedButtonDefaults.itemShape(i, themes.size),
+                        ) { Text(label) }
+                    }
                 }
             }
-            Spacer(Modifier.height(20.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(12.dp))
 
-            SwitchRow("Vibrate on match", "Buzzes even when the phone is on silent", settings.vibrate) { on ->
-                onChange { it.copy(vibrate = on) }
-            }
-            SwitchRow("Count half / double tempo", "For example, 65 BPM counts as 130", settings.halfDoubleMatch) { on ->
-                onChange { it.copy(halfDoubleMatch = on) }
-            }
-            SwitchRow(
-                "Save clips of unnamed songs",
-                "Keeps 12 s of a song without a name to replay or play to Shazam later from the log. Deleted once named; stays on your phone unless you turn on Help name unknown songs.",
-                settings.saveClips,
-            ) { on -> onChange { it.copy(saveClips = on) } }
-            SwitchRow(
-                "All songs, not just matches",
-                "Off: only songs that matched your BPM range get a clip",
-                settings.clipAllSongs,
-                enabled = settings.saveClips,
-            ) { on -> onChange { it.copy(clipAllSongs = on) } }
-            Text(
-                "Keep clips of the last ${settings.clipLimit} songs · about ${clipStorage(settings.clipLimit)}",
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (settings.saveClips) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
-            )
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                Settings.CLIP_LIMITS.forEachIndexed { i, limit ->
-                    SegmentedButton(
-                        selected = settings.clipLimit == limit,
-                        onClick = { onChange { it.copy(clipLimit = limit) } },
-                        shape = SegmentedButtonDefaults.itemShape(i, Settings.CLIP_LIMITS.size),
-                        enabled = settings.saveClips,
-                    ) { Text(limit.toString()) }
+            SectionLabel("Listening & clips")
+            SettingsCard {
+                SwitchRow("Vibrate on match", "Buzzes even when the phone is on silent", settings.vibrate) { on ->
+                    onChange { it.copy(vibrate = on) }
                 }
+                SwitchRow("Count half / double tempo", "For example, 65 BPM counts as 130", settings.halfDoubleMatch) { on ->
+                    onChange { it.copy(halfDoubleMatch = on) }
+                }
+                SwitchRow(
+                    "Save clips of unnamed songs",
+                    "Keeps 12 s of a song without a name to replay or play to Shazam later from the log. Deleted once named; stays on your phone unless you turn on Help name unknown songs.",
+                    settings.saveClips,
+                ) { on -> onChange { it.copy(saveClips = on) } }
+                SwitchRow(
+                    "All songs, not just matches",
+                    "Off: only songs that matched your BPM range get a clip",
+                    settings.clipAllSongs,
+                    enabled = settings.saveClips,
+                ) { on -> onChange { it.copy(clipAllSongs = on) } }
+                Text(
+                    "Keep clips of the last ${settings.clipLimit} songs · about ${clipStorage(settings.clipLimit)}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (settings.saveClips) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+                )
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    Settings.CLIP_LIMITS.forEachIndexed { i, limit ->
+                        SegmentedButton(
+                            selected = settings.clipLimit == limit,
+                            onClick = { onChange { it.copy(clipLimit = limit) } },
+                            shape = SegmentedButtonDefaults.itemShape(i, Settings.CLIP_LIMITS.size),
+                            enabled = settings.saveClips,
+                        ) { Text(limit.toString()) }
+                    }
+                }
+                Text(
+                    "Older clips are deleted automatically; their songs stay in the log.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp, bottom = 8.dp),
+                )
             }
-            Text(
-                "Older clips are deleted automatically; their songs stay in the log.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 6.dp),
-            )
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(16.dp))
 
             SectionLabel("Song names")
-            Text(
-                "Reads song titles from music apps, Shazam and Pixel “Now Playing”. Nothing leaves your phone.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            SettingsCard(Modifier.padding(vertical = 12.dp)) {
                 Text(
-                    if (access) "Access allowed ✓" else "Access not allowed",
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.weight(1f),
+                    "Reads song titles from music apps, Shazam and Pixel “Now Playing”. Nothing leaves your phone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                FilledTonalButton(onClick = onOpenNotificationAccess) { Text(if (access) "Manage" else "Allow") }
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (access) "Access allowed ✓" else "Access not allowed",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    FilledTonalButton(onClick = onOpenNotificationAccess) { Text(if (access) "Manage" else "Allow") }
+                }
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Tip: turn on Auto Shazam in the Shazam app and songs around you get named automatically.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            Spacer(Modifier.height(12.dp))
-            Text(
-                "Tip: turn on Auto Shazam in the Shazam app and songs around you get named automatically.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(12.dp))
 
             SectionLabel("Library")
-            SwitchRow(
-                "Contribute to the Library",
-                "Shares the titles, tempos and audio fingerprints BeatRadar hears (never audio) to build a public tempo library",
-                settings.contribute,
-            ) { on -> onChange { it.copy(contribute = on) } }
-            val canShareClips = settings.contribute && settings.saveClips
-            SwitchRow(
-                "Help name unknown songs",
-                "Sends a 12-second clip of songs BeatRadar couldn't name, so an admin can listen and name them for everyone. " +
-                    "Only music, kept at most 30 days. Turning this off deletes your clips from the server." +
-                    if (canShareClips) "" else " Needs Contribute to the Library and Save clips of unnamed songs.",
-                settings.shareClips && canShareClips,
-                enabled = canShareClips,
-            ) { on -> onChange { it.copy(shareClips = on) } }
+            SettingsCard {
+                SwitchRow(
+                    "Contribute to the Library",
+                    "Shares the titles, tempos and audio fingerprints BeatRadar hears (never audio) to build a public tempo library",
+                    settings.contribute,
+                ) { on -> onChange { it.copy(contribute = on) } }
+                val canShareClips = settings.contribute && settings.saveClips
+                SwitchRow(
+                    "Help name unknown songs",
+                    "Sends a 12-second clip of songs BeatRadar couldn't name, so an admin can listen and name them for everyone. " +
+                        "Only music, kept at most 30 days. Turning this off deletes your clips from the server." +
+                        if (canShareClips) "" else " Needs Contribute to the Library and Save clips of unnamed songs.",
+                    settings.shareClips && canShareClips,
+                    enabled = canShareClips,
+                ) { on -> onChange { it.copy(shareClips = on) } }
+            }
             if (account.coffeeAvailable) {
                 Spacer(Modifier.height(8.dp))
                 Row(
@@ -189,13 +191,31 @@ fun SettingsSheet(
     }
 }
 
+/** Small caps-style label above a card, like the revamped screens' section headers. */
 @Composable
 private fun SectionLabel(text: String) {
     Text(
-        text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(bottom = 10.dp),
+        text.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 1.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 4.dp, top = 12.dp, bottom = 6.dp),
+    )
+}
+
+/** A rounded surface card holding one settings section. */
+@Composable
+private fun SettingsCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+            .padding(horizontal = 14.dp)
+            .then(modifier),
+        content = content,
     )
 }
 
@@ -210,7 +230,12 @@ private fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.width(12.dp))
-        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            enabled = enabled,
+            colors = brandSwitchColors(),
+        )
     }
 }
 
@@ -231,9 +256,9 @@ class AccountSettings(
 
 @Composable
 private fun AccountSection(a: AccountSettings) {
-    SectionLabel("Account")
     val user = a.user
     if (user == null) {
+        Spacer(Modifier.height(12.dp))
         Text(
             "Sign in to love songs, back up your log and join the leaderboards. Everything else works without an account.",
             style = MaterialTheme.typography.bodyMedium,
@@ -241,11 +266,12 @@ private fun AccountSection(a: AccountSettings) {
         )
         Spacer(Modifier.height(10.dp))
         FilledTonalButton(onClick = a.onSignIn) { Text("Sign in") }
+        Spacer(Modifier.height(12.dp))
         return
     }
     var renaming by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(painterResource(R.drawable.ic_account), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
@@ -255,7 +281,7 @@ private fun AccountSection(a: AccountSettings) {
         TextButton(onClick = { renaming = true }) { Text("Rename") }
     }
     SwitchRow("Show me on leaderboards", "Under your nickname only, never your name or email", user.onLeaderboard) { a.onLeaderboard(it) }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = a.onSignOut) { Text("Sign out") }
         TextButton(onClick = { confirmDelete = true }) { Text("Delete account", color = MaterialTheme.colorScheme.error) }
     }

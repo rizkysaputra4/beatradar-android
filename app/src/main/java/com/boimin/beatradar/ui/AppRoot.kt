@@ -262,8 +262,9 @@ private fun SharingNotice(onOk: () -> Unit, onTurnOff: () -> Unit) {
         title = { Text("BeatRadar builds a shared tempo library") },
         text = {
             Text(
-                "BeatRadar shares the titles, tempos and audio fingerprints it hears, never audio, to build a public tempo library " +
-                    "anyone can search. If you sign in, your nickname is shown on leaderboards. You can turn sharing off anytime in Settings.",
+                "BeatRadar shares the titles, tempos and audio fingerprints it hears to build a public tempo library " +
+                    "anyone can search. It never sends audio unless you turn on Help name unknown songs. If you sign in, your nickname is " +
+                    "shown on leaderboards. You can turn sharing off anytime in Settings.",
             )
         },
         confirmButton = { TextButton(onClick = onOk) { Text("OK") } },

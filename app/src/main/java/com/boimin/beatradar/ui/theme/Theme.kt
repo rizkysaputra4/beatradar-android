@@ -1,17 +1,15 @@
 package com.boimin.beatradar.ui.theme
 
 import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwitchColors
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import com.boimin.beatradar.data.ThemeMode
@@ -98,3 +96,16 @@ fun BeatRadarTheme(mode: ThemeMode, content: @Composable () -> Unit) {
     }
     MaterialTheme(colorScheme = colors, content = content)
 }
+
+/**
+ * Switches in the brand style: white thumb on the primary track when on. Off uses the muted text colour for the thumb
+ * and border, since the theme's `outline` (Material's default for them) is a near-invisible card hairline here.
+ */
+@Composable
+fun brandSwitchColors(): SwitchColors = SwitchDefaults.colors(
+    checkedThumbColor = Color.White,
+    checkedTrackColor = MaterialTheme.colorScheme.primary,
+    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    uncheckedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+)

@@ -467,22 +467,21 @@ private fun LogRow(
                 Spacer(Modifier.width(8.dp))
                 Box(
                     Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Brand.Success.copy(alpha = 0.15f))
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
                         .clickable(onClick = onAccept)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
                 ) {
-                    Text("Accept", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Brand.Success)
+                    Text("Accept", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(2.dp))
                 Box(
                     Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .clip(RoundedCornerShape(8.dp))
                         .clickable(onClick = onReject)
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                 ) {
-                    Text("Dismiss", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Dismiss", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

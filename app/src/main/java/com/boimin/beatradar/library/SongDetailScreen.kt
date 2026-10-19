@@ -38,7 +38,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -211,8 +214,9 @@ private fun SongPage(song: SongDetail, vm: LibraryViewModel, actions: LibraryAct
                     .weight(1f)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+                    // The tempo is the page's focal stat: primary-tinted, the accuracy card stays neutral.
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.28f), RoundedCornerShape(16.dp))
                     .padding(14.dp),
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
@@ -221,16 +225,21 @@ private fun SongPage(song: SongDetail, vm: LibraryViewModel, actions: LibraryAct
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.8.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    song.bpm.roundToInt().toString(),
+                    buildAnnotatedString {
+                        append(song.bpm.roundToInt().toString())
+                        withStyle(SpanStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.sp, color = MaterialTheme.colorScheme.primary)) {
+                            append(" BPM")
+                        }
+                    },
                     fontSize = 34.sp,
                     lineHeight = 36.sp,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = (-1.5).sp,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(

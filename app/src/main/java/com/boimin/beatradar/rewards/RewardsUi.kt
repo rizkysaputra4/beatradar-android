@@ -135,7 +135,7 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onDismiss: () -> Un
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        "$streakDays ${if (streakDays == 1L) "Day" else "Day"} Streak",
+                        "$streakDays Day Streak",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = Brand.Coral,
