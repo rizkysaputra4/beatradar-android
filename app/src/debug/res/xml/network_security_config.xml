@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug only: plain HTTP to the local dev server (emulator 10.0.2.2, localhost through adb reverse, or the PC's
+     Wi-Fi address, which changes with DHCP and can't be listed here). Release builds stay HTTPS-only. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
