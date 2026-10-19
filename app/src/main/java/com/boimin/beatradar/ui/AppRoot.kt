@@ -1,5 +1,7 @@
 package com.boimin.beatradar.ui
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -24,7 +27,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -139,12 +141,13 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             Header(
                 when (tab) {
                     TAB_LISTEN -> "BeatRadar"
-                    TAB_LOG -> "Song log"
-                    else -> "Library"
+                    TAB_LOG -> "Activity Log"
+                    else -> "Discover"
                 },
                 rewards = { BeatsChip(rewards) { showRewards = true } },
                 onSettings = { showSettings = true },
@@ -298,38 +301,60 @@ private fun CoffeeSheet(state: CoffeeState, onBuy: (Coffee) -> Unit, onDismiss: 
     }
 }
 
-/** Slim header: logo + title on the left, beats chip and settings on the right. */
+/** Slim header: squircle logo badge + title on the left, beats chip and bordered settings button on the right. */
 @Composable
 private fun Header(title: String, rewards: @Composable () -> Unit, onSettings: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .height(52.dp)
-            .padding(start = 20.dp, end = 8.dp),
+            .height(54.dp)
+            .padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            painterResource(R.drawable.ic_radar),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(22.dp),
+        Box(
+            Modifier
+                .size(28.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painterResource(R.drawable.ic_radar),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        Spacer(Modifier.width(9.dp))
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f),
         )
-        Spacer(Modifier.width(10.dp))
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
         rewards()
-        IconButton(onClick = onSettings) {
+        Spacer(Modifier.width(8.dp))
+        Box(
+            Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                .clickable(onClick = onSettings),
+            contentAlignment = Alignment.Center,
+        ) {
             Icon(
                 painterResource(R.drawable.ic_settings),
                 contentDescription = "Settings",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(16.dp),
             )
         }
     }
 }
 
-/** Small pill tab bar, styled like the cards. */
+/** Floating Pill Dock navigation bar, matching the surface cards and 1.dp outline system. */
 @Composable
 private fun TabBar(selected: Int, onSelect: (Int) -> Unit) {
     val tabs = listOf("Listen" to R.drawable.ic_radar, "Log" to R.drawable.ic_list, "Library" to R.drawable.ic_library)
@@ -337,27 +362,33 @@ private fun TabBar(selected: Int, onSelect: (Int) -> Unit) {
         Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 10.dp)
-            .clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(4.dp),
+            .padding(horizontal = 18.dp, vertical = 10.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+            .padding(5.dp),
     ) {
         tabs.forEachIndexed { i, (label, icon) ->
             val active = i == selected
             Row(
                 Modifier
                     .weight(1f)
-                    .height(42.dp)
-                    .clip(RoundedCornerShape(50))
+                    .height(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
                     .background(if (active) MaterialTheme.colorScheme.primary else Color.Transparent)
                     .clickable { onSelect(i) },
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 val tint = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                Icon(painterResource(icon), contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+                Icon(painterResource(icon), contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(label, color = tint, style = MaterialTheme.typography.labelLarge)
+                Text(
+                    label,
+                    color = tint,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
     }

@@ -1,14 +1,15 @@
 package com.boimin.beatradar.library
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,15 +18,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -38,27 +37,91 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
+import androidx.compose.ui.unit.sp
 import com.boimin.beatradar.R
 import com.boimin.beatradar.net.SongDetail
 import com.boimin.beatradar.ui.theme.Brand
+import kotlin.math.roundToInt
 
 @Composable
 internal fun SongDetailScreen(state: DetailState, vm: LibraryViewModel, actions: LibraryActions, modifier: Modifier) {
     var reporting by remember { mutableStateOf(false) }
     val song = state.song
     Column(modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = vm::close) { Icon(painterResource(R.drawable.ic_back), contentDescription = "Back") }
+        // Top Action Bar
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                Modifier
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(50))
+                    .clickable(onClick = vm::close)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_back),
+                    contentDescription = "Back",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.width(5.dp))
+                Text(
+                    "Back",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Spacer(Modifier.weight(1f))
             if (song != null) {
-                IconButton(onClick = { actions.share(song.summary()) }) { Icon(painterResource(R.drawable.ic_share), contentDescription = "Share") }
-                IconButton(onClick = { reporting = true }) { Icon(painterResource(R.drawable.ic_flag), contentDescription = "Report") }
+                LovePillButton(song.lovedByMe, song.loveCount) {
+                    val target = !song.lovedByMe
+                    if (actions.signedIn) vm.setLoved(song.slug, target) else actions.requireSignIn { vm.setLoved(song.slug, target) }
+                }
+                Box(
+                    Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                        .clickable { actions.share(song.summary()) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_share),
+                        contentDescription = "Share",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+                Box(
+                    Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                        .clickable { reporting = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_flag),
+                        contentDescription = "Report",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
             }
         }
         when {
@@ -75,87 +138,259 @@ internal fun SongDetailScreen(state: DetailState, vm: LibraryViewModel, actions:
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SongPage(song: SongDetail, vm: LibraryViewModel, actions: LibraryActions) {
     var explain by remember { mutableStateOf(false) }
+
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 18.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (song.artworkUrl != null) {
-            AsyncImage(
-                model = song.artworkUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(180.dp).clip(RoundedCornerShape(20.dp)),
-            )
-            Spacer(Modifier.height(16.dp))
+        // Horizontal Track Hero Card
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SongArtwork(song.artworkUrl, sizeDp = 68, cornerDp = 14)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    song.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    song.artist,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                song.broughtInBy?.let { nick ->
+                    Spacer(Modifier.height(7.dp))
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                            .clickable { vm.openProfile(nick) }
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    ) {
+                        Text(
+                            "Brought in by @$nick",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
         }
-        Text(song.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
-        Text(song.artist, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(20.dp))
-        BigBpm(song.bpm, song.bpmAlt)
-        Spacer(Modifier.height(16.dp))
-        SongCounters(
-            song.listeners, song.confirmations, loves = null, labelled = true,
-            modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { explain = !explain }.padding(8.dp),
-        )
+
+        // 2-Column Bento Grid: Consensus BPM & Accuracy
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Max),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            // Consensus BPM Card
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    "CONSENSUS BPM",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    song.bpm.roundToInt().toString(),
+                    fontSize = 34.sp,
+                    lineHeight = 36.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-1.5).sp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    if (song.bpmAlt != null) "½× heard at ${song.bpmAlt.roundToInt()} BPM" else "Verified community tempo",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            // Accuracy & Confirmations Card
+            val ratio = if (song.listeners > 0) (song.confirmations.toFloat() / song.listeners).coerceIn(0f, 1f) else 0f
+            val pct = (ratio * 100).roundToInt()
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+                    .clickable { explain = !explain }
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    "ACCURACY",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        "$pct%",
+                        fontSize = 22.sp,
+                        lineHeight = 24.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (song.confirmations > 0) Brand.Success else MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "${compactCount(song.confirmations)} / ${compactCount(song.listeners)}",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth(ratio)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(Brand.Success),
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Measured within ±2 BPM",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
         if (explain) {
             Text(
                 confirmationExplainer(song.listeners, song.confirmations),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 4.dp),
             )
         }
-        Spacer(Modifier.height(16.dp))
-        LoveButton(song.lovedByMe, song.loveCount) {
-            val target = !song.lovedByMe
-            if (actions.signedIn) vm.setLoved(song.slug, target) else actions.requireSignIn { vm.setLoved(song.slug, target) }
-        }
+
+        // Open Track In Streaming Links Card
         if (song.links.isNotEmpty()) {
-            Spacer(Modifier.height(24.dp))
-            Text("Listen on", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(8.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (link in song.links.sortedBy { SERVICES.keys.indexOf(it.service) }) {
-                    OutlinedButton(onClick = { actions.openUrl(link.url) }) {
-                        Text(SERVICES[link.service] ?: link.service, maxLines = 1)
-                        if (!link.exact) {
-                            Spacer(Modifier.width(4.dp))
-                            Icon(painterResource(R.drawable.ic_search), contentDescription = "search", modifier = Modifier.size(14.dp))
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+                    .padding(14.dp),
+            ) {
+                Text(
+                    "OPEN TRACK IN",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    for (link in song.links.sortedBy { SERVICES.keys.indexOf(it.service) }) {
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp))
+                                .clickable { actions.openUrl(link.url) }
+                                .padding(vertical = 9.dp, horizontal = 6.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                "${SERVICES[link.service] ?: link.service} ↗",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
                 }
             }
         }
-        song.broughtInBy?.let { nick ->
-            Spacer(Modifier.height(20.dp))
-            Text(
-                "Brought in by $nick",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { vm.openProfile(nick) }.padding(6.dp),
-            )
-        }
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(24.dp))
     }
 }
 
-private val SERVICES = linkedMapOf("spotify" to "Spotify", "youtube" to "YouTube", "apple_music" to "Apple Music")
+private val SERVICES = linkedMapOf("spotify" to "Spotify", "apple_music" to "Apple", "youtube" to "YouTube")
 
 @Composable
-private fun LoveButton(loved: Boolean, count: Int, onClick: () -> Unit) {
-    FilledTonalButton(onClick = onClick) {
+private fun LovePillButton(loved: Boolean, count: Int, onClick: () -> Unit) {
+    val bg = if (loved) Brand.Coral.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainer
+    val border = if (loved) Brand.Coral.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outline
+    val fg = if (loved) Brand.Coral else MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        Modifier
+            .height(32.dp)
+            .clip(RoundedCornerShape(50))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Icon(
             painterResource(if (loved) R.drawable.ic_favorite else R.drawable.ic_favorite_border),
             contentDescription = if (loved) "Unlove" else "Love",
-            tint = if (loved) Brand.Coral else MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.size(20.dp),
+            tint = if (loved) Brand.Coral else fg,
+            modifier = Modifier.size(14.dp),
         )
-        Spacer(Modifier.width(8.dp))
-        Text(compactCount(count))
+        Spacer(Modifier.width(5.dp))
+        Text(
+            compactCount(count),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = fg,
+        )
     }
 }
 
@@ -192,6 +427,16 @@ private fun ReportDialog(onDismiss: () -> Unit, onSend: (String, String?) -> Uni
 @Composable
 internal fun Pill(text: String) {
     Box(
-        Modifier.clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.secondaryContainer).padding(horizontal = 10.dp, vertical = 4.dp),
-    ) { Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSecondaryContainer) }
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
 }

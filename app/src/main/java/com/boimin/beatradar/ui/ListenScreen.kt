@@ -3,7 +3,9 @@ package com.boimin.beatradar.ui
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core. FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -11,10 +13,10 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,17 +29,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RangeSlider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -51,38 +54,34 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.unit.sp
 import com.boimin.beatradar.R
-import kotlinx.coroutines.launch
 import com.boimin.beatradar.capture.MicHit
 import com.boimin.beatradar.capture.MicHits
 import com.boimin.beatradar.capture.MonitorState
 import com.boimin.beatradar.capture.MonitorStatus
 import com.boimin.beatradar.data.NameSuggestion
 import com.boimin.beatradar.data.Settings
-import com.boimin.beatradar.sync.UnnamedRules
 import com.boimin.beatradar.ui.theme.Brand
+import kotlinx.coroutines.launch
 import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -99,15 +98,17 @@ fun ListenScreen(
     onRejectSuggestion: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val inTarget = state.matched || (state.status == MonitorStatus.LISTENING && state.bpm != null && settings.rangeEnabled && settings.matches(state.bpm))
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(4.dp))
-        SourceChip(state)
+        SourceChip(state, settings, inTarget)
         Spacer(Modifier.height(8.dp))
 
         val beat = rememberBeatClock(
@@ -117,86 +118,121 @@ fun ListenScreen(
         val listening = state.status == MonitorStatus.LISTENING
         val ripples = rememberHitRipples(listening, beat)
         BeatCircle(
-            state,
-            ripples,
-            // Until a beat is found the disc kicks on every hit the mic hears; after that it keeps the beat,
-            // and the ripples leave on the same beats.
+            state = state,
+            settings = settings,
+            inTarget = inTarget,
+            ripples = ripples,
             pulse = if (listening && state.bpm != null && state.lastBeatAtMs != null) beat.pulse else ripples.kick,
             showProgress = settings.rangeEnabled && state.active,
             onToggle = if (state.active) actions.stop else actions.start,
         )
-        Spacer(Modifier.height(4.dp))
-        if (state.active && settings.rangeEnabled) {
-            VerdictLine(state, settings)
-            Spacer(Modifier.height(4.dp))
-        }
 
-        // A song logged without a name: the best moment to identify it is while it still plays.
-        val unnamed = state.title == null && state.placeholderNo != null && state.active
-        Text(
-            when {
-                state.title != null -> listOfNotNull(state.title, state.artist).joinToString(" · ")
-                unnamed -> "Song #${state.placeholderNo} · Identify"
-                state.status == MonitorStatus.LISTENING && state.bpm == null -> "Listening for a beat…"
-                state.status == MonitorStatus.PAUSED -> "Paused"
-                state.active -> " "
-                else -> "Hold the phone near the music, then tap the circle"
-            },
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (unnamed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = if (unnamed) Modifier.clickable(onClick = actions.identify) else Modifier,
+        Spacer(Modifier.height(8.dp))
+        NowPlayingCard(
+            state = state,
+            inTarget = inTarget,
+            suggestion = suggestion,
+            onAcceptSuggestion = onAcceptSuggestion,
+            onRejectSuggestion = onRejectSuggestion,
+            actions = actions,
         )
-        if (unnamed && suggestion != null) {
-            // Same line of the layout, just below: answer while the song still plays.
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    UnnamedRules.question(suggestion),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                TextButton(onClick = onAcceptSuggestion) { Text("Yes") }
-                TextButton(onClick = onRejectSuggestion) { Text("No") }
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-
-
-        if (state.active) {
-            Controls(state, actions)
-            Spacer(Modifier.height(16.dp))
-        }
+        Spacer(Modifier.height(10.dp))
         RangeCard(settings, onSettingsChange)
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
     }
 }
 
-/** Where the sound comes from: always the mic; mention the app if this phone is the one playing. */
+/** Minimalist status pill with animated 3-bar equalizer and live target verdict. */
 @Composable
-private fun SourceChip(state: MonitorState) {
-    val detail = when {
-        !state.active -> null
-        state.phoneApp != null -> "hearing ${state.phoneApp} on this phone"
-        else -> "hearing music around you"
+private fun SourceChip(state: MonitorState, settings: Settings, inTarget: Boolean) {
+    val listening = state.status == MonitorStatus.LISTENING
+    val accentColor = if (inTarget) Brand.Coral else MaterialTheme.colorScheme.primary
+    val sourceText = when {
+        !state.active -> "Ambient Mic Ready"
+        state.phoneApp != null -> "Phone · ${state.phoneApp}"
+        else -> "Ambient Mic"
     }
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    val verdictText = when {
+        !state.active || !settings.rangeEnabled || state.bpm == null -> null
+        state.matched || settings.matches(state.bpm) -> "IN TARGET"
+        else -> "OUT OF RANGE"
+    }
+
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(Modifier.padding(horizontal = 14.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(painterResource(R.drawable.ic_mic), contentDescription = null, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(
-                if (detail == null) "Microphone" else "Microphone · $detail",
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        if (listening) {
+            EqualizerBars(color = accentColor)
+        } else {
+            Icon(
+                painterResource(R.drawable.ic_mic),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(14.dp),
+            )
+        }
+        Spacer(Modifier.width(7.dp))
+        Text(
+            buildAnnotatedString {
+                append(sourceText)
+                if (verdictText != null) {
+                    append(" · ")
+                    withStyle(
+                        SpanStyle(
+                            color = if (inTarget) Brand.Coral else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Bold,
+                        ),
+                    ) {
+                        append(verdictText)
+                    }
+                }
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun EqualizerBars(color: Color) {
+    val transition = rememberInfiniteTransition(label = "eq")
+    val h1 by transition.animateFloat(
+        initialValue = 4f,
+        targetValue = 11f,
+        animationSpec = infiniteRepeatable(tween(420, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "eq1",
+    )
+    val h2 by transition.animateFloat(
+        initialValue = 11f,
+        targetValue = 4f,
+        animationSpec = infiniteRepeatable(tween(360, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "eq2",
+    )
+    val h3 by transition.animateFloat(
+        initialValue = 6f,
+        targetValue = 12f,
+        animationSpec = infiniteRepeatable(tween(480, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "eq3",
+    )
+    Row(
+        Modifier.height(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        for (h in listOf(h1, h2, h3)) {
+            Box(
+                Modifier
+                    .width(2.5.dp)
+                    .height(h.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(color),
             )
         }
     }
@@ -217,7 +253,6 @@ private class BeatClock {
 @Composable
 private fun rememberBeatClock(bpm: Float?, lastBeatAtMs: Long?): BeatClock {
     val clock = remember { BeatClock() }
-    // Plain holder (not Compose state): updated while composing, read by the effect below.
     val grid = remember { LongArray(1) { NO_ANCHOR } }
 
     if (bpm != null && lastBeatAtMs != null) {
@@ -260,61 +295,127 @@ private fun rememberBeatClock(bpm: Float?, lastBeatAtMs: Long?): BeatClock {
 private const val NO_ANCHOR = Long.MIN_VALUE
 
 /**
- * The live BPM inside a circle that pulses on each beat; tapping it turns the microphone on and off.
- * While the tempo holds inside the target range, the circle's own rim fills clockwise from the top;
- * on a match the whole disc turns coral.
+ * Precision Sonar Dial: smooth concentric rings, high-contrast circular progress arc, and tactile center dial.
  */
 @Composable
-private fun BeatCircle(state: MonitorState, ripples: HitRipples, pulse: Float, showProgress: Boolean, onToggle: () -> Unit) {
+private fun BeatCircle(
+    state: MonitorState,
+    settings: Settings,
+    inTarget: Boolean,
+    ripples: HitRipples,
+    pulse: Float,
+    showProgress: Boolean,
+    onToggle: () -> Unit,
+) {
     val listening = state.status == MonitorStatus.LISTENING
     val accent by animateColorAsState(
-        if (state.matched) Brand.Coral else MaterialTheme.colorScheme.primary,
+        if (inTarget) Brand.Coral else MaterialTheme.colorScheme.primary,
         label = "accent",
     )
-    val onAccent = if (state.matched) Brand.OnCoral else MaterialTheme.colorScheme.onPrimary
-    val progress by animateFloatAsState(if (showProgress) state.matchProgress else 0f, tween(450), label = "progress")
-    // A quick first guess shows dimmed until the reading settles.
-    val numberAlpha by animateFloatAsState(if (state.bpmSettled) 1f else 0.55f, tween(400), label = "settled")
+    val progress by animateFloatAsState(
+        targetValue = when {
+            !showProgress -> 0f
+            state.matched -> 1f
+            else -> state.matchProgress
+        },
+        animationSpec = tween(400),
+        label = "progress",
+    )
+    val numberAlpha by animateFloatAsState(if (state.bpmSettled) 1f else 0.6f, tween(350), label = "settled")
 
     Box(
         Modifier
             .fillMaxWidth()
-            .aspectRatio(1f),
+            .height(226.dp),
         contentAlignment = Alignment.Center,
     ) {
-        if (listening) MicRipple(accent)
-        if (listening) HitRippleCanvas(ripples, accent)
-        // Disc and rim pulse together, so the progress reads as part of the BPM display.
+        if (listening) SonarRings(accent)
+        if (listening) SmoothHitRipples(ripples, accent)
+
         Box(
             Modifier
-                .size(212.dp)
-                .scale(1f + 0.05f * pulse),
+                .size(196.dp)
+                .scale(1f + 0.04f * pulse),
             contentAlignment = Alignment.Center,
         ) {
-            if (showProgress) ProgressZigzag(progress, pulse, accent)
+            ProgressArc(
+                progress = if (showProgress) progress else if (listening && state.bpm != null) 0.72f else 0f,
+                accent = accent,
+                trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
+            )
+            val borderColor = when {
+                inTarget -> Brand.Coral
+                state.active -> MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                else -> MaterialTheme.colorScheme.outline
+            }
             Surface(
                 onClick = onToggle,
                 shape = CircleShape,
-                color = if (state.active) accent else MaterialTheme.colorScheme.surfaceContainerHigh,
-                contentColor = if (state.active) onAccent else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(172.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .size(164.dp)
+                    .border(2.dp, borderColor, CircleShape),
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    when {
-                        state.bpm != null && listening -> {
-                            Text(
-                                state.bpm.roundToInt().toString(),
-                                style = MaterialTheme.typography.displayLarge,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.alpha(numberAlpha),
-                            )
-                            Text("BPM", style = MaterialTheme.typography.titleMedium)
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    if (state.active) accent.copy(alpha = 0.14f) else Color.Transparent,
+                                    Color.Transparent,
+                                ),
+                            ),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        when {
+                            state.bpm != null && listening -> {
+                                Text(
+                                    "BPM",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.5.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Text(
+                                    state.bpm.roundToInt().toString(),
+                                    fontSize = 50.sp,
+                                    lineHeight = 52.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = (-2).sp,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.alpha(numberAlpha),
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                DialStatusBadge(state, settings, inTarget)
+                            }
+                            else -> {
+                                Icon(
+                                    painterResource(R.drawable.ic_mic),
+                                    contentDescription = if (state.active) "Stop listening" else "Start listening",
+                                    tint = if (state.active) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(38.dp),
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    when (state.status) {
+                                        MonitorStatus.LISTENING -> "LISTENING…"
+                                        MonitorStatus.PAUSED -> "PAUSED"
+                                        else -> "TAP TO LISTEN"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp,
+                                    color = if (state.active) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
-                        else -> Icon(
-                            painterResource(R.drawable.ic_mic),
-                            contentDescription = if (state.active) "Stop listening" else "Start listening",
-                            modifier = Modifier.size(56.dp),
-                        )
                     }
                 }
             }
@@ -322,18 +423,92 @@ private fun BeatCircle(state: MonitorState, ripples: HitRipples, pulse: Float, s
     }
 }
 
-/**
- * Ripples on their way out. Until a beat is found, every hit the mic hears sends one; once the beat clock
- * runs, one leaves on each beat, together with the disc's pulse, sized by how hard the song has been hitting.
- * [kick] is a quick bump on the latest hit, for the disc while there is no beat yet.
- */
+@Composable
+private fun DialStatusBadge(state: MonitorState, settings: Settings, inTarget: Boolean) {
+    val seconds = (state.matchProgress * 10).toInt()
+    val (label, bg, fg) = when {
+        state.matched && state.alreadyListed -> Triple(
+            "✓ In Log · 10s",
+            Brand.Coral.copy(alpha = 0.16f),
+            Brand.Coral,
+        )
+        state.matched -> Triple(
+            "✓ Saved · 10s",
+            Brand.Coral.copy(alpha = 0.16f),
+            Brand.Coral,
+        )
+        inTarget -> Triple(
+            "Hold ${seconds}s / 10s",
+            Brand.Coral.copy(alpha = 0.16f),
+            Brand.Coral,
+        )
+        settings.rangeEnabled -> Triple(
+            "Target ${settings.minBpm}–${settings.maxBpm}",
+            MaterialTheme.colorScheme.surfaceContainerHigh,
+            MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        state.bpmSettled -> Triple(
+            "Locked",
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+            MaterialTheme.colorScheme.primary,
+        )
+        else -> Triple(
+            "Measuring…",
+            MaterialTheme.colorScheme.surfaceContainerHigh,
+            MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(bg)
+            .padding(horizontal = 9.dp, vertical = 3.dp),
+    ) {
+        Text(
+            label,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = fg,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun ProgressArc(progress: Float, accent: Color, trackColor: Color) {
+    Canvas(Modifier.fillMaxSize()) {
+        val strokeWidth = 4.dp.toPx()
+        val radius = 89.dp.toPx()
+        val arcTopLeft = Offset(center.x - radius, center.y - radius)
+        val arcSize = Size(radius * 2, radius * 2)
+        drawArc(
+            color = trackColor,
+            startAngle = 0f,
+            sweepAngle = 360f,
+            useCenter = false,
+            topLeft = arcTopLeft,
+            size = arcSize,
+            style = Stroke(width = strokeWidth),
+        )
+        if (progress > 0f) {
+            drawArc(
+                color = accent,
+                startAngle = -90f,
+                sweepAngle = 360f * progress.coerceIn(0f, 1f),
+                useCenter = false,
+                topLeft = arcTopLeft,
+                size = arcSize,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+            )
+        }
+    }
+}
+
 private class HitRipples {
     val startMs = LongArray(MAX_RIPPLES) { Long.MIN_VALUE / 2 }
     val strength = FloatArray(MAX_RIPPLES)
     private var next = 0
-    /** How hard recent hits were, for sizing the ripples that follow the beat. */
     private var loudness = 0.7f
-    /** The frame clock, so drawing reads it and redraws every frame while listening. */
     var nowMs by mutableLongStateOf(SystemClock.elapsedRealtime())
 
     fun onHit(hit: MicHit, beatFound: Boolean) {
@@ -374,8 +549,6 @@ private fun rememberHitRipples(listening: Boolean, beat: BeatClock): HitRipples 
             val anchor = beat.anchorMs
             val period = beat.periodMs
             if (anchor != null && period > 0) {
-                // A ripple on each beat of the same grid the disc pulses on. When the grid re-locks,
-                // skip a beat that would land right after the last ripple.
                 val k = floor((now - anchor) / period).toLong()
                 if (k != lastBeat) {
                     val at = anchor + (k * period).toLong()
@@ -393,38 +566,36 @@ private fun rememberHitRipples(listening: Boolean, beat: BeatClock): HitRipples 
     return ripples
 }
 
-/**
- * A shockwave for every ripple in [ripples], sized by its strength: a glow that brightens toward a jagged
- * front, rolling out past the screen edges and smoothing as it spreads. Overlapping hits overlap their waves.
- */
+/** Smooth concentric beat shockwaves expanding cleanly from the sonar dial. */
 @Composable
-private fun HitRippleCanvas(ripples: HitRipples, accent: Color) {
-    val front = remember { Path() }
+private fun SmoothHitRipples(ripples: HitRipples, accent: Color) {
     Canvas(Modifier.fillMaxSize()) {
         val now = ripples.nowMs
-        val inner = 106.dp.toPx()
-        val outer = size.minDimension / 2 + 24.dp.toPx()
-        val glow = 44.dp.toPx()
+        val inner = 84.dp.toPx()
+        val outer = size.minDimension / 2 + 16.dp.toPx()
+        val glow = 32.dp.toPx()
         for (i in 0 until MAX_RIPPLES) {
             val t = (now - ripples.startMs[i]) / RIPPLE_MS
             if (t !in 0f..1f) continue
             val s = ripples.strength[i]
             val fade = 1f - t
-            // Leaves the disc fast and eases off as it spreads.
             val travel = 1f - fade * fade
             val r = inner + (outer - inner) * travel
             drawCircle(
                 Brush.radialGradient(
                     0f to Color.Transparent,
                     ((r - glow) / r).coerceAtLeast(0f) to Color.Transparent,
-                    1f to accent.copy(alpha = 0.4f * s * fade),
+                    1f to accent.copy(alpha = 0.25f * s * fade),
                     center = center,
                     radius = r,
                 ),
                 radius = r,
             )
-            zigzag(front, center, r, 0f, 360f, toothDeg = 360f / 24, amp = 9.dp.toPx() * s * fade, phase = travel * 2)
-            drawPath(front, accent.copy(alpha = 0.85f * s * fade), style = Stroke(3.dp.toPx(), join = StrokeJoin.Round))
+            drawCircle(
+                color = accent.copy(alpha = 0.55f * s * fade),
+                radius = r,
+                style = Stroke(width = 1.5.dp.toPx()),
+            )
         }
     }
 }
@@ -433,258 +604,400 @@ private const val MAX_RIPPLES = 8
 private const val RIPPLE_MS = 1_100f
 private const val KICK_MS = 220f
 
-/**
- * The 10 s progress as a zigzag drawn clockwise from the top, with a flat track for the rest. The teeth
- * kick taller on every beat and crawl slowly around, so the ring keeps time with the music.
- */
 @Composable
-private fun ProgressZigzag(progress: Float, pulse: Float, accent: Color) {
-    val crawl by rememberInfiniteTransition(label = "zigzag").animateFloat(
-        initialValue = 0f,
-        targetValue = 2f,
-        animationSpec = infiniteRepeatable(tween(1_200, easing = LinearEasing)),
-        label = "zigzagCrawl",
-    )
-    val path = remember { Path() }
-    Canvas(Modifier.fillMaxSize()) {
-        val width = 4.dp.toPx()
-        val radius = 97.dp.toPx()
-        val sweep = 360f * progress
-        val gap = if (progress > 0f) 8f else 0f
-        val track = 360f - sweep - 2 * gap
-        if (track > 0f) {
-            drawArc(
-                color = accent.copy(alpha = 0.25f),
-                startAngle = -90f + sweep + gap,
-                sweepAngle = track,
-                useCenter = false,
-                topLeft = Offset(center.x - radius, center.y - radius),
-                size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
-                style = Stroke(width, cap = StrokeCap.Round),
-            )
-        }
-        if (sweep > 0f) {
-            val amp = 2.5.dp.toPx() + 3.5.dp.toPx() * pulse
-            zigzag(path, center, radius, -90f, sweep, toothDeg = 9f, amp = amp, phase = crawl, taperDeg = 10f)
-            drawPath(path, accent, style = Stroke(width, cap = StrokeCap.Round, join = StrokeJoin.Round))
-        }
-    }
-}
-
-/**
- * Fills [path] with a zigzag following a circle arc: sharp teeth of [amp] either side of [radius], one
- * every [toothDeg]. [phase] slides the teeth clockwise (2 = one whole tooth); [taperDeg] flattens the ends.
- */
-private fun zigzag(
-    path: Path,
-    center: Offset,
-    radius: Float,
-    startDeg: Float,
-    sweepDeg: Float,
-    toothDeg: Float,
-    amp: Float,
-    phase: Float,
-    taperDeg: Float = 0f,
-) {
-    path.reset()
-    val half = toothDeg / 2
-    // Position along the zigzag in half-teeth: whole numbers are the tips, alternating out and in.
-    fun valueAt(u: Float): Float {
-        val k = floor(u)
-        val out = (k.toInt() % 2 + 2) % 2 == 0
-        return (if (out) 1f else -1f) * (1 - 2 * (u - k))
-    }
-    fun point(deg: Float, value: Float, first: Boolean) {
-        val along = deg - startDeg
-        val taper = if (taperDeg > 0f) minOf(1f, along / taperDeg, (sweepDeg - along) / taperDeg).coerceAtLeast(0f) else 1f
-        val r = radius + amp * taper * value
-        val a = Math.toRadians(deg.toDouble())
-        val x = center.x + r * kotlin.math.cos(a).toFloat()
-        val y = center.y + r * kotlin.math.sin(a).toFloat()
-        if (first) path.moveTo(x, y) else path.lineTo(x, y)
-    }
-    val endDeg = startDeg + sweepDeg
-    val u0 = startDeg / half - phase
-    val u1 = endDeg / half - phase
-    point(startDeg, valueAt(u0), first = true)
-    var k = floor(u0) + 1
-    while (k < u1) {
-        point((k + phase) * half, if ((k.toInt() % 2 + 2) % 2 == 0) 1f else -1f, first = false)
-        k += 1
-    }
-    point(endDeg, valueAt(u1), first = false)
-}
-
-/**
- * A calm, even ripple that rolls out of the disc for as long as the mic is on, whether or not a beat
- * is heard yet: three thin rings, evenly spaced, fading as they spread.
- */
-@Composable
-private fun MicRipple(accent: Color) {
-    val travel by rememberInfiniteTransition(label = "mic").animateFloat(
+private fun SonarRings(accent: Color) {
+    val travel by rememberInfiniteTransition(label = "sonar").animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(MIC_RIPPLE_MS, easing = LinearEasing)),
-        label = "micTravel",
+        animationSpec = infiniteRepeatable(tween(SONAR_RIPPLE_MS, easing = LinearEasing)),
+        label = "sonarTravel",
     )
     Canvas(Modifier.fillMaxSize()) {
-        val inner = 110.dp.toPx()
-        val outer = size.minDimension / 2 + 24.dp.toPx()
-        for (i in 0 until MIC_RINGS) {
-            val t = (travel + i.toFloat() / MIC_RINGS) % 1f
+        val inner = 86.dp.toPx()
+        val outer = size.minDimension / 2 + 12.dp.toPx()
+        for (i in 0 until SONAR_RINGS) {
+            val t = (travel + i.toFloat() / SONAR_RINGS) % 1f
             drawCircle(
-                accent.copy(alpha = 0.6f * (1f - t)),
+                accent.copy(alpha = 0.35f * (1f - t)),
                 radius = inner + (outer - inner) * t,
-                style = Stroke(2.dp.toPx()),
+                style = Stroke(1.2.dp.toPx()),
             )
         }
     }
 }
 
-private const val MIC_RIPPLE_MS = 3_600
-private const val MIC_RINGS = 3
+private const val SONAR_RIPPLE_MS = 3_400
+private const val SONAR_RINGS = 2
 
-/** One line explaining the ring: counting, out of range, or the verdict. */
+/**
+ * Unified Now Playing & Crowd Suggestion card below the dial.
+ */
 @Composable
-private fun VerdictLine(state: MonitorState, settings: Settings) {
-    val bpm = state.bpm
-    val target = "${settings.minBpm}–${settings.maxBpm} BPM"
-    val seconds = (state.matchProgress * 10).toInt()
-    val text = when {
-        state.matched && state.alreadyListed -> "Already in your list · $target"
-        state.matched -> "Match! Stayed in $target for 10 s"
-        state.status != MonitorStatus.LISTENING || bpm == null -> "Target $target"
-        settings.matches(bpm) -> "In range · hold it, $seconds of 10 s"
-        else -> "Out of range · target $target"
+private fun NowPlayingCard(
+    state: MonitorState,
+    inTarget: Boolean,
+    suggestion: NameSuggestion?,
+    onAcceptSuggestion: () -> Unit,
+    onRejectSuggestion: () -> Unit,
+    actions: AppActions,
+) {
+    val unnamed = state.title == null && state.placeholderNo != null && state.active
+    val titleText = when {
+        state.title != null -> state.title
+        unnamed -> "Unnamed Track #${state.placeholderNo}"
+        state.status == MonitorStatus.LISTENING -> "Listening for a beat…"
+        state.status == MonitorStatus.PAUSED -> "Monitoring paused"
+        else -> "Ready to detect tempo"
     }
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = if (state.matched) FontWeight.SemiBold else FontWeight.Medium,
-        color = if (state.matched || (bpm != null && settings.matches(bpm))) Brand.Coral else MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center,
-    )
+    val subText = when {
+        state.title != null -> listOfNotNull(state.artist, state.phoneApp ?: "Ambient").joinToString(" · ")
+        unnamed -> "Tap ID to Shazam or accept crowd match"
+        state.active && state.phoneApp != null -> "Hearing ${state.phoneApp} on this phone"
+        state.active -> "Hearing music around you"
+        else -> "Hold phone near the music and tap the dial"
+    }
+    val iconBg = when {
+        inTarget -> Brand.Coral.copy(alpha = 0.15f)
+        state.active -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    val iconTint = when {
+        inTarget -> Brand.Coral
+        state.active -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+            .padding(12.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(iconBg),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painterResource(if (state.title != null) R.drawable.ic_speaker else R.drawable.ic_radar),
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(
+                Modifier
+                    .weight(1f)
+                    .then(if (unnamed) Modifier.clickable(onClick = actions.identify) else Modifier),
+            ) {
+                Text(
+                    titleText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    subText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (state.active) {
+                Spacer(Modifier.width(8.dp))
+                val paused = state.status == MonitorStatus.PAUSED
+                Row(
+                    Modifier
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(9.dp))
+                        .clickable(onClick = if (paused) actions.resume else actions.pause)
+                        .padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        painterResource(if (paused) R.drawable.ic_play else R.drawable.ic_pause),
+                        contentDescription = if (paused) "Resume" else "Pause",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(13.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        if (paused) "Resume" else "Pause",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                Spacer(Modifier.width(6.dp))
+                Row(
+                    Modifier
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                        .clickable(onClick = actions.identify)
+                        .padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_search),
+                        contentDescription = "Identify with Shazam",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(13.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "ID",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+        }
+
+        if (unnamed && suggestion != null) {
+            Spacer(Modifier.height(9.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val label = buildString {
+                    append(suggestion.title)
+                    if (suggestion.artist.isNotBlank()) append(" · ${suggestion.artist}")
+                    append("?")
+                }
+                Text(
+                    buildAnnotatedString {
+                        append("Crowd match: ")
+                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)) {
+                            append(label)
+                        }
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Brand.Success.copy(alpha = 0.15f))
+                        .clickable(onClick = onAcceptSuggestion)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text("Yes", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Brand.Success)
+                }
+                Spacer(Modifier.width(4.dp))
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .clickable(onClick = onRejectSuggestion)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text("No", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
 }
 
-/** Pause and Identify while listening; starting and stopping is the circle itself. */
-@Composable
-private fun Controls(state: MonitorState, actions: AppActions) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-        val paused = state.status == MonitorStatus.PAUSED
-        OutlinedButton(onClick = if (paused) actions.resume else actions.pause, modifier = Modifier.weight(1f)) {
-            Icon(painterResource(if (paused) R.drawable.ic_play else R.drawable.ic_pause), null, Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(if (paused) "Resume" else "Pause")
-        }
-        OutlinedButton(onClick = actions.identify, modifier = Modifier.weight(1f)) {
-            Icon(painterResource(R.drawable.ic_search), null, Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Identify")
-        }
-    }
-}
+private data class TempoPreset(val label: String, val min: Int, val max: Int)
+
+private val TEMPO_PRESETS = listOf(
+    TempoPreset("Groove 95–110", 95, 110),
+    TempoPreset("House 120–132", 120, 132),
+    TempoPreset("Run 155–175", 155, 175),
+)
 
 @Composable
 private fun RangeCard(settings: Settings, onSettingsChange: ((Settings) -> Settings) -> Unit) {
-    // Local state while dragging; persisted once the finger lifts.
     var range by remember(settings.minBpm, settings.maxBpm) {
         mutableStateOf(settings.minBpm.toFloat()..settings.maxBpm.toFloat())
     }
-    Card(
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-        modifier = Modifier.fillMaxWidth(),
+    var showCustomDialog by remember { mutableStateOf(false) }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+            .padding(14.dp),
     ) {
-        Column(Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Find a BPM range", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        if (settings.rangeEnabled) "Vibrates after 10 s inside the range" else "Off — every song's BPM is just logged",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(
-                    checked = settings.rangeEnabled,
-                    onCheckedChange = { on -> onSettingsChange { it.copy(rangeEnabled = on) } },
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Target Range",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    if (settings.rangeEnabled) "Vibrates after 10s in target" else "Off — logging all tempos",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            AnimatedVisibility(settings.rangeEnabled) {
-                Column {
-                    Spacer(Modifier.height(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        BpmField(
-                            value = range.start.roundToInt(),
-                            label = "Min BPM",
-                            onCommit = { v ->
-                                val lo = v.coerceIn(Settings.BPM_FLOOR, settings.maxBpm)
-                                onSettingsChange { it.copy(minBpm = lo) }
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text(
-                            "–",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 14.dp),
-                        )
-                        BpmField(
-                            value = range.endInclusive.roundToInt(),
-                            label = "Max BPM",
-                            onCommit = { v ->
-                                val hi = v.coerceIn(settings.minBpm, Settings.BPM_CEILING)
-                                onSettingsChange { it.copy(maxBpm = hi) }
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    RangeSlider(
-                        value = range,
-                        onValueChange = { range = it },
-                        valueRange = Settings.BPM_FLOOR.toFloat()..Settings.BPM_CEILING.toFloat(),
-                        steps = Settings.BPM_CEILING - Settings.BPM_FLOOR - 1,
-                        onValueChangeFinished = {
-                            val lo = range.start.roundToInt()
-                            val hi = range.endInclusive.roundToInt()
-                            onSettingsChange { it.copy(minBpm = lo, maxBpm = hi) }
-                        },
+            if (settings.rangeEnabled) {
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Brand.Coral.copy(alpha = 0.14f))
+                        .clickable { showCustomDialog = true }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        "${range.start.roundToInt()} – ${range.endInclusive.roundToInt()} BPM",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Brand.Coral,
                     )
-                    Row {
-                        Text("${Settings.BPM_FLOOR}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.weight(1f))
-                        Text("${Settings.BPM_CEILING}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(Modifier.width(8.dp))
+            }
+            Switch(
+                checked = settings.rangeEnabled,
+                onCheckedChange = { on -> onSettingsChange { it.copy(rangeEnabled = on) } },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                ),
+            )
+        }
+        AnimatedVisibility(settings.rangeEnabled) {
+            Column {
+                Spacer(Modifier.height(6.dp))
+                RangeSlider(
+                    value = range,
+                    onValueChange = { range = it },
+                    valueRange = Settings.BPM_FLOOR.toFloat()..Settings.BPM_CEILING.toFloat(),
+                    steps = Settings.BPM_CEILING - Settings.BPM_FLOOR - 1,
+                    onValueChangeFinished = {
+                        val lo = range.start.roundToInt()
+                        val hi = range.endInclusive.roundToInt()
+                        onSettingsChange { it.copy(minBpm = lo, maxBpm = hi) }
+                    },
+                    colors = SliderDefaults.colors(
+                        thumbColor = Brand.Coral,
+                        activeTrackColor = Brand.Coral,
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ),
+                )
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    val curMin = range.start.roundToInt()
+                    val curMax = range.endInclusive.roundToInt()
+                    TEMPO_PRESETS.forEach { preset ->
+                        val active = curMin == preset.min && curMax == preset.max
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                    else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                )
+                                .border(
+                                    1.dp,
+                                    if (active) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    RoundedCornerShape(8.dp),
+                                )
+                                .clickable {
+                                    range = preset.min.toFloat()..preset.max.toFloat()
+                                    onSettingsChange { it.copy(minBpm = preset.min, maxBpm = preset.max) }
+                                }
+                                .padding(vertical = 6.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                preset.label,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }
         }
     }
+
+    if (showCustomDialog) {
+        CustomRangeDialog(
+            minBpm = settings.minBpm,
+            maxBpm = settings.maxBpm,
+            onDismiss = { showCustomDialog = false },
+            onSave = { lo, hi ->
+                showCustomDialog = false
+                range = lo.toFloat()..hi.toFloat()
+                onSettingsChange { it.copy(minBpm = lo, maxBpm = hi) }
+            },
+        )
+    }
 }
 
-/** A small number box. Applies the typed value on Done or when focus leaves; shows the slider's value otherwise. */
 @Composable
-private fun BpmField(value: Int, label: String, onCommit: (Int) -> Unit, modifier: Modifier = Modifier) {
-    var text by remember(value) { mutableStateOf(value.toString()) }
-    var focused by remember { mutableStateOf(false) }
-    val focus = LocalFocusManager.current
-    fun commit() {
-        val typed = text.toIntOrNull()
-        if (typed != null && typed != value) onCommit(typed) else text = value.toString()
-    }
-    OutlinedTextField(
-        value = text,
-        onValueChange = { new -> if (new.length <= 3 && new.all(Char::isDigit)) text = new },
-        label = { Text(label) },
-        singleLine = true,
-        textStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
-        shape = RoundedCornerShape(16.dp),
-        modifier = modifier
-            .onFocusChanged { f ->
-                if (focused && !f.isFocused) commit()
-                focused = f.isFocused
-            },
+private fun CustomRangeDialog(minBpm: Int, maxBpm: Int, onDismiss: () -> Unit, onSave: (Int, Int) -> Unit) {
+    var minText by remember { mutableStateOf(minBpm.toString()) }
+    var maxText by remember { mutableStateOf(maxBpm.toString()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Custom BPM Range") },
+        text = {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = minText,
+                    onValueChange = { if (it.length <= 3 && it.all(Char::isDigit)) minText = it },
+                    label = { Text("Min BPM") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = maxText,
+                    onValueChange = { if (it.length <= 3 && it.all(Char::isDigit)) maxText = it },
+                    label = { Text("Max BPM") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val a = (minText.toIntOrNull() ?: minBpm).coerceIn(Settings.BPM_FLOOR, Settings.BPM_CEILING)
+                    val b = (maxText.toIntOrNull() ?: maxBpm).coerceIn(Settings.BPM_FLOOR, Settings.BPM_CEILING)
+                    onSave(minOf(a, b), maxOf(a, b))
+                },
+            ) { Text("Apply") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

@@ -26,8 +26,8 @@ import java.util.Locale
  */
 @Composable
 fun SongCounters(listeners: Int, confirmations: Int, loves: Int?, labelled: Boolean = false, modifier: Modifier = Modifier) {
-    val iconSize = if (labelled) 20.dp else 15.dp
-    val style = if (labelled) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.labelMedium
+    val iconSize = if (labelled) 18.dp else 13.dp
+    val style = if (labelled) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.labelSmall
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     val description = buildString {
         append("$listeners ${if (listeners == 1) "person" else "people"} measured it, $confirmations confirmed")
@@ -35,19 +35,30 @@ fun SongCounters(listeners: Int, confirmations: Int, loves: Int?, labelled: Bool
     }
     Row(
         modifier.semantics(mergeDescendants = true) { contentDescription = description },
-        horizontalArrangement = Arrangement.spacedBy(if (labelled) 16.dp else 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (labelled) 14.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Counter(R.drawable.ic_groups, compactCount(listeners), if (labelled) "submitted" else null, muted, iconSize, style)
+        if (labelled) {
+            Counter(R.drawable.ic_groups, compactCount(listeners), "submitted", muted, iconSize, style)
+        }
         Counter(
             if (confirmations > 0) R.drawable.ic_verified else R.drawable.ic_verified_outline,
             compactCount(confirmations),
             if (labelled) "confirmed" else null,
-            if (confirmations > 0) MaterialTheme.colorScheme.primary else muted,
+            if (confirmations > 0) Brand.Success else muted,
             iconSize,
             style,
         )
-        if (loves != null) Counter(R.drawable.ic_favorite, compactCount(loves), null, if (loves > 0) Brand.Coral else muted, iconSize, style)
+        if (loves != null) {
+            Counter(
+                R.drawable.ic_favorite,
+                compactCount(loves),
+                null,
+                if (loves > 0) Brand.Coral else muted,
+                iconSize,
+                style,
+            )
+        }
     }
 }
 
@@ -55,7 +66,7 @@ fun SongCounters(listeners: Int, confirmations: Int, loves: Int?, labelled: Bool
 private fun Counter(icon: Int, value: String, label: String?, tint: Color, size: androidx.compose.ui.unit.Dp, style: androidx.compose.ui.text.TextStyle) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(painterResource(icon), contentDescription = null, tint = tint, modifier = Modifier.size(size))
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(3.dp))
         Text(if (label != null) "$value $label" else value, style = style, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

@@ -18,39 +18,64 @@ import com.boimin.beatradar.data.ThemeMode
 
 object Brand {
     val Indigo = Color(0xFF3D2C8D)
-    /** The "in range" highlight, identical in light and dark. */
+    /** Electric Violet primary accent in dark mode, Electric Indigo in light mode. */
+    val Violet = Color(0xFF7C6CF6)
+    /** The "in range" & streak highlight, identical in light and dark. */
     val Coral = Color(0xFFFF5A5F)
     val OnCoral = Color.White
+    val Success = Color(0xFF10B981)
 }
 
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF5140B8),
+    primary = Color(0xFF5846E0),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFE5DEFF),
-    onPrimaryContainer = Color(0xFF170965),
-    secondary = Color(0xFF5F5C71),
-    secondaryContainer = Color(0xFFE5DFF9),
-    onSecondaryContainer = Color(0xFF1C192B),
-    tertiary = Color(0xFFB3272F),
-    background = Color(0xFFFCF8FF),
-    surface = Color(0xFFFCF8FF),
-    surfaceContainer = Color(0xFFF1ECF8),
-    surfaceContainerHigh = Color(0xFFEBE6F3),
+    primaryContainer = Color(0xFFEAE7FF),
+    onPrimaryContainer = Color(0xFF1E1466),
+    secondary = Color(0xFF656578),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFEFEFF7),
+    onSecondaryContainer = Color(0xFF111118),
+    tertiary = Brand.Coral,
+    onTertiary = Color.White,
+    background = Color(0xFFF7F7FB),
+    onBackground = Color(0xFF111118),
+    surface = Color(0xFFF7F7FB),
+    onSurface = Color(0xFF111118),
+    surfaceVariant = Color(0xFFEFEFF7),
+    onSurfaceVariant = Color(0xFF656578),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFFFFFFF),
+    surfaceContainer = Color(0xFFFFFFFF),
+    surfaceContainerHigh = Color(0xFFEFEFF7),
+    surfaceContainerHighest = Color(0xFFE2E2EE),
+    outline = Color(0xFFE2E2EE),
+    outlineVariant = Color(0xFFE8E8F2),
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFC8BFFF),
-    onPrimary = Color(0xFF29148A),
-    primaryContainer = Brand.Indigo,
+    primary = Color(0xFF7C6CF6),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFF231F42),
     onPrimaryContainer = Color(0xFFE5DEFF),
-    secondary = Color(0xFFC9C3DC),
-    secondaryContainer = Color(0xFF474459),
-    onSecondaryContainer = Color(0xFFE5DFF9),
-    tertiary = Color(0xFFFFB3B0),
-    background = Color(0xFF131218),
-    surface = Color(0xFF131218),
-    surfaceContainer = Color(0xFF1F1E25),
-    surfaceContainerHigh = Color(0xFF2A2830),
+    secondary = Color(0xFF8E8EA0),
+    onSecondary = Color(0xFF0B0B10),
+    secondaryContainer = Color(0xFF1D1D2B),
+    onSecondaryContainer = Color(0xFFF4F4F8),
+    tertiary = Brand.Coral,
+    onTertiary = Color.White,
+    background = Color(0xFF0B0B10),
+    onBackground = Color(0xFFF4F4F8),
+    surface = Color(0xFF0B0B10),
+    onSurface = Color(0xFFF4F4F8),
+    surfaceVariant = Color(0xFF1D1D2B),
+    onSurfaceVariant = Color(0xFF8E8EA0),
+    surfaceContainerLowest = Color(0xFF0B0B10),
+    surfaceContainerLow = Color(0xFF111119),
+    surfaceContainer = Color(0xFF14141D),
+    surfaceContainerHigh = Color(0xFF1D1D2B),
+    surfaceContainerHighest = Color(0xFF262636),
+    outline = Color(0xFF262636),
+    outlineVariant = Color(0xFF1F1F2E),
 )
 
 @Composable
@@ -60,12 +85,7 @@ fun BeatRadarTheme(mode: ThemeMode, content: @Composable () -> Unit) {
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
     }
-    val context = LocalContext.current
-    val colors = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        dark -> DarkColors
-        else -> LightColors
-    }
+    val colors = if (dark) DarkColors else LightColors
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {

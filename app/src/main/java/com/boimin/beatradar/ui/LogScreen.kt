@@ -2,9 +2,9 @@ package com.boimin.beatradar.ui
 
 import android.text.format.DateUtils
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,22 +19,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,15 +42,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.boimin.beatradar.R
 import com.boimin.beatradar.data.BeatLogEntry
-import com.boimin.beatradar.sync.UnnamedRules
 import com.boimin.beatradar.ui.theme.Brand
 import kotlin.math.roundToInt
 
@@ -87,49 +92,117 @@ fun LogScreen(
     var renaming by remember { mutableStateOf<BeatLogEntry?>(null) }
 
     Column(modifier.fillMaxSize()) {
+        // Low-profile Search Bar + CSV & Clear actions
         Row(
-            Modifier.padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 8.dp),
+            Modifier
+                .fillMaxWidth()
+                .padding(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                placeholder = { Text("Search songs") },
-                leadingIcon = { Icon(painterResource(R.drawable.ic_search), null) },
-                singleLine = true,
-                shape = RoundedCornerShape(28.dp),
-                modifier = Modifier.weight(1f),
-            )
-            IconButton(onClick = onExport, enabled = entries.isNotEmpty()) {
-                Icon(painterResource(R.drawable.ic_share), contentDescription = "Export CSV")
-            }
-            IconButton(onClick = { confirmClear = true }, enabled = entries.isNotEmpty()) {
-                Icon(painterResource(R.drawable.ic_delete), contentDescription = "Clear log")
-            }
-        }
-
-        Row(
-            Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            FilterChip(
-                selected = onlyInRange,
-                onClick = onToggleInRange,
-                label = { Text("In range") },
-                leadingIcon = if (onlyInRange) { { Icon(painterResource(R.drawable.ic_check), null, Modifier.size(16.dp)) } } else null,
-                shape = RoundedCornerShape(50),
-            )
-            FilterChip(
-                selected = onlyIdentified,
-                onClick = onToggleIdentified,
-                label = { Text("Identified") },
-                leadingIcon = if (onlyIdentified) { { Icon(painterResource(R.drawable.ic_check), null, Modifier.size(16.dp)) } } else null,
-                shape = RoundedCornerShape(50),
-            )
+            Row(
+                Modifier
+                    .weight(1f)
+                    .height(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_search),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(15.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    if (query.isEmpty()) {
+                        Text(
+                            "Search logged songs…",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    BasicTextField(
+                        value = query,
+                        onValueChange = onQueryChange,
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+            Box(
+                Modifier
+                    .height(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                    .alpha(if (entries.isNotEmpty()) 1f else 0.45f)
+                    .clickable(enabled = entries.isNotEmpty(), onClick = onExport)
+                    .padding(horizontal = 11.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "CSV",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Box(
+                Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                    .alpha(if (entries.isNotEmpty()) 1f else 0.45f)
+                    .clickable(enabled = entries.isNotEmpty()) { confirmClear = true },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_delete),
+                    contentDescription = "Clear log",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
         }
 
-        if (unnamedWithClip > 0 || onlyUnnamed) {
-            UnnamedLine(unnamedWithClip, suggested, onlyUnnamed, onToggleUnnamed)
+        // Sleek Filter Pills
+        Row(
+            Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(start = 18.dp, end = 18.dp, bottom = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            LogFilterPill(
+                label = "● In Target",
+                selected = onlyInRange,
+                activeColor = Brand.Coral,
+                onClick = onToggleInRange,
+            )
+            LogFilterPill(
+                label = "Named",
+                selected = onlyIdentified,
+                activeColor = MaterialTheme.colorScheme.primary,
+                onClick = onToggleIdentified,
+            )
+            if (unnamedWithClip > 0 || onlyUnnamed) {
+                val badgeText = buildString {
+                    append("$unnamedWithClip Unnamed")
+                    if (suggested > 0) append(" · $suggested Match")
+                }
+                LogFilterPill(
+                    label = badgeText,
+                    selected = onlyUnnamed,
+                    activeColor = MaterialTheme.colorScheme.primary,
+                    onClick = onToggleUnnamed,
+                )
+            }
         }
 
         // Pull down to sync: uploads, and brings in entries from the user's other phones when signed in.
@@ -138,14 +211,14 @@ fun LogScreen(
                 EmptyState(searching = query.isNotBlank() || onlyInRange || onlyIdentified || onlyUnnamed)
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(start = 18.dp, end = 18.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     items(entries, key = { it.id }) { entry ->
                         SwipeToDelete(onDelete = { onDelete(entry) }) {
                             LogRow(
-                                entry,
+                                entry = entry,
                                 onIdentify = { onIdentify(entry) },
                                 onPlayClip = { onPlayClip(entry) },
                                 onRename = { renaming = entry },
@@ -182,6 +255,34 @@ fun LogScreen(
 }
 
 @Composable
+internal fun LogFilterPill(
+    label: String,
+    selected: Boolean,
+    activeColor: Color,
+    onClick: () -> Unit,
+) {
+    val bg = if (selected) activeColor.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainer
+    val border = if (selected) activeColor.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outline
+    val fg = if (selected) activeColor else MaterialTheme.colorScheme.onSurfaceVariant
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 11.dp, vertical = 5.dp),
+    ) {
+        Text(
+            label,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = fg,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
 private fun SwipeToDelete(onDelete: () -> Unit, content: @Composable () -> Unit) {
     val state = rememberSwipeToDismissBoxState()
     SwipeToDismissBox(
@@ -192,31 +293,15 @@ private fun SwipeToDelete(onDelete: () -> Unit, content: @Composable () -> Unit)
             Box(
                 Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(20.dp))
+                    .clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.errorContainer)
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = 20.dp),
                 contentAlignment = Alignment.CenterEnd,
             ) {
                 Icon(painterResource(R.drawable.ic_delete), "Delete", tint = MaterialTheme.colorScheme.onErrorContainer)
             }
         },
     ) { content() }
-}
-
-/** "3 songs without a name · Identify": filters the log to them, or back to everything. */
-@Composable
-private fun UnnamedLine(count: Int, suggested: Int, active: Boolean, onToggle: () -> Unit) {
-    val text = if (active) "Showing songs without a name · Show all" else unnamedLineText(count, suggested)
-    Text(
-        text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier
-            .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onToggle)
-            .padding(vertical = 4.dp),
-    )
 }
 
 @Composable
@@ -229,92 +314,191 @@ private fun LogRow(
     onAccept: () -> Unit,
     onReject: () -> Unit,
 ) {
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onRename,
+    val suggestion = entry.suggestion?.takeIf { entry.title == null }
+    val unnamed = entry.title == null
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+            .clickable(onClick = onRename)
+            .padding(12.dp),
     ) {
-        val suggestion = entry.suggestion?.takeIf { entry.title == null }
-        Row(Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = if (suggestion != null) 4.dp else 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             BpmBadge(entry.bpm, entry.inRange)
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(
-                    entry.label,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                val detail = listOfNotNull(entry.artist, entry.sourceApp).joinToString(" · ")
-                if (detail.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        detail,
+                        if (unnamed && entry.placeholderNo != null) "Unnamed Track #${entry.placeholderNo}" else entry.label,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (unnamed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
+                    if (entry.playCount > 1) {
+                        Spacer(Modifier.width(6.dp))
+                        Box(
+                            Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                .padding(horizontal = 5.dp, vertical = 1.dp),
+                        ) {
+                            Text(
+                                "${entry.playCount}×",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
+                Spacer(Modifier.height(2.dp))
                 Text(
-                    heardLine(entry),
+                    compactMetaLine(entry),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (entry.title == null) {
+            Spacer(Modifier.width(8.dp))
+            if (unnamed) {
                 if (entry.clipPath != null) {
-                    // A saved clip: replay it to recall the song, or play it to Shazam to get the name.
-                    IconButton(onClick = onPlayClip) {
-                        Icon(painterResource(R.drawable.ic_play), contentDescription = "Play clip", modifier = Modifier.size(20.dp))
-                    }
-                    FilledTonalIconButton(onClick = onIdentify) {
-                        Icon(painterResource(R.drawable.ic_search), contentDescription = "Identify with Shazam", modifier = Modifier.size(20.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                .clickable(onClick = onPlayClip),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_play),
+                                contentDescription = "Play clip",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(13.dp),
+                            )
+                        }
+                        Box(
+                            Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                                .clickable(onClick = onIdentify)
+                                .padding(horizontal = 9.dp, vertical = 5.dp),
+                        ) {
+                            Text(
+                                "Shazam",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                     }
                 } else {
-                    IconButton(onClick = onRename) {
-                        Icon(painterResource(R.drawable.ic_edit), contentDescription = "Rename", modifier = Modifier.size(20.dp))
+                    Box(
+                        Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .clickable(onClick = onRename),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.ic_edit),
+                            contentDescription = "Rename",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(13.dp),
+                        )
                     }
                 }
-            } else {
-                if (onOpenSong != null) {
-                    // In the Library: open its page (shared BPM, listeners, links).
-                    IconButton(onClick = onOpenSong) {
-                        Icon(painterResource(R.drawable.ic_library), contentDescription = "Open in Library", modifier = Modifier.size(20.dp))
-                    }
+            } else if (onOpenSong != null) {
+                Box(
+                    Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .clickable(onClick = onOpenSong),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_open),
+                        contentDescription = "Open in Library",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(13.dp),
+                    )
                 }
-                if (entry.inRange) Icon(painterResource(R.drawable.ic_check), contentDescription = "In range", tint = Brand.Coral)
             }
         }
+
         if (suggestion != null) {
-            // The crowd may know this one (PLAN §5c): one tap names it.
-            Row(Modifier.fillMaxWidth().padding(start = 86.dp, end = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            Spacer(Modifier.height(7.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val sugLabel = buildString {
+                    append(suggestion.title)
+                    if (suggestion.artist.isNotBlank()) append(" · ${suggestion.artist}")
+                }
                 Text(
-                    UnnamedRules.question(suggestion),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 2,
+                    buildAnnotatedString {
+                        append("Suggested: ")
+                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)) {
+                            append(sugLabel)
+                        }
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = onAccept) { Text("Yes") }
-                TextButton(onClick = onReject) { Text("No") }
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Brand.Success.copy(alpha = 0.15f))
+                        .clickable(onClick = onAccept)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text("Accept", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Brand.Success)
+                }
+                Spacer(Modifier.width(4.dp))
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .clickable(onClick = onReject)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text("Dismiss", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }
 }
 
-/** "Heard 3× · 5 minutes ago · nearby speaker" (or "on phone · Spotify"). */
-private fun heardLine(entry: BeatLogEntry): String = listOfNotNull(
-    "Heard ${entry.playCount}×".takeIf { entry.playCount > 1 },
-    relativeTime(entry.timestamp),
+private fun compactMetaLine(entry: BeatLogEntry): String = listOfNotNull(
+    entry.artist?.takeIf { it.isNotBlank() },
     when {
-        entry.remoteInstallId != null -> "from your other phone"
-        entry.phoneApp != null -> "on phone · ${entry.phoneApp}"
-        else -> "nearby speaker"
+        entry.sourceApp != null -> entry.sourceApp
+        entry.remoteInstallId != null -> "Other phone"
+        entry.phoneApp != null -> entry.phoneApp
+        entry.clipPath != null && entry.title == null -> "12s clip saved"
+        else -> "Ambient"
     },
+    relativeTime(entry.timestamp),
 ).joinToString(" · ")
 
 /** Type a title and artist by hand. Always applies, and merges with an entry of the same song. */
@@ -344,20 +528,37 @@ private fun relativeTime(timestamp: Long): String {
     else DateUtils.getRelativeTimeSpanString(timestamp, now, DateUtils.MINUTE_IN_MILLIS).toString()
 }
 
+/** 48dp rounded squircle BPM badge (Coral tinted when in target range, neutral surfaceHigh otherwise). */
 @Composable
 internal fun BpmBadge(bpm: Float, inRange: Boolean) {
-    val bg = if (inRange) Brand.Coral else MaterialTheme.colorScheme.primaryContainer
-    val fg = if (inRange) Brand.OnCoral else MaterialTheme.colorScheme.onPrimaryContainer
+    val bg = if (inRange) Brand.Coral.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainerHigh
+    val border = if (inRange) Brand.Coral.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outline
+    val numColor = if (inRange) Brand.Coral else MaterialTheme.colorScheme.onSurface
+    val subColor = if (inRange) Brand.Coral.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
     Box(
         Modifier
-            .size(58.dp)
-            .clip(CircleShape)
-            .background(bg),
+            .size(48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(12.dp)),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(bpm.roundToInt().toString(), color = fg, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text("BPM", color = fg, style = MaterialTheme.typography.labelSmall)
+            Text(
+                bpm.roundToInt().toString(),
+                color = numColor,
+                fontSize = 15.sp,
+                lineHeight = 16.sp,
+                fontWeight = FontWeight.ExtraBold,
+            )
+            Text(
+                "BPM",
+                color = subColor,
+                fontSize = 8.sp,
+                lineHeight = 9.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp,
+            )
         }
     }
 }
@@ -367,7 +568,6 @@ private fun EmptyState(searching: Boolean) {
     Column(
         Modifier
             .fillMaxSize()
-            // Scrollable so pull-to-refresh works on an empty log too.
             .verticalScroll(rememberScrollState())
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -377,17 +577,18 @@ private fun EmptyState(searching: Boolean) {
             painterResource(if (searching) R.drawable.ic_search else R.drawable.ic_radar),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(56.dp),
+            modifier = Modifier.size(48.dp),
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(14.dp))
         Text(
             if (searching) "No matching songs" else "No songs yet",
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            if (searching) "Try a different search or filter." else "Play some music and tap Start. Every song's BPM lands here.",
-            style = MaterialTheme.typography.bodyMedium,
+            if (searching) "Try a different search or filter." else "Play some music and tap the dial. Every song's BPM lands here.",
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
