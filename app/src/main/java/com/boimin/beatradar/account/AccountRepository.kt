@@ -131,10 +131,9 @@ class AccountRepository(context: Context) : TokenSource {
 
     // Account actions (all throw ApiException with the server's code on failure)
 
-    /** Sends the verification email; the account can sign in once the address is verified. */
-    suspend fun register(email: String, password: String) {
-        api.post<Credentials, Unit>("v1/auth/register", Credentials(email.trim(), password))
-    }
+    /** Creates the account and signs in straight away (no verification email, any password). */
+    suspend fun register(email: String, password: String): Me =
+        signedInWith(api.post("v1/auth/register", Credentials(email.trim(), password)))
 
     suspend fun resendVerification(email: String) {
         api.post<EmailOnly, Unit>("v1/auth/resend-verification", EmailOnly(email.trim()), auth = false)

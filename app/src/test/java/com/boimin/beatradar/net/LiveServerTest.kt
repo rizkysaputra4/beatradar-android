@@ -13,7 +13,6 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
-import java.io.File
 import java.util.UUID
 import kotlin.random.Random
 
@@ -117,21 +116,11 @@ class LiveServerTest {
 
         val email = "e2e-${UUID.randomUUID().toString().take(8)}@example.com"
         val password = "correct horse battery ${Random.nextInt()}"
-        val weak = runCatching { rl { api.post<Credentials, Unit>("v1/auth/register", Credentials(email, "short")) } }.exceptionOrNull() as ApiException
-        assertEquals("weak_password", weak.code)
-        rl { api.post<Credentials, Unit>("v1/auth/register", Credentials(email, password)) }
-        val notYet = runCatching { rl { api.post<Credentials, Session>("v1/auth/login", Credentials(email, password)) } }.exceptionOrNull() as ApiException
-        assertEquals("email_not_verified", notYet.code)
-
-        // The dev server logs the verification mail instead of sending it.
-        var token: String? = null
-        repeat(20) {
-            token = Regex("""verify-email\?token=([A-Za-z0-9_\-]+)""").findAll(File(log!!).readText())
-                .map { it.groupValues[1] }.lastOrNull()
-            if (token != null && File(log).readText().contains(email)) return@repeat
-            delay(250)
-        }
-        rl { api.post<TokenOnlyBody, Unit>("v1/auth/verify-email", TokenOnlyBody(token!!), auth = false) }
+        // Any password, no verification: registering signs in at once, and the address is then taken.
+        val registered: Session = rl { api.post("v1/auth/register", Credentials(email, password)) }
+        assertEquals(email, registered.user.email)
+        val taken = runCatching { rl { api.post<Credentials, Session>("v1/auth/register", Credentials(email, "x")) } }.exceptionOrNull() as ApiException
+        assertEquals("email_taken", taken.code)
         val bad = runCatching { rl { api.post<Credentials, Session>("v1/auth/login", Credentials(email, "wrong password!")) } }.exceptionOrNull() as ApiException
         assertEquals("invalid_credentials", bad.code)
 
@@ -188,7 +177,4 @@ class LiveServerTest {
         }
         return block()
     }
-
-    @kotlinx.serialization.Serializable
-    private data class TokenOnlyBody(val token: String)
 }

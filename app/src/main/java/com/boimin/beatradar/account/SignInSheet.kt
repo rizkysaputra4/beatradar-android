@@ -97,14 +97,14 @@ fun SignInSheet(vm: AccountViewModel, onDismiss: () -> Unit) {
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
-                        label = { Text(if (mode == Mode.REGISTER) "Password (8+ characters)" else "Password") },
+                        label = { Text("Password") },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                val ready = email.contains('@') && (mode == Mode.FORGOT || password.length >= if (mode == Mode.REGISTER) 8 else 1)
+                val ready = email.contains('@') && (mode == Mode.FORGOT || password.isNotEmpty())
                 Button(
                     onClick = {
                         when (mode) {

@@ -82,16 +82,9 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         signedIn()
     }
 
-    fun register(email: String, password: String) {
-        _signIn.value = SignInState(busy = true)
-        viewModelScope.launch {
-            _signIn.value = try {
-                account.register(email, password)
-                SignInState(info = "Check your inbox: we sent a link to verify $email. Then sign in here.")
-            } catch (e: ApiException) {
-                SignInState(error = describe(e))
-            }
-        }
+    fun register(email: String, password: String) = signInStep {
+        account.register(email, password)
+        signedIn()
     }
 
     fun google(idToken: String) = signInStep {
@@ -205,8 +198,8 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
             "invalid_credentials" -> "Wrong email or password"
             "email_not_verified" -> "Verify your email first: open the link we sent you."
             "locked" -> "Too many attempts. Try again in a few minutes."
-            "weak_password" -> "Use at least 8 characters for the password."
-            "breached_password" -> "This password appeared in a data breach. Please choose another."
+            "empty_password" -> "Enter a password."
+            "weak_password" -> "That password is too long."
             "email_taken" -> "There's already an account with this email. Sign in instead."
             "use_google" -> "This email signs in with Google."
             "nickname_taken" -> "That nickname is taken"
