@@ -188,3 +188,7 @@ val ApiJson = Json {
 @Serializable data class UnnamedResult(val results: List<UnnamedItemResult>)
 @Serializable data class SuggestionList(val items: List<Suggestion>)
 @Serializable data class RejectResult(val next: Suggestion? = null)
+
+// Clips of unknown songs, only with Help name unknown songs on (PLAN §5d)
+@Serializable data class ClipConsentIn(val appVersion: String)
+@Serializable data class WantedClips(val clientRefs: List<String> = emptyList())

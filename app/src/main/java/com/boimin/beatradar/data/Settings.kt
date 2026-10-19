@@ -22,7 +22,7 @@ data class Settings(
     val maxBpm: Int = 130,
     val vibrate: Boolean = true,
     val halfDoubleMatch: Boolean = false,
-    /** Keep a short clip of songs without a name, to play to Shazam later. Clips never leave the phone. */
+    /** Keep a short clip of songs without a name, to play to Shazam later. Clips leave the phone only with [shareClips]. */
     val saveClips: Boolean = true,
     /** Clips for every unnamed song, not only for in-range matches. */
     val clipAllSongs: Boolean = true,
@@ -30,6 +30,12 @@ data class Settings(
     val clipLimit: Int = 30,
     /** Send titles, tempos and (for reliably named songs) fingerprints to the shared Library. Never audio. */
     val contribute: Boolean = true,
+    /**
+     * Help name unknown songs (PLAN §5d): send the 12 s clip of songs nobody could name, so an admin can listen and
+     * name them for everyone. Off by default; needs [saveClips] (and [contribute], which sends their fingerprints).
+     * Turning it off deletes this phone's clips on the server.
+     */
+    val shareClips: Boolean = false,
     /** The one-time "what BeatRadar shares" notice was shown. */
     val sharingNoticeShown: Boolean = false,
     val theme: ThemeMode = ThemeMode.SYSTEM,
@@ -65,6 +71,7 @@ class SettingsRepository(private val context: Context) {
         val CLIP_ALL_SONGS = booleanPreferencesKey("clip_all_songs")
         val CLIP_LIMIT = intPreferencesKey("clip_limit")
         val CONTRIBUTE = booleanPreferencesKey("contribute")
+        val SHARE_CLIPS = booleanPreferencesKey("share_clips")
         val SHARING_NOTICE = booleanPreferencesKey("sharing_notice_shown")
         val THEME = stringPreferencesKey("theme")
     }
@@ -85,6 +92,7 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.CLIP_ALL_SONGS] = s.clipAllSongs
             prefs[Keys.CLIP_LIMIT] = s.clipLimit
             prefs[Keys.CONTRIBUTE] = s.contribute
+            prefs[Keys.SHARE_CLIPS] = s.shareClips
             prefs[Keys.SHARING_NOTICE] = s.sharingNoticeShown
             prefs[Keys.THEME] = s.theme.name
         }
@@ -102,6 +110,7 @@ class SettingsRepository(private val context: Context) {
             clipAllSongs = this[Keys.CLIP_ALL_SONGS] ?: d.clipAllSongs,
             clipLimit = this[Keys.CLIP_LIMIT]?.takeIf { it in Settings.CLIP_LIMITS } ?: d.clipLimit,
             contribute = this[Keys.CONTRIBUTE] ?: d.contribute,
+            shareClips = this[Keys.SHARE_CLIPS] ?: d.shareClips,
             sharingNoticeShown = this[Keys.SHARING_NOTICE] ?: d.sharingNoticeShown,
             theme = enumOrDefault(this[Keys.THEME], d.theme),
         )

@@ -9,6 +9,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.util.concurrent.TimeUnit
@@ -46,7 +47,7 @@ class ApiClient(
         auth: Boolean = true,
         timeoutMs: Long? = null,
     ): T {
-        val raw = send(method, path, body, query, auth, timeoutMs, retried = false)
+        val (_, raw) = send(method, path, body?.toRequestBody(JSON), emptyMap(), query, auth, timeoutMs, retried = false)
         // 202/204 answers may have no body; Unit (and JsonObject) read "{}".
         return ApiJson.decodeFromString(response, raw.ifBlank { "{}" })
     }
@@ -67,22 +68,28 @@ class ApiClient(
 
     suspend inline fun <reified T> delete(path: String): T = call("DELETE", path, serializer())
 
+    /** PUTs raw bytes (e.g. an audio clip) and returns the HTTP status (2xx); errors throw [ApiException]. */
+    suspend fun putBytes(path: String, bytes: ByteArray, contentType: String, headers: Map<String, String> = emptyMap()): Int =
+        send("PUT", path, bytes.toRequestBody(contentType.toMediaType()), headers, emptyMap(), auth = true, timeoutMs = 60_000, retried = false).first
+
     private suspend fun send(
         method: String,
         path: String,
-        body: String?,
+        body: RequestBody?,
+        headers: Map<String, String>,
         query: Map<String, Any?>,
         auth: Boolean,
         timeoutMs: Long?,
         retried: Boolean,
-    ): String {
+    ): Pair<Int, String> {
         val url = base.newBuilder().addPathSegments(path).apply {
             for ((k, v) in query) if (v != null) addQueryParameter(k, v.toString())
         }.build()
         val token = if (auth) tokens?.token() else null
         val request = Request.Builder().url(url).apply {
             if (token != null) header("Authorization", "Bearer $token")
-            method(method, body?.toRequestBody(JSON))
+            for ((k, v) in headers) header(k, v)
+            method(method, body)
         }.build()
         val client = if (timeoutMs != null) http.newBuilder().callTimeout(timeoutMs, TimeUnit.MILLISECONDS).build() else http
         val (code, text) = withContext(Dispatchers.IO) {
@@ -92,9 +99,9 @@ class ApiClient(
                 throw ApiException(0, "offline", e.message ?: "No connection")
             }
         }
-        if (code in 200..299) return text
+        if (code in 200..299) return code to text
         if (code == 401 && token != null && !retried && tokens?.onUnauthorized(token) == true) {
-            return send(method, path, body, query, auth, timeoutMs, retried = true)
+            return send(method, path, body, headers, query, auth, timeoutMs, retried = true)
         }
         throw parseError(code, text)
     }

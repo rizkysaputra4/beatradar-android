@@ -10,7 +10,8 @@ import java.nio.ByteOrder
 
 /**
  * Short song clips (12 s, 22 kHz mono WAV, ~0.5 MB) kept so an unnamed song can be played to Shazam
- * later. Each clip is deleted as soon as its song gets a name.
+ * later. Each clip is deleted as soon as its song gets a name. They stay on the phone unless the user turns on
+ * *Help name unknown songs*, which sends them (re-encoded, [ClipEncoder]) when the server asks (PLAN §5d).
  */
 object ClipStore {
     const val SAMPLE_RATE = 22_050

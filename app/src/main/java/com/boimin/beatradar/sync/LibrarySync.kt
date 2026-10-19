@@ -2,11 +2,13 @@ package com.boimin.beatradar.sync
 
 import android.content.Context
 import android.util.Log
+import com.boimin.beatradar.BuildConfig
 import com.boimin.beatradar.account.AccountRepository
 import com.boimin.beatradar.account.IntegrityCheck
 import com.boimin.beatradar.capture.Monitor
 import com.boimin.beatradar.data.AppDatabase
 import com.boimin.beatradar.data.BeatLogEntry
+import com.boimin.beatradar.data.ClipEncoder
 import com.boimin.beatradar.data.ClipStore
 import com.boimin.beatradar.data.NameSource
 import com.boimin.beatradar.data.Placeholders
@@ -18,6 +20,8 @@ import com.boimin.beatradar.data.SyncState
 import com.boimin.beatradar.data.UploadState
 import com.boimin.beatradar.dsp.Landmark
 import com.boimin.beatradar.net.ApiException
+import com.boimin.beatradar.net.ClipConsentIn
+import com.boimin.beatradar.net.WantedClips
 import com.boimin.beatradar.net.LogPage
 import com.boimin.beatradar.net.LogPush
 import com.boimin.beatradar.net.Landmarks
@@ -32,7 +36,10 @@ import com.boimin.beatradar.meta.SongNamer
 import com.boimin.beatradar.net.UploadResult
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import java.io.File
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -62,6 +69,7 @@ class LibrarySync(
             uploadMeasurements()
             uploadUnnamed()
             forgetUnnamed()
+            syncClips()
             fetchSuggestions()
             if (account.user.value != null) {
                 pushLog()
@@ -142,6 +150,46 @@ class LibrarySync(
                 }
             }
             if (stop) return
+        }
+    }
+
+    /**
+     * Clips of unknown songs (PLAN §5d), only with *Help name unknown songs* on: the consent once, then the clips the
+     * server asks for (a few per unknown song), re-encoded to AAC. Turning it off withdraws the consent, which deletes
+     * this phone's clips on the server.
+     */
+    private suspend fun syncClips() {
+        val sharing = ClipRules.sharing(settings.settings.first())
+        when (ClipRules.consentStep(sharing, prefs.getBoolean(KEY_CLIP_CONSENT, false))) {
+            ClipRules.ConsentStep.WITHDRAW -> {
+                account.api.delete<Unit>("v1/unnamed/clips")
+                prefs.edit().putBoolean(KEY_CLIP_CONSENT, false).apply()
+            }
+            ClipRules.ConsentStep.SEND -> {
+                account.api.post<ClipConsentIn, Unit>("v1/unnamed/clips/consent", ClipConsentIn(BuildConfig.VERSION_NAME))
+                prefs.edit().putBoolean(KEY_CLIP_CONSENT, true).apply()
+            }
+            ClipRules.ConsentStep.NONE -> {}
+        }
+        if (!sharing) return
+        val wanted: WantedClips = account.api.get("v1/unnamed/clips/wanted")
+        val entries = wanted.clientRefs.mapNotNull { it.toLongOrNull() }.mapNotNull { dao.byId(it) }
+        for ((id, path) in ClipRules.toUpload(wanted.clientRefs, entries) { File(it).isFile }) {
+            val out = File(context.cacheDir, "clip-$id.m4a")
+            try {
+                val encoded = withContext(Dispatchers.IO) { ClipEncoder.encode(File(path), out) }
+                val bytes = out.readBytes()
+                if (bytes.size > ClipRules.MAX_BYTES) continue
+                account.api.putBytes("v1/unnamed/$id/clip", bytes, "audio/mp4", mapOf("x-clip-duration-ms" to encoded.durationMs.toString()))
+            } catch (e: ApiException) {
+                // Offline or server trouble: try again later. Not wanted any more, or refused: skip this one.
+                if (e.offline || e.http >= 500) throw e
+                Log.i(TAG, "clip $id not sent: ${e.code}")
+            } catch (e: Exception) {
+                Log.w(TAG, "clip $id couldn't be encoded", e)
+            } finally {
+                out.delete()
+            }
         }
     }
 
@@ -280,5 +328,7 @@ class LibrarySync(
     private companion object {
         const val TAG = "BeatRadar"
         const val MAX_ROUNDS = 20
+        /** The server has this install's consent to share clips. */
+        const val KEY_CLIP_CONSENT = "clip_consent_sent"
     }
 }

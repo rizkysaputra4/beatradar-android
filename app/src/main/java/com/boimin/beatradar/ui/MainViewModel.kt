@@ -9,6 +9,7 @@ import com.boimin.beatradar.capture.Monitor
 import com.boimin.beatradar.capture.MonitorState
 import com.boimin.beatradar.data.BeatLogEntry
 import com.boimin.beatradar.data.ClipStore
+import com.boimin.beatradar.sync.ClipRules
 import com.boimin.beatradar.data.CsvExport
 import com.boimin.beatradar.data.NameSource
 import com.boimin.beatradar.data.Settings
@@ -112,6 +113,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // A lower limit drops the oldest clips right away.
             val after = before?.let(transform) ?: return@launch
             if (after.clipLimit < before.clipLimit) ClipStore.trim(dao, after.clipLimit)
+            // Sharing clips turned on or off: send the consent and clips, or delete them on the server, now.
+            if (ClipRules.sharing(after) != ClipRules.sharing(before)) getApplication<Application>().app.requestSync()
         }
     }
 

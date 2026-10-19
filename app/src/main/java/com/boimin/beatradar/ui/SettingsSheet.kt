@@ -96,7 +96,7 @@ fun SettingsSheet(
             }
             SwitchRow(
                 "Save clips of unnamed songs",
-                "Keeps 12 s of a song without a name to replay or play to Shazam later from the log. Deleted once named; never leaves your phone.",
+                "Keeps 12 s of a song without a name to replay or play to Shazam later from the log. Deleted once named; stays on your phone unless you turn on Help name unknown songs.",
                 settings.saveClips,
             ) { on -> onChange { it.copy(saveClips = on) } }
             SwitchRow(
@@ -162,6 +162,15 @@ fun SettingsSheet(
                 "Shares the titles, tempos and audio fingerprints BeatRadar hears (never audio) to build a public tempo library",
                 settings.contribute,
             ) { on -> onChange { it.copy(contribute = on) } }
+            val canShareClips = settings.contribute && settings.saveClips
+            SwitchRow(
+                "Help name unknown songs",
+                "Sends a 12-second clip of songs BeatRadar couldn't name, so an admin can listen and name them for everyone. " +
+                    "Only music, kept at most 30 days. Turning this off deletes your clips from the server." +
+                    if (canShareClips) "" else " Needs Contribute to the Library and Save clips of unnamed songs.",
+                settings.shareClips && canShareClips,
+                enabled = canShareClips,
+            ) { on -> onChange { it.copy(shareClips = on) } }
             if (account.coffeeAvailable) {
                 Spacer(Modifier.height(8.dp))
                 Row(
