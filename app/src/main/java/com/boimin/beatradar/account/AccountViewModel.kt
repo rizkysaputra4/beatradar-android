@@ -50,7 +50,15 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
     private var afterSignIn: (() -> Unit)? = null
 
     init {
-        viewModelScope.launch { account.signedOut.collect { reason -> if (reason == SignOutReason.SESSION_LOST) _toast.value = "You were signed out. Sign in again to keep backing up your log." } }
+        viewModelScope.launch {
+            account.signedOut.collect { reason ->
+                // Nothing of the previous account may stay on screen: drop its beats, badges and board, then show
+                // this phone's own (guest) beats.
+                clearAccountData()
+                loadRewards()
+                if (reason == SignOutReason.SESSION_LOST) _toast.value = "You were signed out. Sign in again to keep backing up your log."
+            }
+        }
         viewModelScope.launch { account.refreshMe() }
     }
 
@@ -74,6 +82,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
     private fun signedIn() {
         afterSignIn?.invoke()
         afterSignIn = null
+        clearAccountData()
         loadRewards()
     }
 
@@ -119,7 +128,6 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             account.logout()
             if (!keepLog) clearLocalLog()
-            loadRewards()
         }
     }
 
@@ -128,11 +136,16 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
             try {
                 account.deleteAccount()
                 _toast.value = "Your account was deleted"
-                loadRewards()
             } catch (e: ApiException) {
                 _toast.value = describe(e)
             }
         }
+    }
+
+    private fun clearAccountData() {
+        _rewards.value = null
+        _board.value = null
+        _celebrate.value = emptyList()
     }
 
     private suspend fun clearLocalLog() {

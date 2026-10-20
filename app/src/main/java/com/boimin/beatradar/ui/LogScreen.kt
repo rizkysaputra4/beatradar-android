@@ -66,6 +66,10 @@ fun LogScreen(
     query: String,
     onQueryChange: (String) -> Unit,
     onlyInRange: Boolean,
+    /** The Listen tab's target range, e.g. "120–130". */
+    targetLabel: String,
+    /** Whether a tempo is in the current target range (the coral badge). */
+    inTarget: (Float) -> Boolean,
     onlyIdentified: Boolean,
     onToggleInRange: () -> Unit,
     onToggleIdentified: () -> Unit,
@@ -180,7 +184,7 @@ fun LogScreen(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             LogFilterPill(
-                label = "● In Target",
+                label = "● In Target $targetLabel",
                 selected = onlyInRange,
                 activeColor = Brand.Coral,
                 onClick = onToggleInRange,
@@ -219,6 +223,7 @@ fun LogScreen(
                         SwipeToDelete(onDelete = { onDelete(entry) }) {
                             LogRow(
                                 entry = entry,
+                                inTarget = inTarget(entry.bpm),
                                 onIdentify = { onIdentify(entry) },
                                 onPlayClip = { onPlayClip(entry) },
                                 onRename = { renaming = entry },
@@ -307,6 +312,7 @@ private fun SwipeToDelete(onDelete: () -> Unit, content: @Composable () -> Unit)
 @Composable
 private fun LogRow(
     entry: BeatLogEntry,
+    inTarget: Boolean,
     onIdentify: () -> Unit,
     onPlayClip: () -> Unit,
     onRename: () -> Unit,
@@ -330,7 +336,7 @@ private fun LogRow(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            BpmBadge(entry.bpm, entry.inRange)
+            BpmBadge(entry.bpm, inTarget)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

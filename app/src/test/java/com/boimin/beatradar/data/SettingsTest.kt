@@ -48,4 +48,30 @@ class SettingsTest {
         assertEquals(2, lines.size)
         assertEquals("1970-01-01T00:00:00Z,Song,\"Artist, Band\",yt,128.0,0.50,true", lines[1])
     }
+
+    @Test fun inTargetFollowsTheRangeEvenWhenAlertsAreOff() {
+        val s = Settings(rangeEnabled = false, minBpm = 120, maxBpm = 130, halfDoubleMatch = true)
+        assertFalse("no alerts while the range is off", s.matches(125f))
+        assertTrue(s.inTarget(125f))
+        assertTrue("half/double tempo counts", s.inTarget(250f))
+        assertFalse(s.inTarget(140f))
+        // Changing the range changes the answer for the same tempo.
+        assertTrue(s.copy(minBpm = 135, maxBpm = 145).inTarget(140f))
+    }
+
+    @Test fun firstRunQuestionsAreAskedAndClipsStayOffUntilAllowed() {
+        val s = Settings()
+        assertFalse(s.sharingConsentAsked)
+        assertTrue(s.contribute)
+        assertFalse(s.shareClips)
+    }
+
+    @Test fun setNamesAndTempoSpans() {
+        assertEquals("Morning run", SetRules.cleanName("  Morning   run "))
+        assertEquals(null, SetRules.cleanName("   "))
+        assertEquals(SetRules.MAX_NAME, SetRules.cleanName("x".repeat(100))!!.length)
+        assertEquals("No songs yet", SetRules.span(null, null))
+        assertEquals("124 BPM", SetRules.span(124.2f, 123.8f))
+        assertEquals("118–128 BPM", SetRules.span(118f, 128.4f))
+    }
 }

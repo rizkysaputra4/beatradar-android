@@ -40,6 +40,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -79,14 +81,53 @@ fun LibraryScreen(vm: LibraryViewModel, settings: Settings, actions: LibraryActi
         if (!vm.list.value.loadedOnce && settings.rangeEnabled) {
             vm.query.value = vm.query.value.copy(bpmMin = settings.minBpm, bpmMax = settings.maxBpm, halfDouble = settings.halfDoubleMatch)
         }
-        vm.ensureLoaded()
+        // Discover shows live counts and loves: fresh data every time the tab is opened.
+        vm.refresh()
     }
+    var showSets by rememberSaveable { mutableStateOf(false) }
     val d = detail
     if (d != null) {
         BackHandler { vm.close() }
         SongDetailScreen(d, vm, actions, modifier)
     } else {
-        SongList(vm, actions, modifier)
+        Column(modifier.fillMaxSize()) {
+            LibrarySwitch(showSets, onSelect = { showSets = it })
+            if (showSets) SetsScreen(vm, settings) else SongList(vm, actions, Modifier)
+        }
+    }
+}
+
+/** Discover (the public library) or My sets (the user's own song lists by tempo), inside the one Library tab. */
+@Composable
+private fun LibrarySwitch(showSets: Boolean, onSelect: (Boolean) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 18.dp, end = 18.dp, top = 2.dp, bottom = 8.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+            .padding(3.dp),
+    ) {
+        listOf(false to "Discover", true to "My sets").forEach { (value, label) ->
+            val selected = showSets == value
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                    .clickable { onSelect(value) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 

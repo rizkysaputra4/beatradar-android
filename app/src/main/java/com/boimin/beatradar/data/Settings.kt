@@ -36,13 +36,21 @@ data class Settings(
      * Turning it off deletes this phone's clips on the server.
      */
     val shareClips: Boolean = false,
-    /** The one-time "what BeatRadar shares" notice was shown. */
-    val sharingNoticeShown: Boolean = false,
+    /**
+     * The first-run questions were answered: may BeatRadar contribute to the Library, and share clips of unknown songs?
+     * (A new key: phones that only saw the earlier one-line notice are asked once too.)
+     */
+    val sharingConsentAsked: Boolean = false,
     val theme: ThemeMode = ThemeMode.SYSTEM,
 ) {
-    /** True when [bpm] falls in the user's range (optionally counting half/double tempo). */
-    fun matches(bpm: Float): Boolean {
-        if (!rangeEnabled) return false
+    /** True when [bpm] falls in the user's range and range alerts are on (they vibrate). */
+    fun matches(bpm: Float): Boolean = rangeEnabled && inTarget(bpm)
+
+    /**
+     * True when [bpm] falls in the target range set on the Listen tab (optionally counting half/double tempo), whether
+     * or not its alerts are on. The log's "In target" filter uses it, so it always follows the current range.
+     */
+    fun inTarget(bpm: Float): Boolean {
         val range = minBpm..maxBpm
         if (bpm.roundToInt() in range) return true
         return halfDoubleMatch && ((bpm * 2).roundToInt() in range || (bpm / 2).roundToInt() in range)
@@ -72,7 +80,7 @@ class SettingsRepository(private val context: Context) {
         val CLIP_LIMIT = intPreferencesKey("clip_limit")
         val CONTRIBUTE = booleanPreferencesKey("contribute")
         val SHARE_CLIPS = booleanPreferencesKey("share_clips")
-        val SHARING_NOTICE = booleanPreferencesKey("sharing_notice_shown")
+        val SHARING_CONSENT = booleanPreferencesKey("sharing_consent_asked")
         val THEME = stringPreferencesKey("theme")
     }
 
@@ -93,7 +101,7 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.CLIP_LIMIT] = s.clipLimit
             prefs[Keys.CONTRIBUTE] = s.contribute
             prefs[Keys.SHARE_CLIPS] = s.shareClips
-            prefs[Keys.SHARING_NOTICE] = s.sharingNoticeShown
+            prefs[Keys.SHARING_CONSENT] = s.sharingConsentAsked
             prefs[Keys.THEME] = s.theme.name
         }
     }
@@ -111,7 +119,7 @@ class SettingsRepository(private val context: Context) {
             clipLimit = this[Keys.CLIP_LIMIT]?.takeIf { it in Settings.CLIP_LIMITS } ?: d.clipLimit,
             contribute = this[Keys.CONTRIBUTE] ?: d.contribute,
             shareClips = this[Keys.SHARE_CLIPS] ?: d.shareClips,
-            sharingNoticeShown = this[Keys.SHARING_NOTICE] ?: d.sharingNoticeShown,
+            sharingConsentAsked = this[Keys.SHARING_CONSENT] ?: d.sharingConsentAsked,
             theme = enumOrDefault(this[Keys.THEME], d.theme),
         )
     }

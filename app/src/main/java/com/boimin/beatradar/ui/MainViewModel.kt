@@ -49,9 +49,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Only unnamed songs that still have a clip to identify. */
     val onlyUnnamed = MutableStateFlow(false)
 
+    /**
+     * "In target" is worked out against the current target range, not the one set when the song was logged, so
+     * changing the range on the Listen tab re-filters the whole log.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val log: StateFlow<List<BeatLogEntry>> = combine(query, onlyInRange, onlyIdentified, onlyUnnamed) { q, r, i, u -> Filter(q.trim(), r, i, u) }
-        .flatMapLatest { f -> dao.observe(f.query, f.inRange, f.identified, f.unnamed) }
+    val log: StateFlow<List<BeatLogEntry>> = combine(query, onlyIdentified, onlyUnnamed) { q, i, u -> Filter(q.trim(), i, u) }
+        .flatMapLatest { f -> dao.observe(f.query, false, f.identified, f.unnamed) }
+        .combine(combine(onlyInRange, settings) { r, s -> s.takeIf { r } }) { entries, target ->
+            if (target == null) entries else entries.filter { target.inTarget(it.bpm) }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val unnamedWithClip: StateFlow<Int> = dao.observeUnnamedWithClip()
@@ -104,7 +111,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private data class Filter(val query: String, val inRange: Boolean, val identified: Boolean, val unnamed: Boolean)
+    private data class Filter(val query: String, val identified: Boolean, val unnamed: Boolean)
 
     fun updateSettings(transform: (Settings) -> Settings) {
         viewModelScope.launch {

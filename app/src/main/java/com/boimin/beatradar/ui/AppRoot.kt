@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -173,6 +174,8 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                 query = query,
                 onQueryChange = { vm.query.value = it },
                 onlyInRange = onlyInRange,
+                targetLabel = "${settings.minBpm}–${settings.maxBpm}",
+                inTarget = settings::inTarget,
                 onlyIdentified = onlyIdentified,
                 onToggleInRange = { vm.onlyInRange.value = !onlyInRange },
                 onToggleIdentified = { vm.onlyIdentified.value = !onlyIdentified },
@@ -247,28 +250,70 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
             dismissButton = { TextButton(onClick = { confirmSignOut = false; accountVm.signOut(keepLog = false) }) { Text("Remove") } },
         )
     }
-    if (!settings.sharingNoticeShown) {
-        SharingNotice(onOk = { vm.updateSettings { it.copy(sharingNoticeShown = true) } }, onTurnOff = {
-            vm.updateSettings { it.copy(sharingNoticeShown = true, contribute = false) }
-        })
+    if (!settings.sharingConsentAsked) {
+        SharingConsent(
+            onAnswer = { contribute, shareClips ->
+                vm.updateSettings {
+                    // Clips can only be shared if they're kept on the phone in the first place.
+                    it.copy(sharingConsentAsked = true, contribute = contribute, shareClips = shareClips, saveClips = it.saveClips || shareClips)
+                }
+            },
+        )
     }
 }
 
-/** One-time notice on first run (PLAN §9): uploads happen without an account, so say what's shared. */
+/**
+ * First run (PLAN §9, §5d): asks, like a permission prompt, whether BeatRadar may contribute to the shared Library and,
+ * only then, whether it may share clips of songs it can't name. Both can be changed later in Settings.
+ */
 @Composable
-private fun SharingNotice(onOk: () -> Unit, onTurnOff: () -> Unit) {
+private fun SharingConsent(onAnswer: (contribute: Boolean, shareClips: Boolean) -> Unit) {
+    var step by rememberSaveable { mutableIntStateOf(1) }
+    if (step == 1) {
+        ConsentDialog(
+            step = "1 of 2",
+            title = "Contribute to the Library?",
+            body = "BeatRadar can share the titles, tempos and audio fingerprints of the songs it hears, so anyone can " +
+                "search a public tempo library. Fingerprints can't be turned back into sound, voices or words. " +
+                "No account needed; if you sign in, your nickname shows on leaderboards.",
+            onAllow = { step = 2 },
+            onDeny = { onAnswer(false, false) },
+        )
+    } else {
+        ConsentDialog(
+            step = "2 of 2",
+            title = "Help name unknown songs?",
+            body = "When BeatRadar can't name a song, it can send a 12-second clip of it, so an admin can listen and name " +
+                "it for everyone. Only music is clipped, clips are deleted within 30 days, and turning this off later " +
+                "deletes yours from the server.",
+            onAllow = { onAnswer(true, true) },
+            onDeny = { onAnswer(true, false) },
+        )
+    }
+}
+
+@Composable
+private fun ConsentDialog(step: String, title: String, body: String, onAllow: () -> Unit, onDeny: () -> Unit) {
     AlertDialog(
         onDismissRequest = {},
-        title = { Text("BeatRadar builds a shared tempo library") },
-        text = {
-            Text(
-                "BeatRadar shares the titles, tempos and audio fingerprints it hears to build a public tempo library " +
-                    "anyone can search. It never sends audio unless you turn on Help name unknown songs. If you sign in, your nickname is " +
-                    "shown on leaderboards. You can turn sharing off anytime in Settings.",
-            )
+        title = {
+            Column {
+                Text(step, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(title)
+            }
         },
-        confirmButton = { TextButton(onClick = onOk) { Text("OK") } },
-        dismissButton = { TextButton(onClick = onTurnOff) { Text("Don't share") } },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(body)
+                Text(
+                    "You can change this anytime in Settings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = { Button(onClick = onAllow) { Text("Allow") } },
+        dismissButton = { TextButton(onClick = onDeny) { Text("Don't allow") } },
     )
 }
 

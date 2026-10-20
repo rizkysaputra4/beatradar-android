@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.unit.sp
 import com.boimin.beatradar.R
 import com.boimin.beatradar.net.SongDetail
@@ -53,6 +54,7 @@ import kotlin.math.roundToInt
 @Composable
 internal fun SongDetailScreen(state: DetailState, vm: LibraryViewModel, actions: LibraryActions, modifier: Modifier) {
     var reporting by remember { mutableStateOf(false) }
+    var addingToSet by remember { mutableStateOf(false) }
     val song = state.song
     Column(modifier.fillMaxSize()) {
         // Top Action Bar
@@ -89,6 +91,23 @@ internal fun SongDetailScreen(state: DetailState, vm: LibraryViewModel, actions:
             }
             Spacer(Modifier.weight(1f))
             if (song != null) {
+                val inSets by remember(song.slug) { vm.setsWith(song.slug) }.collectAsStateWithLifecycle(emptyList())
+                Box(
+                    Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(if (inSets.isNotEmpty()) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                        .clickable { addingToSet = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painterResource(if (inSets.isNotEmpty()) R.drawable.ic_set_added else R.drawable.ic_set_add),
+                        contentDescription = if (inSets.isNotEmpty()) "In ${inSets.size} set(s): edit" else "Add to set",
+                        tint = if (inSets.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp),
+                    )
+                }
                 LovePillButton(song.lovedByMe, song.loveCount) {
                     val target = !song.lovedByMe
                     if (actions.signedIn) vm.setLoved(song.slug, target) else actions.requireSignIn { vm.setLoved(song.slug, target) }
@@ -132,6 +151,9 @@ internal fun SongDetailScreen(state: DetailState, vm: LibraryViewModel, actions:
             state.loading -> Centered { CircularProgressIndicator() }
             else -> Message("Couldn't load this song", state.error ?: "", retry = vm::refreshDetail)
         }
+    }
+    if (addingToSet && song != null) {
+        AddToSetSheet(song.summary(), vm, onDismiss = { addingToSet = false })
     }
     if (reporting && song != null) {
         ReportDialog(

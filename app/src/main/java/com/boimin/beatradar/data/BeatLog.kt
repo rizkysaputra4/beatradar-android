@@ -352,9 +352,10 @@ interface BeatLogDao {
     }
 }
 
-@Database(entities = [BeatLogEntry::class, Fingerprint::class, UnnamedForget::class], version = 5, exportSchema = false)
+@Database(entities = [BeatLogEntry::class, Fingerprint::class, UnnamedForget::class, SongSet::class, SetSong::class], version = 6, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun beatLog(): BeatLogDao
+    abstract fun sets(): SetDao
 
     companion object {
         /** v2: song fingerprints and saved clips. Keeps every existing log entry. */
@@ -451,9 +452,25 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v6: sets, the user's own song lists by tempo. Keeps every existing log entry. */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `song_set` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL)",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `set_song` (`setId` INTEGER NOT NULL, `slug` TEXT NOT NULL, `title` TEXT NOT NULL, " +
+                        "`artist` TEXT NOT NULL, `bpm` REAL NOT NULL, `artworkUrl` TEXT, `addedAt` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`setId`, `slug`), " +
+                        "FOREIGN KEY(`setId`) REFERENCES `song_set`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+                )
+            }
+        }
+
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "beatradar.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .addCallback(object : Callback() {
                     // Room doesn't know triggers: fresh installs get them here, upgrades in MIGRATION_4_5.
                     override fun onCreate(db: SupportSQLiteDatabase) = FORGET_TRIGGERS.forEach(db::execSQL)

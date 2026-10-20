@@ -10,9 +10,18 @@ import com.boimin.beatradar.net.SongDetail
 import com.boimin.beatradar.net.SongSummary
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import com.boimin.beatradar.data.SetRules
+import com.boimin.beatradar.data.SetSong
+import com.boimin.beatradar.data.SetSummary
+import com.boimin.beatradar.data.SongSet
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -36,6 +45,49 @@ data class DetailState(
 
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
     private val repo = application.app.library
+    private val setDao = application.app.database.sets()
+
+    // Sets (the user's song lists by tempo)
+
+    /** All sets, most recently changed first. */
+    val sets: StateFlow<List<SetSummary>> = setDao.observeSets().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun setSongs(setId: Long): Flow<List<SetSong>> = setDao.observeSongs(setId)
+
+    /** Ids of the sets [slug] is in. */
+    fun setsWith(slug: String): Flow<List<Long>> = setDao.observeSetsWith(slug)
+
+    /** Creates a set and returns its id (null for an empty name). Adds [song] to it if given. */
+    suspend fun createSet(name: String, song: SongSummary? = null): Long? {
+        val clean = SetRules.cleanName(name) ?: return null
+        val now = System.currentTimeMillis()
+        val id = setDao.insertSet(SongSet(name = clean, createdAt = now, updatedAt = now))
+        song?.let { addToSet(id, it) }
+        return id
+    }
+
+    fun renameSet(id: Long, name: String) {
+        val clean = SetRules.cleanName(name) ?: return
+        viewModelScope.launch { setDao.rename(id, clean, System.currentTimeMillis()) }
+    }
+
+    fun deleteSet(id: Long) {
+        viewModelScope.launch { setDao.deleteSet(id) }
+    }
+
+    fun toggleInSet(setId: Long, song: SongSummary, inSet: Boolean) {
+        viewModelScope.launch {
+            if (inSet) setDao.remove(setId, song.slug, System.currentTimeMillis()) else addToSet(setId, song)
+        }
+    }
+
+    fun removeFromSet(setId: Long, slug: String) {
+        viewModelScope.launch { setDao.remove(setId, slug, System.currentTimeMillis()) }
+    }
+
+    private suspend fun addToSet(setId: Long, song: SongSummary) {
+        setDao.add(SetSong(setId, song.slug, song.title, song.artist, song.bpm, song.artworkUrl, System.currentTimeMillis()))
+    }
 
     val query = MutableStateFlow(SongQuery())
     private val _list = MutableStateFlow(ListState())
@@ -57,6 +109,8 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     init {
         @OptIn(FlowPreview::class)
         viewModelScope.launch { query.drop(1).debounce(350).collect { reload() } }
+        // Signing in or out changes which songs are "loved by me".
+        viewModelScope.launch { application.app.account.user.map { it?.id }.distinctUntilChanged().drop(1).collect { refresh() } }
         // My measurement of a song just went up: its counters changed.
         viewModelScope.launch {
             application.app.sync.uploaded.collect { slugs ->
@@ -67,8 +121,13 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun ensureLoaded() {
-        if (!_list.value.loadedOnce && !_list.value.loading) reload()
+    /**
+     * The tab was opened (or the account changed): fetch fresh counters, loves and new songs. The current list stays on
+     * screen while it loads, and an open song page refreshes too.
+     */
+    fun refresh() {
+        reload()
+        refreshDetail()
     }
 
     fun reload() {
