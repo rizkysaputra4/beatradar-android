@@ -338,7 +338,9 @@ private fun BeatCircle(
             contentAlignment = Alignment.Center,
         ) {
             ProgressArc(
-                progress = if (showProgress) progress else if (listening && state.bpm != null) 0.72f else 0f,
+                // Only real progress (time held in the target range). Without a target there is nothing to fill: a fixed
+                // partial arc here used to look like a stuck, three-quarter-full timer.
+                progress = if (showProgress) progress else 0f,
                 accent = accent,
                 trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
             )

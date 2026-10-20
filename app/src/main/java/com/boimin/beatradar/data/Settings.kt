@@ -50,13 +50,15 @@ data class Settings(
      * True when [bpm] falls in the target range set on the Listen tab (optionally counting half/double tempo), whether
      * or not its alerts are on. The log's "In target" filter uses it, so it always follows the current range.
      */
-    fun inTarget(bpm: Float): Boolean {
-        val range = minBpm..maxBpm
-        if (bpm.roundToInt() in range) return true
-        return halfDoubleMatch && ((bpm * 2).roundToInt() in range || (bpm / 2).roundToInt() in range)
-    }
+    fun inTarget(bpm: Float): Boolean = bpmIn(bpm, minBpm..maxBpm, halfDoubleMatch)
 
     companion object {
+        /** True when [bpm] falls in [range], optionally counting half and double tempo. */
+        fun bpmIn(bpm: Float, range: IntRange, halfDouble: Boolean): Boolean {
+            if (bpm.roundToInt() in range) return true
+            return halfDouble && ((bpm * 2).roundToInt() in range || (bpm / 2).roundToInt() in range)
+        }
+
         const val BPM_FLOOR = 60
         const val BPM_CEILING = 200
         val CLIP_LIMITS = listOf(10, 30, 50, 100)

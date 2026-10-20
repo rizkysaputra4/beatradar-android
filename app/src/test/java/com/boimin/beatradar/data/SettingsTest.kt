@@ -4,7 +4,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.ByteArrayOutputStream
 
 class SettingsTest {
 
@@ -36,19 +35,6 @@ class SettingsTest {
         assertFalse(s.matches(70f))
     }
 
-    @Test fun csvEscapesCommasAndQuotes() {
-        assertEquals("plain", CsvExport.escape("plain"))
-        assertEquals("\"Hello, \"\"World\"\"\"", CsvExport.escape("Hello, \"World\""))
-    }
-
-    @Test fun csvHasHeaderAndRow() {
-        val out = ByteArrayOutputStream()
-        CsvExport.write(listOf(BeatLogEntry(1, 0, "Song", "Artist, Band", "yt", 128f, 0.5f, true)), out)
-        val lines = out.toString().trim().lines()
-        assertEquals(2, lines.size)
-        assertEquals("1970-01-01T00:00:00Z,Song,\"Artist, Band\",yt,128.0,0.50,true", lines[1])
-    }
-
     @Test fun inTargetFollowsTheRangeEvenWhenAlertsAreOff() {
         val s = Settings(rangeEnabled = false, minBpm = 120, maxBpm = 130, halfDoubleMatch = true)
         assertFalse("no alerts while the range is off", s.matches(125f))
@@ -57,6 +43,12 @@ class SettingsTest {
         assertFalse(s.inTarget(140f))
         // Changing the range changes the answer for the same tempo.
         assertTrue(s.copy(minBpm = 135, maxBpm = 145).inTarget(140f))
+    }
+
+    @Test fun anyBpmRangeWithHalfDouble() {
+        assertTrue(Settings.bpmIn(100f, 95..110, halfDouble = false))
+        assertFalse(Settings.bpmIn(200f, 95..110, halfDouble = false))
+        assertTrue(Settings.bpmIn(200f, 95..110, halfDouble = true))
     }
 
     @Test fun firstRunQuestionsAreAskedAndClipsStayOffUntilAllowed() {

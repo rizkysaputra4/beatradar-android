@@ -17,7 +17,6 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
-import java.io.OutputStream
 
 @Entity(tableName = "beat_log", indices = [Index("timestamp"), Index("matchKey")])
 data class BeatLogEntry(
@@ -477,26 +476,4 @@ abstract class AppDatabase : RoomDatabase() {
                 })
                 .build()
     }
-}
-
-object CsvExport {
-    fun write(entries: List<BeatLogEntry>, out: OutputStream) {
-        out.bufferedWriter().use { w ->
-            w.appendLine("timestamp,title,artist,source_app,bpm,confidence,in_range")
-            for (e in entries) {
-                w.appendLine(
-                    listOf(
-                        java.time.Instant.ofEpochMilli(e.timestamp).toString(),
-                        e.title.orEmpty(), e.artist.orEmpty(), e.sourceApp.orEmpty(),
-                        "%.1f".format(java.util.Locale.US, e.bpm),
-                        "%.2f".format(java.util.Locale.US, e.confidence),
-                        e.inRange.toString(),
-                    ).joinToString(",") { escape(it) }
-                )
-            }
-        }
-    }
-
-    internal fun escape(value: String): String =
-        if (value.any { it == ',' || it == '"' || it == '\n' || it == '\r' }) "\"" + value.replace("\"", "\"\"") + "\"" else value
 }

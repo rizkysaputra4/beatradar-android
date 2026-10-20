@@ -50,10 +50,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private val exportCsv = registerForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
-        uri?.let(vm::exportTo)
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -71,7 +67,6 @@ class MainActivity : ComponentActivity() {
             identify = { startActivity(ShazamBridge.launchIntent(this)) },
             identifyClip = ::identifyClip,
             openNotificationAccess = { startActivity(Intent(AndroidSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) },
-            exportLog = { exportCsv.launch("beatradar-log.csv") },
             shareSong = ::shareSong,
             openUrl = ::openUrl,
             coffee = coffee.state,

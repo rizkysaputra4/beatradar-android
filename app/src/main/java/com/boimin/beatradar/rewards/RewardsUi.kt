@@ -1,5 +1,9 @@
 package com.boimin.beatradar.rewards
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,12 +36,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -56,9 +62,37 @@ import com.boimin.beatradar.net.Rewards
 import com.boimin.beatradar.ui.theme.Brand
 import java.text.NumberFormat
 
-/** Header chip: Coral dot + streak and all-time beats, e.g. "● 7d · 1,240". Opens the Rewards sheet. */
+/**
+ * How big the header flame is: it grows a step at a time with the beats earned by contributing, so the chip itself
+ * shows how much someone has given to the Library.
+ */
+object Flame {
+    /** Beats needed for each next size. */
+    val STEPS = longArrayOf(1, 25, 100, 300, 1_000, 3_000, 10_000)
+    const val MIN_DP = 12
+    const val STEP_DP = 2
+
+    fun level(beats: Long): Int = STEPS.count { beats >= it }
+
+    fun sizeDp(beats: Long): Int = MIN_DP + STEP_DP * level(beats)
+}
+
+/** Header chip: a flame that grows with contributions, then streak and all-time beats, e.g. "🔥 7d · 1,240". */
 @Composable
 fun BeatsChip(rewards: Rewards?, onClick: () -> Unit) {
+    val beats = rewards?.beatsAll ?: 0L
+    val size by animateDpAsState(Flame.sizeDp(beats).dp, spring(dampingRatio = 0.5f, stiffness = 300f), label = "flame")
+    // A quick pop each time new beats come in while the app is open.
+    val pop = remember { Animatable(1f) }
+    var lastBeats by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(beats) {
+        val before = lastBeats
+        lastBeats = beats
+        if (before != null && beats > before) {
+            pop.animateTo(1.35f, tween(140))
+            pop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = 400f))
+        }
+    }
     Row(
         Modifier
             .clip(RoundedCornerShape(50))
@@ -68,15 +102,16 @@ fun BeatsChip(rewards: Rewards?, onClick: () -> Unit) {
             .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
-                .size(7.dp)
-                .clip(CircleShape)
-                .background(Brand.Coral),
+        Icon(
+            painterResource(R.drawable.ic_fire),
+            contentDescription = "Your beats",
+            // No contributions yet: a small, faint flame.
+            tint = if (beats > 0) Brand.Coral else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            modifier = Modifier.size(size).scale(pop.value),
         )
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(4.dp))
         Text(
-            "${rewards?.streak ?: 0}d · ${number(rewards?.beatsAll ?: 0)}",
+            "${rewards?.streak ?: 0}d · ${number(beats)}",
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,

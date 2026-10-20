@@ -1,7 +1,6 @@
 package com.boimin.beatradar.ui
 
 import android.app.Application
-import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.boimin.beatradar.app
@@ -10,7 +9,6 @@ import com.boimin.beatradar.capture.MonitorState
 import com.boimin.beatradar.data.BeatLogEntry
 import com.boimin.beatradar.data.ClipStore
 import com.boimin.beatradar.sync.ClipRules
-import com.boimin.beatradar.data.CsvExport
 import com.boimin.beatradar.data.NameSource
 import com.boimin.beatradar.data.Settings
 import com.boimin.beatradar.data.SyncState
@@ -18,7 +16,6 @@ import com.boimin.beatradar.meta.NowPlayingListener
 import com.boimin.beatradar.meta.SongNamer
 import com.boimin.beatradar.library.LibraryViewModel
 import com.boimin.beatradar.net.ApiException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,7 +27,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -44,20 +40,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val monitor: StateFlow<MonitorState> = Monitor.state
 
     val query = MutableStateFlow("")
+    /** The log's BPM filter is on. */
     val onlyInRange = MutableStateFlow(false)
+    /** The log's own BPM range; null follows the Listen tab's target range. */
+    val logBpmRange = MutableStateFlow<IntRange?>(null)
     val onlyIdentified = MutableStateFlow(false)
     /** Only unnamed songs that still have a clip to identify. */
     val onlyUnnamed = MutableStateFlow(false)
 
     /**
-     * "In target" is worked out against the current target range, not the one set when the song was logged, so
-     * changing the range on the Listen tab re-filters the whole log.
+     * The BPM filter uses the log's own range, or (until the user changes it there) the Listen tab's current target
+     * range, never the one set when a song was logged.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     val log: StateFlow<List<BeatLogEntry>> = combine(query, onlyIdentified, onlyUnnamed) { q, i, u -> Filter(q.trim(), i, u) }
         .flatMapLatest { f -> dao.observe(f.query, false, f.identified, f.unnamed) }
-        .combine(combine(onlyInRange, settings) { r, s -> s.takeIf { r } }) { entries, target ->
-            if (target == null) entries else entries.filter { target.inTarget(it.bpm) }
+        .combine(combine(onlyInRange, settings, logBpmRange) { on, s, custom -> s?.takeIf { on }?.let { (custom ?: (it.minBpm..it.maxBpm)) to it.halfDoubleMatch } }) { entries, filter ->
+            if (filter == null) entries else entries.filter { Settings.bpmIn(it.bpm, filter.first, filter.second) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -179,15 +178,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Called once a delete can no longer be undone. */
     fun forgetClip(entry: BeatLogEntry) = ClipStore.delete(entry.clipPath)
-
-    fun exportTo(uri: Uri) {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                val entries = dao.all()
-                getApplication<Application>().contentResolver.openOutputStream(uri)?.use { CsvExport.write(entries, it) }
-            }
-        }
-    }
 
     fun hasNotificationAccess(): Boolean = NowPlayingListener.hasAccess(getApplication())
 }

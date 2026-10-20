@@ -75,7 +75,6 @@ class AppActions(
     /** Opens Shazam and plays the entry's saved clip to it. */
     val identifyClip: (BeatLogEntry) -> Unit,
     val openNotificationAccess: () -> Unit,
-    val exportLog: () -> Unit,
     /** Android share sheet with the song's share link. */
     val shareSong: (SongSummary) -> Unit,
     /** Opens a streaming link: the app if installed, else the browser. */
@@ -97,6 +96,7 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
     val log by vm.log.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
     val onlyInRange by vm.onlyInRange.collectAsStateWithLifecycle()
+    val logBpmRange by vm.logBpmRange.collectAsStateWithLifecycle()
     val onlyIdentified by vm.onlyIdentified.collectAsStateWithLifecycle()
     val onlyUnnamed by vm.onlyUnnamed.collectAsStateWithLifecycle()
     val unnamedWithClip by vm.unnamedWithClip.collectAsStateWithLifecycle()
@@ -174,7 +174,10 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                 query = query,
                 onQueryChange = { vm.query.value = it },
                 onlyInRange = onlyInRange,
-                targetLabel = "${settings.minBpm}–${settings.maxBpm}",
+                bpmRange = logBpmRange ?: (settings.minBpm..settings.maxBpm),
+                bpmCustom = logBpmRange != null,
+                onBpmRange = { vm.logBpmRange.value = it },
+                onResetBpm = { vm.logBpmRange.value = null },
                 inTarget = settings::inTarget,
                 onlyIdentified = onlyIdentified,
                 onToggleInRange = { vm.onlyInRange.value = !onlyInRange },
@@ -199,7 +202,6 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                     }
                 },
                 onClear = vm::clearLog,
-                onExport = actions.exportLog,
                 modifier = modifier,
             )
             else -> LibraryScreen(
