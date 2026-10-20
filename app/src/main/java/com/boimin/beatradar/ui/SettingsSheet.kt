@@ -173,6 +173,16 @@ fun SettingsSheet(
                     enabled = canShareClips,
                 ) { on -> onChange { it.copy(shareClips = on) } }
             }
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = account.onShowShared).padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("What I've shared →", style = MaterialTheme.typography.bodyLarge)
+                    Text("Everything this phone sent and how long it's kept.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             if (account.coffeeAvailable) {
                 Spacer(Modifier.height(8.dp))
                 Row(
@@ -252,6 +262,8 @@ class AccountSettings(
     val onLeaderboard: (Boolean) -> Unit,
     val coffeeAvailable: Boolean,
     val onCoffee: () -> Unit,
+    /** "What I've shared": what this phone sent, and how to ask for it to be deleted. */
+    val onShowShared: () -> Unit,
 )
 
 @Composable

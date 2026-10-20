@@ -57,10 +57,12 @@ import com.boimin.beatradar.account.AccountViewModel
 import com.boimin.beatradar.library.Pill
 import com.boimin.beatradar.net.BadgeView
 import com.boimin.beatradar.net.BoardEntry
+import com.boimin.beatradar.net.Discovery
 import com.boimin.beatradar.net.PublicProfile
 import com.boimin.beatradar.net.Rewards
 import com.boimin.beatradar.ui.theme.Brand
 import java.text.NumberFormat
+import kotlin.math.roundToInt
 
 /**
  * How big the header flame is: it grows a step at a time with the beats earned by contributing, so the chip itself
@@ -122,8 +124,9 @@ fun BeatsChip(rewards: Rewards?, onClick: () -> Unit) {
 /** Beats, rank, streak, badges and the leaderboards (PLAN §7b). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onDismiss: () -> Unit) {
+fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String) -> Unit, onDismiss: () -> Unit) {
     val rewards by vm.rewards.collectAsStateWithLifecycle()
+    val discoveries by vm.discoveries.collectAsStateWithLifecycle()
     val board by vm.board.collectAsStateWithLifecycle()
     var allTime by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) { vm.loadRewards() }
@@ -155,6 +158,11 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onDismiss: () -> Un
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
                 )
+                // Bought a coffee: a small thank-you, unlocks nothing.
+                if (r?.supporter == true) {
+                    Pill("☕ Supporter")
+                    Spacer(Modifier.width(6.dp))
+                }
                 Row(
                     Modifier
                         .clip(RoundedCornerShape(50))
@@ -228,6 +236,21 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onDismiss: () -> Un
             )
             Spacer(Modifier.height(8.dp))
             BadgeGrid(r?.badges.orEmpty())
+
+            discoveries?.takeIf { it.total > 0 }?.let { d ->
+                Spacer(Modifier.height(18.dp))
+                Text(
+                    "SONGS YOU BROUGHT IN · ${number(d.total)}",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    d.items.take(DISCOVERIES_SHOWN).forEach { DiscoveryRow(it, onClick = { onOpenSong(it.slug) }) }
+                }
+            }
 
             Spacer(Modifier.height(18.dp))
 
@@ -448,6 +471,42 @@ fun BadgeIcon(code: String, tier: Int, earned: Boolean, sizeDp: Int) {
     }
 }
 
+private const val DISCOVERIES_SHOWN = 5
+
+@Composable
+private fun DiscoveryRow(d: Discovery, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(d.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                "${d.artist} · ${d.bpm.roundToInt()} BPM",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                "${number(d.listeners.toLong())} listener${if (d.listeners == 1) "" else "s"}",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (d.milestone != null) Brand.Coral else MaterialTheme.colorScheme.onSurface,
+            )
+            d.milestone?.let { Text("${number(it.toLong())}+ reached", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+    }
+}
+
 @Composable
 private fun BoardRow(e: BoardEntry, highlight: Boolean) {
     val bg = if (highlight) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainerHigh
@@ -478,7 +537,7 @@ private fun BoardRow(e: BoardEntry, highlight: Boolean) {
             Spacer(Modifier.width(5.dp))
         }
         Text(
-            if (highlight) "${e.nickname} (You)" else e.nickname,
+            (if (highlight) "${e.nickname} (You)" else e.nickname) + if (e.supporter) " ☕" else "",
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -524,6 +583,7 @@ fun ProfileSheet(profile: PublicProfile, onReport: () -> Unit, onDismiss: () -> 
                     Text(profile.nickname, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
                     Text("${number(profile.beatsAll)} beats", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                if (profile.supporter) Pill("☕ Supporter")
                 if (profile.grooveMaster > 0) Pill("Groove Master ×${profile.grooveMaster}")
             }
             Spacer(Modifier.height(16.dp))

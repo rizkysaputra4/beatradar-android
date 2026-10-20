@@ -20,6 +20,7 @@ import com.boimin.beatradar.account.AccountViewModel
 import com.boimin.beatradar.billing.CoffeeBilling
 import com.boimin.beatradar.capture.CaptureService
 import com.boimin.beatradar.library.LibraryViewModel
+import com.boimin.beatradar.library.PlayLinks
 import com.boimin.beatradar.net.SongSummary
 import com.boimin.beatradar.notify.Haptics
 import kotlin.math.roundToInt
@@ -55,9 +56,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         splash.setKeepOnScreenCondition { vm.settings.value == null }
         enableEdgeToEdge()
-        coffee = CoffeeBilling(this).also { it.start() }
+        coffee = CoffeeBilling(this, onPurchased = { product, token ->
+            app.library.claimSupporter(product, token)
+            accountVm.loadRewards()
+        }).also { it.start() }
         haptics = Haptics(this)
-        handleLink(intent)
+        // Not again after a rotation: the link was handled when the activity first started.
+        if (savedInstanceState == null) handleLink(intent)
 
         val actions = AppActions(
             start = ::requestStart,
@@ -68,6 +73,7 @@ class MainActivity : ComponentActivity() {
             identifyClip = ::identifyClip,
             openNotificationAccess = { startActivity(Intent(AndroidSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) },
             shareSong = ::shareSong,
+            shareText = ::shareText,
             openUrl = ::openUrl,
             coffee = coffee.state,
             buyCoffee = { coffee.buy(this, it) },
@@ -95,16 +101,39 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    /** `https://<share host>/s/<slug>` (App Links) opens that song in the Library. */
+    /**
+     * `https://<share host>/s/<slug>` (App Links) opens that song in the Library; a playlist link shared from Spotify or
+     * YouTube Music opens "BPM of a playlist".
+     */
     private fun handleLink(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_OPEN_RECAP, false) == true) {
+            vm.showRecap.value = true
+            return
+        }
+        if (intent?.action == Intent.ACTION_SEND) {
+            val text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
+            if (PlayLinks.looksLikePlaylist(text)) {
+                libraryVm.sharedPlaylistLink.value = text
+            } else {
+                Toast.makeText(this, "Share a Spotify or YouTube playlist to see its BPMs", Toast.LENGTH_LONG).show()
+            }
+            return
+        }
         val uri = intent?.data ?: return
         if (intent.action != Intent.ACTION_VIEW || uri.host != BuildConfig.SHARE_HOST) return
         val segments = uri.pathSegments
         if (segments.size == 2 && segments[0] == "s") vm.openSong.value = segments[1]
+        // A shared set: view it, and copy it into My sets.
+        if (segments.size == 2 && segments[0] == "set") libraryVm.sharedSetLink.value = segments[1]
     }
 
     private fun shareSong(song: SongSummary) {
         val text = "${song.title} – ${song.artist} · ${song.bpm.roundToInt()} BPM on BeatRadar https://${BuildConfig.SHARE_HOST}/s/${song.slug}"
+        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+        startActivity(Intent.createChooser(send, null))
+    }
+
+    private fun shareText(text: String) {
         val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
         startActivity(Intent.createChooser(send, null))
     }
@@ -135,5 +164,10 @@ class MainActivity : ComponentActivity() {
             delay(1_800)
             runCatching { ClipStore.play(path) }
         }
+    }
+
+    companion object {
+        /** From the Sunday notification: open the weekly recap. */
+        const val EXTRA_OPEN_RECAP = "open_recap"
     }
 }

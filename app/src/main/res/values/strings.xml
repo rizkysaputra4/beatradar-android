@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">BeatRadar</string>
+    <string name="widget_description">Live BPM, and start or stop listening</string>
+    <string name="tile_label">BeatRadar</string>
 </resources>

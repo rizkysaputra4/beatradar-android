@@ -24,8 +24,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,6 +45,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.boimin.beatradar.R
 import com.boimin.beatradar.data.SetRules
@@ -56,16 +59,36 @@ import kotlinx.coroutines.launch
 
 /** "My sets" in the Library tab: the user's song lists by tempo. */
 @Composable
-internal fun SetsScreen(vm: LibraryViewModel, settings: Settings, modifier: Modifier = Modifier) {
+internal fun SetsScreen(vm: LibraryViewModel, settings: Settings, actions: LibraryActions, modifier: Modifier = Modifier) {
     val sets by vm.sets.collectAsStateWithLifecycle()
+    val playlist by vm.playlist.collectAsStateWithLifecycle()
+    val shared by vm.sharedSet.collectAsStateWithLifecycle()
+    val build by vm.build.collectAsStateWithLifecycle()
     var openSet by rememberSaveable { mutableStateOf<Long?>(null) }
     var creating by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     val open = openSet?.let { id -> sets.firstOrNull { it.id == id } }
     if (open != null) {
-        BackHandler { openSet = null }
-        SetDetail(open, vm, settings, onBack = { openSet = null }, modifier = modifier)
+        // Closing the set: the next time it plays in another app, ask again.
+        val close = { openSet = null; vm.playChoice = null }
+        BackHandler(onBack = close)
+        SetDetail(open, vm, settings, actions, onBack = close, modifier = modifier)
+        return
+    }
+    playlist?.let { p ->
+        BackHandler { vm.closePlaylist() }
+        PlaylistScreen(p, vm, settings, onSaved = { id -> vm.closePlaylist(); openSet = id }, modifier = modifier)
+        return
+    }
+    shared?.let { s ->
+        BackHandler { vm.closeSharedSet() }
+        SharedSetScreen(s, vm, settings, onSaved = { id -> vm.closeSharedSet(); openSet = id }, modifier = modifier)
+        return
+    }
+    build?.let { b ->
+        BackHandler { vm.closeBuild() }
+        BuildSetScreen(b, vm, settings, onSaved = { id -> vm.closeBuild(); openSet = id }, modifier = modifier)
         return
     }
 
@@ -75,15 +98,17 @@ internal fun SetsScreen(vm: LibraryViewModel, settings: Settings, modifier: Modi
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Group songs by tempo for a run, a workout or a DJ set. Add songs from their page.",
+                    "Group songs by tempo for a run, a workout or a DJ set. Add songs from their page, or start from a playlist.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
                 )
-                Spacer(Modifier.width(10.dp))
-                Button(onClick = { creating = true }, contentPadding = PaddingValues(horizontal = 14.dp)) { Text("New set") }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { creating = true }, contentPadding = PaddingValues(horizontal = 14.dp)) { Text("New set") }
+                    OutlinedButton(onClick = { vm.openBuild() }, contentPadding = PaddingValues(horizontal = 14.dp)) { Text("Build me a set") }
+                }
+                OutlinedButton(onClick = { vm.openPlaylist() }, contentPadding = PaddingValues(horizontal = 14.dp)) { Text("BPM of a playlist") }
             }
         }
         if (sets.isEmpty()) {
@@ -151,11 +176,44 @@ private fun SetCard(set: SetSummary, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings, onBack: () -> Unit, modifier: Modifier) {
+private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings, actions: LibraryActions, onBack: () -> Unit, modifier: Modifier) {
     val songs by remember(set.id) { vm.setSongs(set.id) }.collectAsStateWithLifecycle(emptyList())
+    val scope = rememberCoroutineScope()
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
+    // The first ▶ in an open set asks which app; later ones go straight there (until the set is closed).
+    var choosingFor by remember { mutableStateOf<SetSong?>(null) }
+    // Selecting songs (long-press) to remove several at once; swiping one left removes just that one.
+    var selected by rememberSaveable(set.id) { mutableStateOf(setOf<String>()) }
+    var removing by remember { mutableStateOf<Set<String>?>(null) }
+    val selecting = selected.isNotEmpty()
+    // Back while selecting only ends the selection.
+    BackHandler(enabled = selecting) { selected = emptySet() }
     val inTarget = songs.count { settings.inTarget(it.bpm) }
+
+    fun play(song: SetSong, service: PlayLinks.Service) {
+        scope.launch {
+            when (service) {
+                PlayLinks.Service.SPOTIFY -> actions.openUrl(vm.playUrl(song.slug, song.title, song.artist, service))
+                // YouTube plays from this song to the end of the set as one queue.
+                PlayLinks.Service.YOUTUBE_MUSIC -> {
+                    val from = songs.indexOf(song).coerceAtLeast(0)
+                    val q = vm.youtubeQueue(songs.drop(from).map { it.slug })
+                    actions.openUrl(
+                        q?.url ?: ("https://www.youtube.com/results?search_query=" +
+                            java.net.URLEncoder.encode("${song.artist} ${song.title}", Charsets.UTF_8)),
+                    )
+                }
+            }
+        }
+    }
+    fun onPlay(song: SetSong) {
+        val chosen = vm.playChoice?.takeIf { it.first == set.id }?.second
+        if (chosen != null) play(song, chosen) else choosingFor = song
+    }
+    fun toggle(slug: String) {
+        selected = if (slug in selected) selected - slug else selected + slug
+    }
 
     LazyColumn(
         modifier.fillMaxSize(),
@@ -163,11 +221,20 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onBack) { Text("‹ My sets") }
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = { renaming = true }) { Text("Rename") }
-                TextButton(onClick = { deleting = true }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            if (selecting) {
+                SelectionBar(selected.size, onCancel = { selected = emptySet() }) {
+                    IconButton(onClick = { removing = selected }) {
+                        Icon(painterResource(R.drawable.ic_delete), contentDescription = "Remove selected songs", tint = MaterialTheme.colorScheme.error)
+                    }
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onBack) { Text("‹ My sets") }
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = { scope.launch { vm.shareSet(set.id)?.let(actions.shareText) } }) { Text("Share") }
+                    TextButton(onClick = { renaming = true }) { Text("Rename") }
+                    TextButton(onClick = { deleting = true }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                }
             }
         }
         item {
@@ -193,6 +260,13 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
                         fontWeight = FontWeight.SemiBold,
                         color = if (inTarget > 0) Brand.Coral else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Spacer(Modifier.height(6.dp))
+                    // The whole set, in order, as one YouTube playlist.
+                    Button(onClick = { play(songs.first(), PlayLinks.Service.YOUTUBE_MUSIC) }, contentPadding = PaddingValues(horizontal = 14.dp)) {
+                        Icon(painterResource(R.drawable.ic_play), contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Play all in YouTube")
+                    }
                 }
             }
         }
@@ -207,15 +281,61 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
             }
         }
         items(songs, key = { it.slug }) { song ->
-            SetSongRow(
-                song,
-                inTarget = settings.inTarget(song.bpm),
-                onOpen = { vm.open(song.slug) },
-                onRemove = { vm.removeFromSet(set.id, song.slug) },
-            )
+            SwipeToDelete(onDelete = { removing = setOf(song.slug) }, enabled = !selecting) {
+                LibrarySongRow(
+                    title = song.title,
+                    artist = song.artist,
+                    artworkUrl = song.artworkUrl,
+                    bpm = song.bpm,
+                    inTarget = settings.inTarget(song.bpm),
+                    selected = if (selecting) song.slug in selected else null,
+                    onClick = { if (selecting) toggle(song.slug) else vm.open(song.slug) },
+                    onLongClick = { toggle(song.slug) },
+                    trailing = if (selecting) null else ({
+                        IconButton(onClick = { onPlay(song) }) {
+                            Icon(painterResource(R.drawable.ic_play), contentDescription = "Play ${song.title}", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                        }
+                    }),
+                )
+            }
         }
     }
 
+    choosingFor?.let { song ->
+        AlertDialog(
+            onDismissRequest = { choosingFor = null },
+            title = { Text("Play in") },
+            text = { Text("Which app should this set's songs open in?") },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    for ((service, label) in listOf(PlayLinks.Service.YOUTUBE_MUSIC to "YouTube", PlayLinks.Service.SPOTIFY to "Spotify")) {
+                        TextButton(onClick = {
+                            choosingFor = null
+                            vm.playChoice = set.id to service
+                            play(song, service)
+                        }) { Text(label) }
+                    }
+                }
+            },
+            dismissButton = { TextButton(onClick = { choosingFor = null }) { Text("Cancel") } },
+        )
+    }
+    removing?.let { slugs ->
+        val one = slugs.singleOrNull()?.let { s -> songs.firstOrNull { it.slug == s } }
+        AlertDialog(
+            onDismissRequest = { removing = null },
+            title = { Text(if (one != null) "Remove “${one.title}”?" else "Remove ${slugs.size} songs?") },
+            text = { Text("They come out of “${set.name}”. The songs stay in the Library.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    removing = null
+                    vm.removeSongs(set.id, slugs)
+                    selected = selected - slugs
+                }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { removing = null }) { Text("Cancel") } },
+        )
+    }
     if (renaming) {
         NameDialog("Rename set", set.name, "Save", onDismiss = { renaming = false }, onSave = { renaming = false; vm.renameSet(set.id, it) })
     }
@@ -227,29 +347,6 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
             confirmButton = { TextButton(onClick = { deleting = false; vm.deleteSet(set.id); onBack() }) { Text("Delete", color = MaterialTheme.colorScheme.error) } },
             dismissButton = { TextButton(onClick = { deleting = false }) { Text("Cancel") } },
         )
-    }
-}
-
-@Composable
-private fun SetSongRow(song: SetSong, inTarget: Boolean, onOpen: () -> Unit, onRemove: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip16()
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
-            .clickable(onClick = onOpen)
-            .padding(start = 12.dp, top = 10.dp, bottom = 10.dp, end = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SongArtwork(song.artworkUrl, sizeDp = 42, cornerDp = 10)
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(song.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(song.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        BpmBadge(song.bpm, inTarget)
-        TextButton(onClick = onRemove) { Text("Remove", style = MaterialTheme.typography.labelSmall) }
     }
 }
 

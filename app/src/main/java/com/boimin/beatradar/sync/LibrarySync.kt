@@ -1,5 +1,10 @@
 package com.boimin.beatradar.sync
 
+import com.boimin.beatradar.net.Milestones
+import com.boimin.beatradar.net.SetPage
+import com.boimin.beatradar.net.SetPush
+import com.boimin.beatradar.net.SetPushResult
+import com.boimin.beatradar.notify.Notifier
 import android.content.Context
 import android.util.Log
 import com.boimin.beatradar.BuildConfig
@@ -71,9 +76,12 @@ class LibrarySync(
             forgetUnnamed()
             syncClips()
             fetchSuggestions()
+            notifyMilestones()
             if (account.user.value != null) {
                 pushLog()
                 pullLog()
+                pushSets()
+                pullSets()
             }
             true
         } catch (e: ApiException) {
@@ -210,6 +218,14 @@ class LibrarySync(
         }
     }
 
+    /** Songs this user brought in that reached 10, 100 or 1,000 listeners: told once, as a notification. */
+    private suspend fun notifyMilestones() {
+        val list: Milestones = account.api.get("v1/me/milestones")
+        if (list.items.isEmpty()) return
+        val notifier = Notifier(context)
+        list.items.forEach(notifier::milestone)
+    }
+
     /** `GET /v1/suggestions` is the truth: show its names on still-unnamed entries, drop the rest. */
     suspend fun fetchSuggestions() {
         val list: SuggestionList = account.api.get("v1/suggestions")
@@ -319,10 +335,48 @@ class LibrarySync(
         }
     }
 
-    /** After signing in: this phone's whole log goes up, and everything from the account comes down. */
+    private val sets get() = db.sets()
+
+    private suspend fun pushSets() {
+        repeat(MAX_ROUNDS) {
+            val changed = sets.changedForBackup(SetBackup.MAX_PUSH)
+            if (changed.isEmpty()) return
+            account.api.post<SetPush, SetPushResult>("v1/me/sets", SetPush(changed.map { SetBackup.toPush(it, sets.songs(it.id)) }))
+            for (s in changed) {
+                if (s.syncState == SyncState.DELETED) sets.dropTombstone(s.id, s.updatedAt) else sets.markClean(s.id, s.updatedAt)
+            }
+            if (changed.size < SetBackup.MAX_PUSH) return
+        }
+    }
+
+    private suspend fun pullSets() {
+        val userId = account.user.value?.id ?: return
+        val cursorKey = "sets_cursor_$userId"
+        var cursor = prefs.getString(cursorKey, null)
+        repeat(MAX_ROUNDS) {
+            val page: SetPage = account.api.get("v1/me/sets", mapOf("since" to cursor))
+            for (r in page.sets) {
+                val local = sets.bySyncId(r.id)
+                when (val action = SetBackup.decide(local, r)) {
+                    SetBackup.Action.Skip -> Unit
+                    SetBackup.Action.Insert, is SetBackup.Action.Update -> {
+                        val (set, songs) = SetBackup.fromRemote(r)
+                        sets.applyRemoteSet(local, set, songs)
+                    }
+                    is SetBackup.Action.Delete -> sets.deleteSet(action.localId)
+                }
+            }
+            cursor = page.cursor
+            prefs.edit().putString(cursorKey, cursor).apply()
+            if (!page.hasMore) return
+        }
+    }
+
+    /** After signing in: this phone's whole log and sets go up, and everything from the account comes down. */
     suspend fun onSignedIn(userId: String) {
-        prefs.edit().remove("log_cursor_$userId").apply()
+        prefs.edit().remove("log_cursor_$userId").remove("sets_cursor_$userId").apply()
         dao.markAllDirty()
+        sets.markAllDirty()
     }
 
     private companion object {

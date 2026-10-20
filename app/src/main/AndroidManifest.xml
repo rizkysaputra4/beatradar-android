@@ -45,8 +45,53 @@
                 <data android:scheme="https" />
                 <data android:host="${shareHost}" />
                 <data android:pathPrefix="/s/" />
+                <data android:pathPrefix="/set/" />
+            </intent-filter>
+            <!-- "BPM of a playlist": share a playlist from Spotify or YouTube Music to BeatRadar. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+
+        <!-- The weekly recap card, shared as an image. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Home-screen widget: live BPM and a start/stop button. -->
+        <receiver
+            android:name=".widget.BeatWidget"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/beat_widget_info" />
+        </receiver>
+
+        <!-- Quick Settings tile: start or stop listening from the notification shade. -->
+        <service
+            android:name=".widget.ListenTile"
+            android:exported="true"
+            android:icon="@drawable/ic_stat_beat"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="true" />
+        </service>
 
         <service
             android:name=".capture.CaptureService"

@@ -351,7 +351,11 @@ interface BeatLogDao {
     }
 }
 
-@Database(entities = [BeatLogEntry::class, Fingerprint::class, UnnamedForget::class, SongSet::class, SetSong::class], version = 6, exportSchema = false)
+@Database(
+    entities = [BeatLogEntry::class, Fingerprint::class, UnnamedForget::class, SongSet::class, SetSong::class, WorkoutPlan::class],
+    version = 7,
+    exportSchema = false,
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun beatLog(): BeatLogDao
     abstract fun sets(): SetDao
@@ -467,9 +471,28 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v7: sets get a sync id for the account backup and share links; workout plans. */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `song_set` ADD COLUMN `syncId` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `song_set` ADD COLUMN `syncState` INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE `song_set` ADD COLUMN `shareSlug` TEXT")
+                // A random UUID (version 4 layout) for every existing set.
+                db.execSQL(
+                    "UPDATE `song_set` SET `syncId` = lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || " +
+                        "substr(lower(hex(randomblob(2))), 2) || '-8' || substr(lower(hex(randomblob(2))), 2) || '-' || lower(hex(randomblob(6)))",
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_song_set_syncId` ON `song_set` (`syncId`)")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `workout_plan` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, " +
+                        "`steps` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
+                )
+            }
+        }
+
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "beatradar.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .addCallback(object : Callback() {
                     // Room doesn't know triggers: fresh installs get them here, upgrades in MIGRATION_4_5.
                     override fun onCreate(db: SupportSQLiteDatabase) = FORGET_TRIGGERS.forEach(db::execSQL)

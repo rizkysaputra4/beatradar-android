@@ -1,5 +1,7 @@
 package com.boimin.beatradar.ui
 
+import androidx.compose.ui.platform.LocalContext
+import com.boimin.beatradar.app
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
@@ -46,6 +48,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.boimin.beatradar.R
 import com.boimin.beatradar.account.AccountViewModel
@@ -77,6 +81,8 @@ class AppActions(
     val openNotificationAccess: () -> Unit,
     /** Android share sheet with the song's share link. */
     val shareSong: (SongSummary) -> Unit,
+    /** Android share sheet with plain text. */
+    val shareText: (String) -> Unit,
     /** Opens a streaming link: the app if installed, else the browser. */
     val openUrl: (String) -> Unit,
     val coffee: StateFlow<CoffeeState>,
@@ -118,11 +124,14 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
     var showSignIn by rememberSaveable { mutableStateOf(false) }
     var showRewards by rememberSaveable { mutableStateOf(false) }
     var showCoffee by rememberSaveable { mutableStateOf(false) }
+    var showShared by rememberSaveable { mutableStateOf(false) }
     var confirmSignOut by rememberSaveable { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { accountVm.loadRewards() }
+    // Back in the app (e.g. after listening with the screen off): beats may have come in meanwhile.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { accountVm.loadRewards() }
     // A share link (App Link) opens the song in the Library.
     LaunchedEffect(openSong) {
         openSong?.let { slug ->
@@ -131,6 +140,11 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
             vm.openSong.value = null
         }
     }
+    // A playlist link shared to BeatRadar: the Library tab opens it.
+    val sharedPlaylist by libraryVm.sharedPlaylistLink.collectAsStateWithLifecycle()
+    LaunchedEffect(sharedPlaylist) { if (sharedPlaylist != null) tab = TAB_LIBRARY }
+    val sharedSetLink by libraryVm.sharedSetLink.collectAsStateWithLifecycle()
+    LaunchedEffect(sharedSetLink) { if (sharedSetLink != null) tab = TAB_LIBRARY }
     LaunchedEffect(accountToast) { accountToast?.let { snackbar.showSnackbar(it); accountVm.toastShown() } }
     LaunchedEffect(logMessage) { logMessage?.let { snackbar.showSnackbar(it); vm.messageShown() } }
     LaunchedEffect(libraryMessage) { libraryMessage?.let { snackbar.showSnackbar(it); libraryVm.messageShown() } }
@@ -194,6 +208,7 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                 onOpenSong = { slug -> tab = TAB_LIBRARY; libraryVm.open(slug) },
                 refreshing = refreshing,
                 onRefresh = vm::refresh,
+                onShowRecap = { vm.showRecap.value = true },
                 onDelete = { entry ->
                     vm.delete(entry)
                     scope.launch {
@@ -212,6 +227,7 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                     requireSignIn = requireSignIn,
                     share = actions.shareSong,
                     openUrl = actions.openUrl,
+                    shareText = actions.shareText,
                 ),
                 modifier = modifier,
             )
@@ -233,12 +249,30 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                 onLeaderboard = accountVm::setOnLeaderboard,
                 coffeeAvailable = coffee is CoffeeState.Ready,
                 onCoffee = { showCoffee = true },
+                onShowShared = { showSettings = false; showShared = true },
             ),
             onDismiss = { showSettings = false },
         )
     }
     if (showSignIn) SignInSheet(accountVm, onDismiss = { showSignIn = false })
-    if (showRewards) RewardsSheet(accountVm, onSignIn = { showRewards = false; requireSignIn {} }, onDismiss = { showRewards = false })
+    val showRecap by vm.showRecap.collectAsStateWithLifecycle()
+    val recap by vm.recap.collectAsStateWithLifecycle()
+    LaunchedEffect(showRecap) { if (showRecap) vm.loadRecap() }
+    if (showRecap) {
+        recap?.let { r ->
+            RecapSheet(r, streak = rewards?.streak, beatsWeek = rewards?.beatsWeek, onDismiss = { vm.showRecap.value = false })
+        }
+    }
+    if (showShared) {
+        val library = LocalContext.current.app.library
+        SharedSheet(load = { library.shared() }, email = user?.email, onDismiss = { showShared = false })
+    }
+    if (showRewards) RewardsSheet(
+        accountVm,
+        onSignIn = { showRewards = false; requireSignIn {} },
+        onOpenSong = { slug -> showRewards = false; tab = TAB_LIBRARY; libraryVm.open(slug) },
+        onDismiss = { showRewards = false },
+    )
     profile?.let { p -> ProfileSheet(p, onReport = { libraryVm.reportNickname(p.nickname); libraryVm.closeProfile() }, onDismiss = libraryVm::closeProfile) }
     if (celebrate.isNotEmpty()) BadgeCelebration(celebrate, onDone = accountVm::celebrated)
     if (showCoffee) CoffeeSheet(coffee, actions.buyCoffee, onDismiss = { showCoffee = false; actions.coffeeThanksShown() })

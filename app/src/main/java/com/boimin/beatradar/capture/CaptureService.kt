@@ -1,5 +1,8 @@
 package com.boimin.beatradar.capture
 
+import com.boimin.beatradar.notify.ClickPlayer
+import com.boimin.beatradar.widget.BeatWidget
+import com.boimin.beatradar.widget.ListenTile
 import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Context
@@ -158,6 +161,14 @@ class CaptureService : Service() {
         scope.launch {
             NowPlayingHub.recognitions.collect { r -> launch(serial) { onRecognition(r) } }
         }
+        // The home-screen widget and the Quick Settings tile follow the live state, at most once a second.
+        scope.launch {
+            Monitor.state.collect { st ->
+                BeatWidget.update(this@CaptureService, st)
+                ListenTile.refresh(this@CaptureService)
+                delay(1_000)
+            }
+        }
         scope.launch(serial) {
             while (true) {
                 delay(PRINT_FLUSH_MS)
@@ -187,6 +198,8 @@ class CaptureService : Service() {
     }
 
     private fun start() {
+        // The microphone would measure the practice click instead of the music.
+        ClickPlayer.stop()
         captureJob?.cancel()
         Monitor.update { MonitorState(status = MonitorStatus.LISTENING, phoneApp = it.phoneApp) }
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
@@ -215,6 +228,8 @@ class CaptureService : Service() {
         captureJob?.cancel()
         captureJob = null
         Monitor.update { MonitorState(phoneApp = it.phoneApp) }
+        BeatWidget.update(this, Monitor.state.value)
+        ListenTile.refresh(this)
         foreground = false
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()

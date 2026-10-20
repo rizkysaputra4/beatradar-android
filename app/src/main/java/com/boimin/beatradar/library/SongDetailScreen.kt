@@ -47,14 +47,22 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.unit.sp
 import com.boimin.beatradar.R
+import androidx.compose.ui.platform.LocalContext
+import com.boimin.beatradar.capture.CaptureService
+import com.boimin.beatradar.capture.Monitor
 import com.boimin.beatradar.net.SongDetail
+import com.boimin.beatradar.net.SongSummary
+import com.boimin.beatradar.net.TempoVotes
 import com.boimin.beatradar.ui.theme.Brand
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @Composable
 internal fun SongDetailScreen(state: DetailState, vm: LibraryViewModel, actions: LibraryActions, modifier: Modifier) {
     var reporting by remember { mutableStateOf(false) }
     var addingToSet by remember { mutableStateOf(false) }
+    var addingSimilar by remember { mutableStateOf<SongSummary?>(null) }
+    var practising by remember { mutableStateOf(false) }
     val song = state.song
     Column(modifier.fillMaxSize()) {
         // Top Action Bar
@@ -147,13 +155,31 @@ internal fun SongDetailScreen(state: DetailState, vm: LibraryViewModel, actions:
             }
         }
         when {
-            song != null -> SongPage(song, vm, actions)
+            song != null -> SongPage(
+                song,
+                state.similar,
+                vm,
+                actions,
+                onAddSimilar = { addingSimilar = it },
+                onPractise = { practising = true },
+            )
             state.loading -> Centered { CircularProgressIndicator() }
             else -> Message("Couldn't load this song", state.error ?: "", retry = vm::refreshDetail)
         }
     }
     if (addingToSet && song != null) {
         AddToSetSheet(song.summary(), vm, onDismiss = { addingToSet = false })
+    }
+    addingSimilar?.let { AddToSetSheet(it, vm, onDismiss = { addingSimilar = null }) }
+    if (practising && song != null) {
+        val monitor by Monitor.state.collectAsStateWithLifecycle()
+        val context = LocalContext.current
+        PracticeSheet(
+            startBpm = song.bpm.roundToInt(),
+            listening = monitor.active,
+            onStopListening = { CaptureService.send(context, CaptureService.ACTION_STOP) },
+            onDismiss = { practising = false },
+        )
     }
     if (reporting && song != null) {
         ReportDialog(
@@ -164,7 +190,14 @@ internal fun SongDetailScreen(state: DetailState, vm: LibraryViewModel, actions:
 }
 
 @Composable
-private fun SongPage(song: SongDetail, vm: LibraryViewModel, actions: LibraryActions) {
+private fun SongPage(
+    song: SongDetail,
+    similar: List<SongSummary>,
+    vm: LibraryViewModel,
+    actions: LibraryActions,
+    onAddSimilar: (SongSummary) -> Unit,
+    onPractise: () -> Unit,
+) {
     var explain by remember { mutableStateOf(false) }
 
     Column(
@@ -203,7 +236,26 @@ private fun SongPage(song: SongDetail, vm: LibraryViewModel, actions: LibraryAct
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                song.broughtInBy?.let { nick ->
+                val facts = listOfNotNull(
+                    song.genre,
+                    song.releaseYear?.toString(),
+                    song.durationMs?.let { "%d:%02d".format(it / 60_000, it / 1000 % 60) },
+                )
+                if (facts.isNotEmpty()) {
+                    Text(facts.joinToString(" · "), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (song.discoveredByMe) {
+                    Spacer(Modifier.height(7.dp))
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Brand.Coral.copy(alpha = 0.14f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    ) {
+                        Text("Discovered by you", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Brand.Coral)
+                    }
+                }
+                song.broughtInBy?.takeIf { !song.discoveredByMe }?.let { nick ->
                     Spacer(Modifier.height(7.dp))
                     Box(
                         Modifier
@@ -265,7 +317,11 @@ private fun SongPage(song: SongDetail, vm: LibraryViewModel, actions: LibraryAct
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    if (song.bpmAlt != null) "½× heard at ${song.bpmAlt.roundToInt()} BPM" else "Verified community tempo",
+                    when {
+                        song.bpmAlt == null -> "Verified community tempo"
+                        song.bpmAlt < song.bpm -> "½× heard at ${song.bpmAlt.roundToInt()} BPM"
+                        else -> "2× heard at ${song.bpmAlt.roundToInt()} BPM"
+                    },
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -342,6 +398,10 @@ private fun SongPage(song: SongDetail, vm: LibraryViewModel, actions: LibraryAct
             )
         }
 
+        val alt = song.bpmAlt
+        val votes = song.tempoVotes
+        if (alt != null && votes != null) TempoVoteCard(song.bpm, alt, votes, onVote = { vm.voteTempo(song.slug, it) })
+
         // Open Track In Streaming Links Card
         if (song.links.isNotEmpty()) {
             Column(
@@ -388,7 +448,120 @@ private fun SongPage(song: SongDetail, vm: LibraryViewModel, actions: LibraryAct
                 }
             }
         }
+        TextButton(onClick = onPractise) { Text("Practise at ${song.bpm.roundToInt()} BPM: play a click") }
+
+        if (similar.isNotEmpty()) {
+            Text(
+                "MORE AT ${song.bpm.roundToInt()} ±2 BPM",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            similar.forEach { s ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(14.dp))
+                        .clickable { vm.open(s.slug) }
+                        .padding(start = 10.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SongArtwork(s.artworkUrl, sizeDp = 36, cornerDp = 8)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(s.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("${s.artist} · ${s.bpm.roundToInt()} BPM", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    TextButton(onClick = { onAddSimilar(s) }) { Text("+ Set") }
+                }
+            }
+        }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+/**
+ * "Which tempo feels right?": the song is heard at two octaves (87 or 174?). Listeners say which one they move to; once
+ * most agree on the other one, it becomes the song's main BPM.
+ */
+@Composable
+private fun TempoVoteCard(bpm: Float, alt: Float, votes: TempoVotes, onVote: (Float) -> Unit) {
+    val total = votes.forBpm + votes.forAlt
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            "WHICH TEMPO FEELS RIGHT?",
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.8.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            "Some hear ${bpm.roundToInt()}, some ${alt.roundToInt()}. Which one do you move to?",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for ((tempo, count) in listOf(bpm to votes.forBpm, alt to votes.forAlt).sortedBy { it.first }) {
+                val mine = votes.myVote != null && abs(votes.myVote - tempo) < 0.5f
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (mine) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .border(1.dp, if (mine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                        .clickable(onClickLabel = "I move to ${tempo.roundToInt()} BPM") { if (!mine) onVote(tempo) }
+                        .padding(vertical = 10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        "${tempo.roundToInt()} BPM",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (mine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        when {
+                            mine -> "Your vote · $count"
+                            count == 1 -> "1 vote"
+                            else -> "$count votes"
+                        },
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        if (total > 0) {
+            val share = votes.forBpm.toFloat() / total
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            ) {
+                // The main tempo's share, on the side its button is on.
+                Box(
+                    Modifier
+                        .fillMaxWidth(share)
+                        .fillMaxHeight()
+                        .align(if (bpm < alt) Alignment.CenterStart else Alignment.CenterEnd)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(MaterialTheme.colorScheme.primary),
+                )
+            }
+        }
     }
 }
 

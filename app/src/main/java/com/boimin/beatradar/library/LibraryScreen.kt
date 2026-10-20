@@ -1,5 +1,6 @@
 package com.boimin.beatradar.library
 
+import androidx.compose.material3.Button
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -58,6 +59,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.boimin.beatradar.R
 import com.boimin.beatradar.data.Settings
+import com.boimin.beatradar.net.Facets
 import com.boimin.beatradar.net.SongSummary
 import com.boimin.beatradar.ui.BpmBadge
 import com.boimin.beatradar.ui.LogFilterPill
@@ -71,6 +73,8 @@ class LibraryActions(
     val requireSignIn: (then: () -> Unit) -> Unit,
     val share: (SongSummary) -> Unit,
     val openUrl: (String) -> Unit,
+    /** The share sheet with plain text (e.g. a Set's song list). */
+    val shareText: (String) -> Unit,
 )
 
 @Composable
@@ -85,6 +89,25 @@ fun LibraryScreen(vm: LibraryViewModel, settings: Settings, actions: LibraryActi
         vm.refresh()
     }
     var showSets by rememberSaveable { mutableStateOf(false) }
+    // A playlist link shared from Spotify or YouTube Music opens "BPM of a playlist" under My sets.
+    val sharedPlaylist by vm.sharedPlaylistLink.collectAsStateWithLifecycle()
+    val sharedSetLink by vm.sharedSetLink.collectAsStateWithLifecycle()
+    LaunchedEffect(sharedSetLink) {
+        sharedSetLink?.let { slug ->
+            vm.close()
+            showSets = true
+            vm.openSharedSet(slug)
+            vm.sharedSetLink.value = null
+        }
+    }
+    LaunchedEffect(sharedPlaylist) {
+        sharedPlaylist?.let { link ->
+            vm.close()
+            showSets = true
+            vm.openPlaylist(link)
+            vm.sharedPlaylistLink.value = null
+        }
+    }
     val d = detail
     if (d != null) {
         BackHandler { vm.close() }
@@ -92,7 +115,7 @@ fun LibraryScreen(vm: LibraryViewModel, settings: Settings, actions: LibraryActi
     } else {
         Column(modifier.fillMaxSize()) {
             LibrarySwitch(showSets, onSelect = { showSets = it })
-            if (showSets) SetsScreen(vm, settings) else SongList(vm, actions, Modifier)
+            if (showSets) SetsScreen(vm, settings, actions) else SongList(vm, actions, Modifier)
         }
     }
 }
@@ -135,7 +158,17 @@ private fun LibrarySwitch(showSets: Boolean, onSelect: (Boolean) -> Unit) {
 private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Modifier) {
     val list by vm.list.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
+    val extras by vm.extras.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    // Long-press starts selecting songs to add to a set together.
+    var selected by remember { mutableStateOf(mapOf<String, SongSummary>()) }
+    var adding by remember { mutableStateOf(false) }
+    val selecting = selected.isNotEmpty()
+    // Back while selecting only ends the selection.
+    BackHandler(enabled = selecting) { selected = emptyMap() }
+    fun toggle(song: SongSummary) {
+        selected = if (song.slug in selected) selected - song.slug else selected + (song.slug to song)
+    }
     val nearEnd by remember {
         derivedStateOf { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index?.let { it >= listState.layoutInfo.totalItemsCount - 5 } ?: false }
     }
@@ -180,7 +213,27 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
             }
         }
 
-        Filters(query, actions.signedIn, onChange = { vm.query.value = it })
+        if (selecting) {
+            Box(Modifier.padding(horizontal = 18.dp, vertical = 4.dp)) {
+                SelectionBar(selected.size, onCancel = { selected = emptyMap() }) {
+                    Button(onClick = { adding = true }, contentPadding = PaddingValues(horizontal = 14.dp)) { Text("Add to set") }
+                }
+            }
+        } else {
+            Filters(query, actions.signedIn, extras.facets, onChange = { vm.query.value = it })
+        }
+        if (adding) {
+            AddManyToSetSheet(
+                songs = selected.values.toList(),
+                vm = vm,
+                onDone = { name ->
+                    vm.say("Added ${selected.size} song${if (selected.size == 1) "" else "s"} to “$name”")
+                    adding = false
+                    selected = emptyMap()
+                },
+                onDismiss = { adding = false },
+            )
+        }
 
         if (!actions.signedIn) {
             Row(
@@ -216,7 +269,29 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
                 contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(list.items, key = { it.slug }) { song -> SongRow(song) { vm.open(song.slug) } }
+                val trending = extras.trending?.takeIf { query.text.isBlank() && !query.lovedOnly && it.items.isNotEmpty() && !selecting }
+                if (trending != null) {
+                    item(key = "trending") {
+                        TrendingRow(
+                            title = if (trending.fallback) "MOST CONFIRMED AT THIS TEMPO" else "TRENDING AT THIS TEMPO",
+                            songs = trending.items,
+                            onOpen = { vm.open(it) },
+                        )
+                    }
+                }
+                items(list.items, key = { it.slug }) { song ->
+                    LibrarySongRow(
+                        title = song.title,
+                        artist = song.artist,
+                        artworkUrl = song.artworkUrl,
+                        bpm = song.bpm,
+                        inTarget = false,
+                        selected = if (selecting) song.slug in selected else null,
+                        onClick = { if (selecting) toggle(song) else vm.open(song.slug) },
+                        onLongClick = { toggle(song) },
+                        counters = { SongCounters(song.listeners, song.confirmations, song.loveCount) },
+                    )
+                }
                 if (list.loading) item { Box(Modifier.fillMaxWidth().padding(12.dp), Alignment.Center) { CircularProgressIndicator(Modifier.size(24.dp)) } }
                 if (list.error != null) item { TextButton(onClick = vm::loadMore, modifier = Modifier.fillMaxWidth()) { Text("${list.error} · Retry") } }
             }
@@ -224,10 +299,39 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
     }
 }
 
-/** Tempo range (collapsible so more tracks fit above the fold), half/double, sort and Loved. */
+/** "Trending at your tempo": this week's most measured songs in the range, swiping sideways above the list. */
 @Composable
-private fun Filters(query: SongQuery, signedIn: Boolean, onChange: (SongQuery) -> Unit) {
+private fun TrendingRow(title: String, songs: List<SongSummary>, onOpen: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            songs.forEach { s ->
+                Column(
+                    Modifier
+                        .width(124.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(14.dp))
+                        .clickable { onOpen(s.slug) }
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    SongArtwork(s.artworkUrl, sizeDp = 104, cornerDp = 10)
+                    Text(s.title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${s.bpm.roundToInt()} BPM · ${s.artist}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+        Spacer(Modifier.height(2.dp))
+    }
+}
+
+/** Tempo range (collapsible so more tracks fit above the fold), half/double, sort, Loved, genre and decade. */
+@Composable
+private fun Filters(query: SongQuery, signedIn: Boolean, facets: Facets, onChange: (SongQuery) -> Unit) {
     var sortOpen by remember { mutableStateOf(false) }
+    var genreOpen by remember { mutableStateOf(false) }
+    var decadeOpen by remember { mutableStateOf(false) }
     var sliderExpanded by remember { mutableStateOf(false) }
     val ranged = query.bpmMin != null && query.bpmMax != null
 
@@ -268,6 +372,38 @@ private fun Filters(query: SongQuery, signedIn: Boolean, onChange: (SongQuery) -
             DropdownMenu(expanded = sortOpen, onDismissRequest = { sortOpen = false }) {
                 SongSort.entries.forEach { s ->
                     DropdownMenuItem(text = { Text(s.label) }, onClick = { sortOpen = false; onChange(query.copy(sort = s)) })
+                }
+            }
+        }
+        if (facets.genres.isNotEmpty() || query.genre != null) {
+            Box {
+                LogFilterPill(
+                    label = "${query.genre ?: "Genre"} ▾",
+                    selected = query.genre != null,
+                    activeColor = MaterialTheme.colorScheme.primary,
+                    onClick = { genreOpen = true },
+                )
+                DropdownMenu(expanded = genreOpen, onDismissRequest = { genreOpen = false }) {
+                    DropdownMenuItem(text = { Text("Any genre") }, onClick = { genreOpen = false; onChange(query.copy(genre = null)) })
+                    facets.genres.forEach { g ->
+                        DropdownMenuItem(text = { Text("${g.genre} · ${g.songs}") }, onClick = { genreOpen = false; onChange(query.copy(genre = g.genre)) })
+                    }
+                }
+            }
+        }
+        if (facets.decades.isNotEmpty() || query.decade != null) {
+            Box {
+                LogFilterPill(
+                    label = "${query.decade?.let { "${it}s" } ?: "Decade"} ▾",
+                    selected = query.decade != null,
+                    activeColor = MaterialTheme.colorScheme.primary,
+                    onClick = { decadeOpen = true },
+                )
+                DropdownMenu(expanded = decadeOpen, onDismissRequest = { decadeOpen = false }) {
+                    DropdownMenuItem(text = { Text("Any decade") }, onClick = { decadeOpen = false; onChange(query.copy(decade = null)) })
+                    facets.decades.forEach { d ->
+                        DropdownMenuItem(text = { Text("${d.decade}s · ${d.songs}") }, onClick = { decadeOpen = false; onChange(query.copy(decade = d.decade)) })
+                    }
                 }
             }
         }
@@ -333,44 +469,6 @@ private fun Filters(query: SongQuery, signedIn: Boolean, onChange: (SongQuery) -
 }
 
 /** Artwork-first on the left, track metadata in the middle, crisp squircle BPM badge on the right. */
-@Composable
-private fun SongRow(song: SongSummary, onOpen: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
-            .clickable(onClick = onOpen)
-            .padding(11.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SongArtwork(song.artworkUrl, sizeDp = 46, cornerDp = 11)
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                song.title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                song.artist,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(3.dp))
-            SongCounters(song.listeners, song.confirmations, song.loveCount)
-        }
-        Spacer(Modifier.width(10.dp))
-        BpmBadge(song.bpm, inRange = false)
-    }
-}
-
 @Composable
 internal fun SongArtwork(artworkUrl: String?, sizeDp: Int, cornerDp: Int) {
     if (artworkUrl != null) {

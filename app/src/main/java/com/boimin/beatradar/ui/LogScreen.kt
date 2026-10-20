@@ -99,6 +99,8 @@ fun LogScreen(
     onRefresh: () -> Unit,
     onDelete: (BeatLogEntry) -> Unit,
     onClear: () -> Unit,
+    /** Opens the weekly tempo recap. */
+    onShowRecap: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var confirmClear by remember { mutableStateOf(false) }
@@ -147,6 +149,18 @@ fun LogScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+            }
+            Box(
+                Modifier
+                    .height(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                    .clickable(onClickLabel = "Weekly tempo recap", onClick = onShowRecap)
+                    .padding(horizontal = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("My week", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
             }
             Box(
                 Modifier

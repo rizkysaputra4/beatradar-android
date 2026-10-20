@@ -10,6 +10,7 @@ import com.boimin.beatradar.library.LibraryRepository
 import com.boimin.beatradar.meta.NowPlayingHub
 import com.boimin.beatradar.meta.SongNamer
 import com.boimin.beatradar.notify.Notifier
+import com.boimin.beatradar.notify.RecapWorker
 import com.boimin.beatradar.sync.LibrarySync
 import com.boimin.beatradar.sync.SyncWorker
 import com.boimin.beatradar.sync.UnnamedRules
@@ -47,6 +48,7 @@ class BeatRadarApplication : Application() {
             }
         }
         requestSync()
+        RecapWorker.schedule(this)
     }
 
     /** Uploads new measurements (and syncs the log backup when signed in) as soon as there is a network. */

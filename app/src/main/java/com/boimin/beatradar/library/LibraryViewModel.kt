@@ -5,7 +5,14 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.boimin.beatradar.app
 import com.boimin.beatradar.net.ApiException
+import com.boimin.beatradar.net.BuildIn
+import com.boimin.beatradar.net.BuiltSet
+import com.boimin.beatradar.net.Facets
+import com.boimin.beatradar.net.PlaylistBpm
+import com.boimin.beatradar.net.SharedSet
+import com.boimin.beatradar.net.Trending
 import com.boimin.beatradar.net.PublicProfile
+import com.boimin.beatradar.net.SongLink
 import com.boimin.beatradar.net.SongDetail
 import com.boimin.beatradar.net.SongSummary
 import kotlinx.coroutines.FlowPreview
@@ -36,16 +43,48 @@ data class ListState(
     val loadedOnce: Boolean = false,
 )
 
+/** "BPM of my playlist": the link being looked up and what came back. */
+data class PlaylistState(
+    val link: String = "",
+    val loading: Boolean = false,
+    val error: String? = null,
+    val result: PlaylistBpm? = null,
+)
+
 data class DetailState(
     val slug: String,
     val song: SongDetail? = null,
     val loading: Boolean = true,
     val error: String? = null,
+    /** "Same tempo, more songs": other well-confirmed songs within ±2 BPM. */
+    val similar: List<SongSummary> = emptyList(),
 )
+
+/** A set someone shared (`/set/<slug>`), opened to view and copy. */
+data class SharedSetState(val slug: String, val set: SharedSet? = null, val error: String? = null)
+
+/** "Build me a Set": the request and what came back. */
+data class BuildState(
+    val minutes: Int = 30,
+    val onlyMine: Boolean = false,
+    val loading: Boolean = false,
+    val result: BuiltSet? = null,
+    val error: String? = null,
+    val seed: Int = 0,
+)
+
+/** Discover's extras for the current range: trending songs and the genre/decade filters worth offering. */
+data class DiscoverExtras(val trending: Trending? = null, val facets: Facets = Facets())
 
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
     private val repo = application.app.library
     private val setDao = application.app.database.sets()
+    private val signedIn: Boolean get() = getApplication<Application>().app.account.user.value != null
+
+    /** A set changed: signed in, it goes to the account backup soon. */
+    private fun setsChanged() {
+        if (signedIn) getApplication<Application>().app.requestSync()
+    }
 
     // Sets (the user's song lists by tempo)
 
@@ -63,26 +102,220 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         val now = System.currentTimeMillis()
         val id = setDao.insertSet(SongSet(name = clean, createdAt = now, updatedAt = now))
         song?.let { addToSet(id, it) }
+        setsChanged()
         return id
     }
 
     fun renameSet(id: Long, name: String) {
         val clean = SetRules.cleanName(name) ?: return
-        viewModelScope.launch { setDao.rename(id, clean, System.currentTimeMillis()) }
+        viewModelScope.launch { setDao.rename(id, clean, System.currentTimeMillis()); setsChanged() }
     }
 
+    /** Signed in, a delete is a tombstone so it reaches the user's other phones. */
     fun deleteSet(id: Long) {
-        viewModelScope.launch { setDao.deleteSet(id) }
+        viewModelScope.launch {
+            if (signedIn) setDao.markDeleted(id, System.currentTimeMillis()) else setDao.deleteSet(id)
+            setsChanged()
+        }
     }
 
     fun toggleInSet(setId: Long, song: SongSummary, inSet: Boolean) {
         viewModelScope.launch {
             if (inSet) setDao.remove(setId, song.slug, System.currentTimeMillis()) else addToSet(setId, song)
+            setsChanged()
         }
     }
 
     fun removeFromSet(setId: Long, slug: String) {
-        viewModelScope.launch { setDao.remove(setId, slug, System.currentTimeMillis()) }
+        viewModelScope.launch { setDao.remove(setId, slug, System.currentTimeMillis()); setsChanged() }
+    }
+
+    /** Several songs into a set at once (Discover's selection), skipping ones already in it. */
+    fun addSongsToSet(setId: Long, songs: List<SongSummary>) {
+        viewModelScope.launch {
+            songs.distinctBy { it.slug }.forEach { addToSet(setId, it) }
+            setsChanged()
+        }
+    }
+
+    /** Several songs out of a set at once (the set's selection). */
+    fun removeSongs(setId: Long, slugs: Collection<String>) {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            slugs.forEach { setDao.remove(setId, it, now) }
+            setsChanged()
+        }
+    }
+
+    /** Adds [song] to a set (from a quick "+" button), without toggling it off when it's already there. */
+    fun addToSetById(setId: Long, song: SongSummary) {
+        viewModelScope.launch { addToSet(setId, song); setsChanged() }
+    }
+
+    /** Shares a set as a link (sharing again updates the same link). Returns the text for the share sheet. */
+    suspend fun shareSet(setId: Long): String? {
+        val set = setDao.byId(setId) ?: return null
+        val songs = setDao.songs(setId)
+        if (songs.isEmpty()) {
+            _message.value = "Add songs before sharing the set"
+            return null
+        }
+        return try {
+            val out = repo.shareSet(set.syncId, set.name, songs.map { it.slug })
+            setDao.setShareSlug(setId, out.slug)
+            "${set.name} · ${SetRules.span(songs.minOf { it.bpm }, songs.maxOf { it.bpm })} on BeatRadar ${out.url}"
+        } catch (e: ApiException) {
+            _message.value = describe(e)
+            null
+        }
+    }
+
+    // A shared set from a link
+
+    private val _sharedSet = MutableStateFlow<SharedSetState?>(null)
+    val sharedSet: StateFlow<SharedSetState?> = _sharedSet
+
+    /** A `/set/<slug>` link was opened. */
+    val sharedSetLink = MutableStateFlow<String?>(null)
+
+    fun openSharedSet(slug: String) {
+        _sharedSet.value = SharedSetState(slug)
+        viewModelScope.launch {
+            _sharedSet.value = try {
+                SharedSetState(slug, set = repo.sharedSet(slug))
+            } catch (e: ApiException) {
+                SharedSetState(slug, error = if (e.http == 404) "This shared set doesn't exist anymore" else describe(e))
+            }
+        }
+    }
+
+    fun closeSharedSet() {
+        _sharedSet.value = null
+    }
+
+    // Build me a Set
+
+    private val _build = MutableStateFlow<BuildState?>(null)
+    val build: StateFlow<BuildState?> = _build
+
+    fun openBuild() {
+        _build.value = BuildState()
+    }
+
+    fun closeBuild() {
+        _build.value = null
+    }
+
+    /** Builds a set in [range]; [again] mixes other equally good songs in. */
+    fun runBuild(range: IntRange, halfDouble: Boolean, minutes: Int, onlyMine: Boolean, again: Boolean = false) {
+        val seed = if (again) (_build.value?.seed ?: 0) + 1 else 0
+        _build.value = BuildState(minutes, onlyMine, loading = true, seed = seed)
+        viewModelScope.launch {
+            try {
+                val result = repo.buildSet(BuildIn(range.first, range.last, halfDouble, minutes, onlyMine, seed = seed))
+                _build.update { it?.copy(loading = false, result = result) }
+            } catch (e: ApiException) {
+                _build.update { it?.copy(loading = false, error = describe(e)) }
+            }
+        }
+    }
+
+    // Discover extras
+
+    private val _extras = MutableStateFlow(DiscoverExtras())
+    val extras: StateFlow<DiscoverExtras> = _extras
+
+    private fun loadExtras() {
+        val q = query.value
+        viewModelScope.launch {
+            val trending = runCatching { repo.trending(q) }.getOrNull()
+            val facets = runCatching { repo.facets(q) }.getOrNull() ?: Facets()
+            _extras.value = DiscoverExtras(trending, facets)
+        }
+    }
+
+    /** A new set holding [songs] (e.g. a playlist's measured tracks). Returns its id, or null for an empty name. */
+    suspend fun createSetWith(name: String, songs: List<SongSummary>): Long? {
+        val id = createSet(name) ?: return null
+        songs.distinctBy { it.slug }.forEach { addToSet(id, it) }
+        setsChanged()
+        return id
+    }
+
+    private val linkCache = mutableMapOf<String, List<SongLink>>()
+
+    /** The app the open set plays in (set id to app), picked at its first play; forgotten when the set is closed. */
+    var playChoice: Pair<Long, PlayLinks.Service>? = null
+
+    /**
+     * The song in [service]: its own track page when the Library knows it, else a search there. Offline, the search
+     * still works.
+     */
+    suspend fun playUrl(slug: String, title: String, artist: String, service: PlayLinks.Service): String {
+        val links = linkCache[slug] ?: try {
+            repo.song(slug).links.also { linkCache[slug] = it }
+        } catch (_: ApiException) {
+            emptyList()
+        }
+        return PlayLinks.url(service, links, title, artist)
+    }
+
+    /** The set as one YouTube queue, or null (with a message) when the server can't be reached. */
+    suspend fun youtubeQueue(slugs: List<String>): com.boimin.beatradar.net.YoutubeQueue? = try {
+        repo.youtubeQueue(slugs)
+    } catch (e: ApiException) {
+        _message.value = describe(e)
+        null
+    }
+
+    // BPM of my playlist
+
+    private val _playlist = MutableStateFlow<PlaylistState?>(null)
+    /** The playlist screen, or null when closed. */
+    val playlist: StateFlow<PlaylistState?> = _playlist
+
+    /** A playlist link shared to BeatRadar from another app, waiting for the Library tab to open it. */
+    val sharedPlaylistLink = MutableStateFlow<String?>(null)
+
+    fun openPlaylist(link: String = "") {
+        _playlist.value = PlaylistState(link = link)
+        if (link.isNotBlank()) lookupPlaylist(link)
+    }
+
+    fun closePlaylist() {
+        _playlist.value = null
+    }
+
+    fun lookupPlaylist(link: String) {
+        _playlist.value = PlaylistState(link = link, loading = true)
+        viewModelScope.launch {
+            try {
+                val result = repo.playlist(link.trim())
+                _playlist.update { p -> if (p?.link == link) p.copy(loading = false, result = result) else p }
+            } catch (e: ApiException) {
+                val message = when (e.code) {
+                    "not_a_playlist", "playlist_not_found", "playlist_unavailable" -> e.message
+                    else -> describe(e)
+                }
+                _playlist.update { p -> if (p?.link == link) p.copy(loading = false, error = message) else p }
+            }
+        }
+    }
+
+    // Which tempo feels right?
+
+    fun voteTempo(slug: String, bpm: Float) {
+        viewModelScope.launch {
+            try {
+                val votes = repo.voteTempo(slug, bpm)
+                _detail.update { d ->
+                    val song = d?.song
+                    if (song?.slug != slug) d else d.copy(song = song.copy(tempoVotes = votes))
+                }
+            } catch (e: ApiException) {
+                _message.value = describe(e)
+            }
+        }
     }
 
     private suspend fun addToSet(setId: Long, song: SongSummary) {
@@ -131,6 +364,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun reload() {
+        loadExtras()
         loadJob?.cancel()
         _list.update { it.copy(loading = true, error = null) }
         loadJob = viewModelScope.launch {
@@ -176,6 +410,8 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             try {
                 val song = repo.song(slug)
                 _detail.update { d -> if (d?.slug == slug) d.copy(song = song, loading = false, error = null) else d }
+                val similar = runCatching { repo.similar(song.bpm).items.filter { it.slug != song.slug }.take(8) }.getOrDefault(emptyList())
+                _detail.update { d -> if (d?.slug == slug) d.copy(similar = similar) else d }
             } catch (e: ApiException) {
                 _detail.update { d -> if (d?.slug == slug) d.copy(loading = false, error = describe(e)) else d }
             }
@@ -239,6 +475,11 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 describe(e)
             }
         }
+    }
+
+    /** A short message for the snackbar (e.g. "Added 3 songs to …"). */
+    fun say(text: String) {
+        _message.value = text
     }
 
     fun messageShown() {

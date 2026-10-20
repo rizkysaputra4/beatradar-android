@@ -93,15 +93,112 @@ val ApiJson = Json {
     val loveCount: Int = 0,
     val artworkUrl: String? = null,
     val lovedByMe: Boolean = false,
+    val genre: String? = null,
+    val releaseYear: Int? = null,
+    val durationMs: Int? = null,
     val links: List<SongLink> = emptyList(),
     val broughtInBy: String? = null,
+    /** This phone (or another of the signed-in user's) brought the song into the Library. */
+    val discoveredByMe: Boolean = false,
+    /** "Which tempo feels right?", while the song is also heard at [bpmAlt]. */
+    val tempoVotes: TempoVotes? = null,
     val createdAt: String? = null,
 ) {
     fun summary() = SongSummary(slug, title, artist, bpm, bpmAlt, listeners, confirmations, loveCount, artworkUrl, lovedByMe)
 }
+@Serializable data class Trending(val items: List<SongSummary> = emptyList(), val fallback: Boolean = false)
+@Serializable data class GenreFacet(val genre: String, val songs: Int = 0)
+@Serializable data class DecadeFacet(val decade: Int, val songs: Int = 0)
+@Serializable data class Facets(val genres: List<GenreFacet> = emptyList(), val decades: List<DecadeFacet> = emptyList())
+@Serializable data class TempoVotes(val forBpm: Int = 0, val forAlt: Int = 0, val myVote: Float? = null)
+@Serializable data class TempoVoteIn(val bpm: Float)
 @Serializable data class LoveState(val loved: Boolean, val loveCount: Int)
 @Serializable data class ReportIn(val reason: String, val note: String? = null)
 @Serializable data class NicknameReport(val note: String? = null)
+
+// BPM of my playlist
+
+@Serializable data class PlaylistIn(val link: String)
+@Serializable data class PlaylistTrack(val position: Int, val title: String, val artist: String, val song: SongSummary? = null)
+@Serializable data class PlaylistBpm(
+    val service: String,
+    val name: String? = null,
+    val total: Int = 0,
+    val matched: Int = 0,
+    val tracks: List<PlaylistTrack> = emptyList(),
+)
+
+// Sets: backup, share links, Build me a Set
+
+@Serializable data class SetIn(
+    val id: String,
+    val name: String,
+    val songs: List<String>,
+    val createdAt: String,
+    val updatedAt: String,
+    val deleted: Boolean = false,
+)
+@Serializable data class SetPush(val sets: List<SetIn>)
+@Serializable data class SetPushResult(val applied: Int = 0)
+@Serializable data class SetOut(
+    val id: String,
+    val name: String,
+    val songs: List<SongSummary> = emptyList(),
+    val createdAt: String,
+    val updatedAt: String,
+    val deleted: Boolean = false,
+)
+@Serializable data class SetPage(val sets: List<SetOut>, val cursor: String, val hasMore: Boolean)
+@Serializable data class ShareIn(val clientRef: String, val name: String, val songs: List<String>)
+@Serializable data class ShareOut(val slug: String, val url: String)
+@Serializable data class SharedSet(
+    val slug: String,
+    val name: String,
+    val songs: List<SongSummary> = emptyList(),
+    val sharedBy: String? = null,
+)
+@Serializable data class BuildIn(
+    val bpmMin: Int,
+    val bpmMax: Int,
+    val halfDouble: Boolean,
+    val minutes: Int,
+    val onlyMine: Boolean,
+    val exclude: List<String> = emptyList(),
+    val seed: Int = 0,
+)
+@Serializable data class BuiltSong(
+    val slug: String,
+    val title: String,
+    val artist: String,
+    val bpm: Float,
+    val bpmAlt: Float? = null,
+    val listeners: Int = 0,
+    val confirmations: Int = 0,
+    val loveCount: Int = 0,
+    val artworkUrl: String? = null,
+    val lovedByMe: Boolean = false,
+    val durationMs: Int,
+    val estimated: Boolean = false,
+) {
+    fun summary() = SongSummary(slug, title, artist, bpm, bpmAlt, listeners, confirmations, loveCount, artworkUrl, lovedByMe)
+}
+@Serializable data class YoutubeQueueIn(val songs: List<String>)
+/** [url] opens the songs found as one temporary YouTube playlist; [missing] slugs aren't on YouTube yet. */
+@Serializable data class YoutubeQueue(val url: String? = null, val found: Int = 0, val missing: List<String> = emptyList())
+@Serializable data class BuiltSet(val songs: List<BuiltSong> = emptyList(), val totalMs: Long = 0, val targetMs: Long = 0)
+
+// What I've shared
+
+@Serializable data class SharedKind(val kind: String, val count: Long = 0, val lastAt: String? = null, val kept: String = "")
+/** [deletionEmail]: where to ask for deletion (an admin deletes); [reference] identifies this phone in the request. */
+@Serializable data class SharedSummary(val items: List<SharedKind> = emptyList(), val deletionEmail: String? = null, val reference: String = "")
+
+// Crowd names and supporters
+
+@Serializable data class NameProposalIn(val title: String, val artist: String)
+@Serializable data class NameProposalOut(val recorded: Boolean = false)
+@Serializable data class SupporterIn(val productId: String, val purchaseToken: String)
+@Serializable data class SupporterOut(val supporter: Boolean = false)
 
 // Log backup
 
@@ -159,8 +256,10 @@ val ApiJson = Json {
     val badges: List<BadgeView> = emptyList(),
     val newBadges: List<String> = emptyList(),
     val signedIn: Boolean = false,
+    /** Bought a coffee: a small badge next to the nickname. */
+    val supporter: Boolean = false,
 )
-@Serializable data class BoardEntry(val rank: Long, val nickname: String, val beats: Long, val grooveMaster: Long = 0)
+@Serializable data class BoardEntry(val rank: Long, val nickname: String, val beats: Long, val grooveMaster: Long = 0, val supporter: Boolean = false)
 @Serializable data class BoardView(
     val period: String = "week",
     val entries: List<BoardEntry> = emptyList(),
@@ -168,8 +267,27 @@ val ApiJson = Json {
     val lastGrooveMaster: String? = null,
     val refreshedAt: String? = null,
 )
+/** A song the user brought in, with the highest listener milestone it reached (10, 100, 1000). */
+@Serializable data class Discovery(
+    val slug: String,
+    val title: String,
+    val artist: String,
+    val bpm: Float,
+    val listeners: Int = 0,
+    val artworkUrl: String? = null,
+    val milestone: Int? = null,
+)
+@Serializable data class Discoveries(val total: Long = 0, val items: List<Discovery> = emptyList())
+@Serializable data class Milestone(val slug: String, val title: String, val artist: String, val milestone: Int, val listeners: Int = 0)
+@Serializable data class Milestones(val items: List<Milestone> = emptyList())
 @Serializable data class PublicBadge(val code: String, val name: String, val tier: Int = 0, val count: Int = 0)
-@Serializable data class PublicProfile(val nickname: String, val beatsAll: Long = 0, val grooveMaster: Long = 0, val badges: List<PublicBadge> = emptyList())
+@Serializable data class PublicProfile(
+    val nickname: String,
+    val beatsAll: Long = 0,
+    val grooveMaster: Long = 0,
+    val supporter: Boolean = false,
+    val badges: List<PublicBadge> = emptyList(),
+)
 
 // Unnamed songs and name suggestions (PLAN §5c)
 

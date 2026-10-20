@@ -11,12 +11,17 @@ import android.content.pm.PackageManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
+import com.boimin.beatradar.BuildConfig
 import com.boimin.beatradar.MainActivity
 import com.boimin.beatradar.R
 import com.boimin.beatradar.capture.CaptureService
 import com.boimin.beatradar.capture.MonitorState
 import com.boimin.beatradar.capture.MonitorStatus
 import com.boimin.beatradar.meta.ShazamBridge
+import com.boimin.beatradar.data.Recap
+import com.boimin.beatradar.net.Milestone
+import java.text.NumberFormat
 import kotlin.math.roundToInt
 import androidx.media.app.NotificationCompat.MediaStyle
 
@@ -78,6 +83,50 @@ class Notifier(private val context: Context) {
         notify(ID_MATCH, builder.build())
     }
 
+    /** "You brought this song in": a song this user first measured reached [m] listeners. Tapping opens it. */
+    fun milestone(m: Milestone) {
+        val open = PendingIntent.getActivity(
+            context, m.slug.hashCode(),
+            Intent(Intent.ACTION_VIEW, "https://${BuildConfig.SHARE_HOST}/s/${m.slug}".toUri(), context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        notify(
+            ID_MILESTONE_BASE + (m.slug.hashCode() and 0xffff),
+            NotificationCompat.Builder(context, CHANNEL_SONGS)
+                .setSmallIcon(R.drawable.ic_stat_beat)
+                .setColor(ContextCompat.getColor(context, R.color.brand_coral))
+                .setContentTitle("${m.title} reached ${NumberFormat.getIntegerInstance().format(m.milestone)} listeners")
+                .setContentText("You brought this song in. ${m.artist} · now ${NumberFormat.getIntegerInstance().format(m.listeners)} listeners")
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .setCategory(NotificationCompat.CATEGORY_SOCIAL)
+                .build(),
+        )
+    }
+
+    /** Sunday evening: "Your week in tempo". Tapping opens the recap. */
+    fun recap(r: Recap) {
+        val open = PendingIntent.getActivity(
+            context, REQUEST_RECAP,
+            Intent(context, MainActivity::class.java).putExtra(MainActivity.EXTRA_OPEN_RECAP, true).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        notify(
+            ID_RECAP,
+            NotificationCompat.Builder(context, CHANNEL_SONGS)
+                .setSmallIcon(R.drawable.ic_stat_beat)
+                .setColor(ContextCompat.getColor(context, R.color.brand_coral))
+                .setContentTitle("Your week in tempo")
+                .setContentText(
+                    "${r.songs} songs" + (r.topBand?.let { ", mostly at $it–${it + 9} BPM" } ?: "") + ". See your recap and share it.",
+                )
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .build(),
+        )
+    }
+
     fun stoppedBySystem() {
         notify(
             ID_SYSTEM,
@@ -114,9 +163,13 @@ class Notifier(private val context: Context) {
     companion object {
         const val CHANNEL_LISTENING = "listening"
         const val CHANNEL_MATCH = "matches"
+        const val CHANNEL_SONGS = "your_songs"
         const val ID_LISTENING = 1
         const val ID_MATCH = 2
         const val ID_SYSTEM = 3
+        private const val ID_MILESTONE_BASE = 1_000
+        const val ID_RECAP = 4
+        private const val REQUEST_RECAP = 12
         private const val REQUEST_OPEN = 10
         private const val REQUEST_SHAZAM = 11
 
@@ -134,6 +187,11 @@ class Notifier(private val context: Context) {
                     // BeatRadar vibrates itself (works on silent); keep the channel quiet.
                     setSound(null, null)
                     enableVibration(false)
+                },
+            )
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL_SONGS, "Songs you brought in", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                    description = "When a song you first added reaches 10, 100 or 1,000 listeners"
                 },
             )
         }

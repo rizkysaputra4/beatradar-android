@@ -8,9 +8,12 @@ import com.boimin.beatradar.data.ClipStore
 import com.boimin.beatradar.net.ApiException
 import com.boimin.beatradar.net.BoardView
 import com.boimin.beatradar.net.Me
+import com.boimin.beatradar.net.Discoveries
 import com.boimin.beatradar.net.Rewards
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /** Sign-in sheet progress: what's busy, and the last error or info line. */
@@ -32,6 +35,10 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
 
     private val _signIn = MutableStateFlow(SignInState())
     val signIn: StateFlow<SignInState> = _signIn
+
+    private val _discoveries = MutableStateFlow<Discoveries?>(null)
+    /** Songs this user (or phone) brought into the Library. */
+    val discoveries: StateFlow<Discoveries?> = _discoveries
 
     private val _rewards = MutableStateFlow<Rewards?>(null)
     val rewards: StateFlow<Rewards?> = _rewards
@@ -60,6 +67,16 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
             }
         }
         viewModelScope.launch { account.refreshMe() }
+        // The server awards beats a few seconds after a measurement arrives (its consensus job): refresh the flame then,
+        // and once more in case that job was busy. A burst of uploads makes one refresh.
+        viewModelScope.launch {
+            application.app.sync.uploaded.collectLatest {
+                for (wait in REWARDS_AFTER_UPLOAD_MS) {
+                    delay(wait)
+                    loadRewards()
+                }
+            }
+        }
     }
 
     fun setAfterSignIn(action: (() -> Unit)?) {
@@ -144,6 +161,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
 
     private fun clearAccountData() {
         _rewards.value = null
+        _discoveries.value = null
         _board.value = null
         _celebrate.value = emptyList()
     }
@@ -176,6 +194,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
 
     /** Beats and badges; new badges are celebrated once (the call marks them seen). */
     fun loadRewards() {
+        viewModelScope.launch { runCatching { library.discoveries() }.getOrNull()?.let { _discoveries.value = it } }
         viewModelScope.launch {
             val r = runCatching { library.rewards() }.getOrNull() ?: return@launch
             _rewards.value = r
@@ -227,3 +246,6 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 }
+
+/** After an upload, check for new beats this long later (the server's consensus job runs about 5 s after it), and again. */
+private val REWARDS_AFTER_UPLOAD_MS = listOf(7_000L, 15_000L)

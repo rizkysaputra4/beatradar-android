@@ -10,6 +10,9 @@ import com.boimin.beatradar.data.BeatLogEntry
 import com.boimin.beatradar.data.ClipStore
 import com.boimin.beatradar.sync.ClipRules
 import com.boimin.beatradar.data.NameSource
+import com.boimin.beatradar.data.PrintUpload
+import com.boimin.beatradar.data.Recap
+import com.boimin.beatradar.data.RecapCalc
 import com.boimin.beatradar.data.Settings
 import com.boimin.beatradar.data.SyncState
 import com.boimin.beatradar.meta.NowPlayingListener
@@ -32,6 +35,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repo = application.app.settings
     private val dao = application.app.database.beatLog()
+
 
     /** Null until loaded, so the splash screen can wait and the theme never flashes. */
     val settings: StateFlow<Settings?> = repo.settings
@@ -124,9 +128,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** The user typed a name: always applies, and merges with an entry of the same song. */
+    /**
+     * The user typed a name: always applies, and merges with an entry of the same song. An unnamed song whose
+     * fingerprint went to the server also proposes the name for that unknown song (crowd names: an admin decides),
+     * before the sync forgets the fingerprint.
+     */
     fun rename(entry: BeatLogEntry, title: String, artist: String) {
         viewModelScope.launch {
+            if (entry.title == null && entry.printUpload == PrintUpload.SENT && artist.isNotBlank()) {
+                runCatching { getApplication<Application>().app.library.proposeName(entry.id.toString(), title, artist) }
+            }
             SongNamer.name(getApplication(), entry.id, title, artist, sourceLabel = null, source = NameSource.MANUAL, manual = true)
             getApplication<Application>().app.requestSync()
         }
@@ -158,6 +169,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (signedIn) dao.markAllDeleted() else dao.clear()
             getApplication<Application>().app.requestSync()
         }
+    }
+
+    /** The weekly recap sheet is open (from the Log tab or the Sunday notification). */
+    val showRecap = MutableStateFlow(false)
+
+    private val _recap = MutableStateFlow<Recap?>(null)
+    val recap: StateFlow<Recap?> = _recap
+
+    fun loadRecap() {
+        viewModelScope.launch { _recap.value = RecapCalc.week(dao.all(), System.currentTimeMillis()) }
     }
 
     /** A song to open in the Library (from a share link). */

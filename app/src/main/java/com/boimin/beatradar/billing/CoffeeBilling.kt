@@ -33,10 +33,11 @@ sealed interface CoffeeState {
 }
 
 /**
- * "Buy me a coffee" (PLAN §8): consumable Play products, so a tip can be given again. Nothing is unlocked and no
- * server is involved; a purchase is consumed (which also acknowledges it) as soon as Play confirms payment.
+ * "Buy me a coffee" (PLAN §8): consumable Play products, so a tip can be given again. Nothing is unlocked; the
+ * purchase is sent to the server for the supporter badge ([onPurchased], which checks it with Google Play), then
+ * consumed (which also acknowledges it) as soon as Play confirms payment.
  */
-class CoffeeBilling(context: Context) {
+class CoffeeBilling(context: Context, private val onPurchased: suspend (productId: String, purchaseToken: String) -> Unit = { _, _ -> }) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val _state = MutableStateFlow<CoffeeState>(CoffeeState.Loading)
     val state: StateFlow<CoffeeState> = _state
@@ -91,6 +92,8 @@ class CoffeeBilling(context: Context) {
     private fun handle(purchase: Purchase) {
         when (purchase.purchaseState) {
             Purchase.PurchaseState.PURCHASED -> scope.launch {
+                // The badge is a thank-you: a failed claim (offline) never blocks the tip.
+                purchase.products.firstOrNull()?.let { runCatching { onPurchased(it, purchase.purchaseToken) } }
                 client.consumePurchase(ConsumeParams.newBuilder().setPurchaseToken(purchase.purchaseToken).build())
                 (_state.value as? CoffeeState.Ready)?.let { _state.value = it.copy(thanks = true, pending = false) }
             }
