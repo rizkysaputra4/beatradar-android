@@ -478,7 +478,8 @@ private fun Header(title: String, rewards: @Composable () -> Unit, onSettings: (
                 .background(Tone.logoTile),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(painterResource(R.drawable.ic_graphic_eq), contentDescription = null, tint = Tone.logo, modifier = Modifier.size(24.dp))
+            // The app logo in its own colours, half the tile like the launcher icon.
+            Icon(painterResource(R.drawable.ic_logo), contentDescription = null, tint = Color.Unspecified, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.width(10.dp))
         Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))

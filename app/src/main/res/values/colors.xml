@@ -1,5 +1,6 @@
 <resources>
-    <color name="brand_indigo">#3D2C8D</color>
+    <color name="brand_indigo">#7C6CF6</color>
     <color name="brand_coral">#FF5A5F</color>
-    <color name="window_background">#FCF8FF</color>
+    <color name="splash_background">#0C0B10</color>
+    <color name="window_background">#0C0B10</color>
 </resources>

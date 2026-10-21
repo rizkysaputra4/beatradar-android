@@ -58,7 +58,6 @@ object Tone {
     val sheetLine: Color @Composable get() = if (isDark()) Color(0xFF262532) else Color(0xFFE2E1EA)
     val primarySoft: Color @Composable get() = if (isDark()) Color(0xFFB8AEF7) else Color(0xFF4A3FC2)
     val logoTile: Color @Composable get() = if (isDark()) Color(0xFF1E1B33) else Color(0xFFECE9FF)
-    val logo: Color @Composable get() = if (isDark()) Color(0xFF9D90FF) else Color(0xFF5B4FD6)
 }
 
 private val LightColors = lightColorScheme(

@@ -1,0 +1,40 @@
+<!-- The app logo in colour for in-app use (header tile): the launcher icon's beat pulse and radar arcs, cropped to the
+     drawing so its size is set by the view. Draw it untinted (Image, or Icon with Color.Unspecified). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="70"
+    android:viewportHeight="70">
+    <!-- Launcher coordinates moved so the drawing (x 14.75–83.25, y 19.75–88.25 with strokes) fills the box. -->
+    <group
+        android:translateX="-14"
+        android:translateY="-19">
+        <!-- Pulse Line (Coral #FF5A5F - Tempo Energy) -->
+        <path
+            android:strokeColor="#FF5A5F"
+            android:strokeWidth="6.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M 18,54 H 24 L 28,61 L 34,26 L 40,78 L 45,54 H 49" />
+        <!-- Radar Arc 1 (Inner: Electric Violet #7C6CF6) -->
+        <path
+            android:strokeColor="#7C6CF6"
+            android:strokeWidth="6.5"
+            android:strokeLineCap="round"
+            android:pathData="M 49,43 A 11,11 0 0,1 49,65" />
+        <!-- Radar Arc 2 (Middle, 80 %) -->
+        <path
+            android:strokeColor="#7C6CF6"
+            android:strokeAlpha="0.8"
+            android:strokeWidth="6.5"
+            android:strokeLineCap="round"
+            android:pathData="M 49,33 A 21,21 0 0,1 49,75" />
+        <!-- Radar Arc 3 (Outer, 50 %) -->
+        <path
+            android:strokeColor="#7C6CF6"
+            android:strokeAlpha="0.5"
+            android:strokeWidth="6.5"
+            android:strokeLineCap="round"
+            android:pathData="M 49,23 A 31,31 0 0,1 49,85" />
+    </group>
+</vector>
