@@ -23,12 +23,19 @@
     <!-- Listen tab: target chip and target sheet -->
     <string name="listen_edit_target_range">Edit target range</string>
     <string name="listen_target">Target</string>
-    <string name="listen_target_range_bpm">%1$d–%2$d BPM</string>
     <string name="listen_target_off">off</string>
     <string name="listen_target_range_title">Target range</string>
     <string name="listen_vibrates_after">Vibrates after 10 s in range</string>
     <string name="listen_from">From</string>
     <string name="listen_to">To</string>
+    <string name="app_loading">Loading</string>
+    <string name="tempo_mode_any">Any</string>
+    <string name="tempo_mode_between">Between</string>
+    <string name="tempo_mode_at_least">At least</string>
+    <string name="tempo_mode_up_to">Up to</string>
+    <string name="tempo_at_least_bpm">%1$d+ BPM</string>
+    <string name="tempo_up_to_bpm">Up to %1$d BPM</string>
+    <string name="tempo_any_hint">All tempos</string>
     <string name="listen_step_lower">Lower %1$s</string>
     <string name="listen_step_raise">Raise %1$s</string>
     <string name="listen_preset_groove">Groove</string>
@@ -38,11 +45,6 @@
     <string name="listen_range_alerts">Range alerts</string>
 
     <!-- Listen tab: custom range dialog -->
-    <string name="listen_custom_range_title">Custom BPM Range</string>
-    <string name="listen_min_bpm">Min BPM</string>
-    <string name="listen_max_bpm">Max BPM</string>
-    <string name="listen_apply">Apply</string>
-    <string name="listen_cancel">Cancel</string>
 
     <!-- Listen tab: heard recently -->
     <string name="listen_heard_recently">Heard recently</string>

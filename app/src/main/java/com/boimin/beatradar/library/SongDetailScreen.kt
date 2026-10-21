@@ -62,6 +62,9 @@ import com.boimin.beatradar.ui.theme.Brand
 import com.boimin.beatradar.ui.theme.inTargetColor
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import com.boimin.beatradar.ui.Skeleton
+import com.boimin.beatradar.ui.SkeletonBox
+import com.boimin.beatradar.ui.SkeletonSongRow
 
 /**
  * A song's page: its own bar (back, share, ⋮ with Report), the song, its tempo in plain words, practice and tempo
@@ -104,7 +107,7 @@ internal fun SongDetailScreen(state: DetailState, vm: LibraryViewModel, actions:
                 // Two tempos people hear: vote. One tempo: say it's wrong, with the tempo heard.
                 onFeelsDifferent = { if (song.bpmAlt != null && song.tempoVotes != null) voting = true else reporting = "wrong_bpm" },
             )
-            state.loading -> Centered { CircularProgressIndicator() }
+            state.loading -> SongPageSkeleton()
             else -> Message(str(R.string.song_load_failed), state.error ?: "", retry = vm::refreshDetail)
         }
     }
@@ -225,7 +228,7 @@ private fun SongPage(
             if (settings.rangeEnabled) {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    if (inTarget) str(R.string.song_in_target, settings.minBpm, settings.maxBpm) else str(R.string.song_outside_target, settings.minBpm, settings.maxBpm),
+                    if (inTarget) str(R.string.song_in_target, settings.targetRange.first, settings.targetRange.last) else str(R.string.song_outside_target, settings.targetRange.first, settings.targetRange.last),
                     fontSize = 13.sp,
                     lineHeight = 15.sp,
                     color = if (inTarget) inTargetColor() else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -446,5 +449,45 @@ internal fun Pill(text: String) {
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
         )
+    }
+}
+
+/** [SongPage] while it loads: the 112 dp art and title, the tempo card, the actions and a few similar songs. */
+@Composable
+private fun SongPageSkeleton() {
+    Skeleton(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+        Column {
+            Row(Modifier.padding(start = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                SkeletonBox(Modifier.size(112.dp), corner = 12.dp)
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SkeletonBox(Modifier.fillMaxWidth(0.85f).height(22.dp))
+                    SkeletonBox(Modifier.fillMaxWidth(0.55f).height(16.dp))
+                    SkeletonBox(Modifier.fillMaxWidth(0.4f).height(12.dp))
+                }
+            }
+            Spacer(Modifier.height(22.dp))
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                SkeletonBox(Modifier.size(width = 110.dp, height = 48.dp), corner = 10.dp)
+                SkeletonBox(Modifier.fillMaxWidth(0.7f).height(13.dp))
+                SkeletonBox(Modifier.fillMaxWidth(0.45f).height(12.dp))
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SkeletonBox(Modifier.weight(1f).height(48.dp), corner = 24.dp)
+                SkeletonBox(Modifier.weight(1f).height(48.dp), corner = 24.dp)
+            }
+            Spacer(Modifier.height(24.dp))
+            SkeletonBox(Modifier.fillMaxWidth(0.4f).height(12.dp))
+            Spacer(Modifier.height(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { repeat(3) { SkeletonSongRow() } }
+        }
     }
 }

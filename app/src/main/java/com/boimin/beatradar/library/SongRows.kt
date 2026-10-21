@@ -27,7 +27,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -54,6 +53,8 @@ import com.boimin.beatradar.i18n.str
 import com.boimin.beatradar.i18n.strPlural
 import com.boimin.beatradar.net.SongSummary
 import com.boimin.beatradar.ui.BpmBadge
+import com.boimin.beatradar.ui.CalmBottomSheet
+import com.boimin.beatradar.ui.rememberCalmSheetState
 import kotlinx.coroutines.launch
 
 /**
@@ -158,6 +159,9 @@ internal fun SwipeToDelete(onDelete: () -> Unit, enabled: Boolean = true, conten
 }
 
 /** The bar shown while selecting songs: how many, an action, and a way out. */
+/** As tall as Discover's filter pills, which the bar covers there; other screens use the same height. */
+internal val SelectionBarHeight = 34.dp
+
 @Composable
 internal fun SelectionBar(count: Int, onCancel: () -> Unit, modifier: Modifier = Modifier, action: @Composable () -> Unit) {
     // Fills the space of what it covers (the filters, the top bar), so nothing under it moves. It also takes the taps
@@ -211,7 +215,7 @@ internal fun AddManyToSetSheet(songs: List<SongSummary>, vm: LibraryViewModel, o
     val sets by vm.sets.collectAsStateWithLifecycle()
     var newName by rememberSaveable { mutableStateOf("") }
     val scope = rememberCoroutineScope()
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetGesturesEnabled = false) {
+    CalmBottomSheet(onDismissRequest = onDismiss, sheetState = rememberCalmSheetState()) {
         Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(strPlural(R.plurals.sets_add_songs_title, songs.size, songs.size), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             sets.forEach { set ->

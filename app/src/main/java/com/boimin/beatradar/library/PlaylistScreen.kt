@@ -48,6 +48,7 @@ import com.boimin.beatradar.i18n.strPlural
 import com.boimin.beatradar.net.PlaylistTrack
 import com.boimin.beatradar.ui.BpmBadge
 import kotlinx.coroutines.launch
+import com.boimin.beatradar.ui.SkeletonSongList
 
 /**
  * "BPM of my playlist": paste (or share from Spotify / YouTube Music) a playlist link and see the tempo of every
@@ -102,7 +103,7 @@ internal fun PlaylistScreen(state: PlaylistState, vm: LibraryViewModel, settings
             }
         }
         if (state.loading) {
-            item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+            item { SkeletonSongList(6, Modifier.padding(top = 6.dp)) }
         }
         if (result != null) {
             item {

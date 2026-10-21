@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -45,6 +46,10 @@ import com.boimin.beatradar.net.SongSummary
 import com.boimin.beatradar.ui.BpmBadge
 import com.boimin.beatradar.ui.theme.brandSwitchColors
 import kotlinx.coroutines.launch
+import com.boimin.beatradar.ui.Skeleton
+import com.boimin.beatradar.ui.SkeletonBox
+import com.boimin.beatradar.ui.SkeletonSongRow
+import com.boimin.beatradar.ui.SkeletonSongList
 
 /** A set someone shared as a link: its songs, and "Copy this set" into My sets. */
 @Composable
@@ -80,7 +85,14 @@ internal fun SharedSetScreen(state: SharedSetState, vm: LibraryViewModel, settin
                 }
             }
             state.error != null -> item { Text(state.error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
-            else -> item { Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+            else -> item {
+                Skeleton {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SkeletonBox(Modifier.fillMaxWidth().height(124.dp), corner = 16.dp)
+                        repeat(5) { SkeletonSongRow() }
+                    }
+                }
+            }
         }
     }
 }
@@ -90,7 +102,7 @@ internal fun SharedSetScreen(state: SharedSetState, vm: LibraryViewModel, settin
 internal fun BuildSetScreen(state: BuildState, vm: LibraryViewModel, settings: Settings, onSaved: (Long) -> Unit, modifier: Modifier) {
     var minutes by rememberSaveable { mutableIntStateOf(state.minutes) }
     var onlyMine by rememberSaveable { mutableStateOf(state.onlyMine) }
-    val range = settings.minBpm..settings.maxBpm
+    val range = settings.targetRange
     val scope = rememberCoroutineScope()
     val result = state.result
     LazyColumn(
@@ -130,7 +142,9 @@ internal fun BuildSetScreen(state: BuildState, vm: LibraryViewModel, settings: S
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
         }
-        if (result != null) {
+        if (state.loading) {
+            item { SkeletonSongList(6) }
+        } else if (result != null) {
             item {
                 val got = result.totalMs / 60_000
                 val want = result.targetMs / 60_000

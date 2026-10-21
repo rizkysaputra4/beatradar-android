@@ -127,7 +127,8 @@ class CaptureService : Service() {
                     val old = settings
                     settings = s
                     val rangeChanged = s.rangeEnabled != old.rangeEnabled || s.minBpm != old.minBpm ||
-                        s.maxBpm != old.maxBpm || s.halfDoubleMatch != old.halfDoubleMatch
+                        s.maxBpm != old.maxBpm || s.minOpen != old.minOpen || s.maxOpen != old.maxOpen ||
+                        s.halfDoubleMatch != old.halfDoubleMatch
                     if (rangeChanged) launch(serial) {
                         judge.restartCountdown()
                         Monitor.update { it.copy(matchProgress = 0f, matched = false) }

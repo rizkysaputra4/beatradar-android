@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
 /** The Library list: songs loaded so far, paging and load state. */
@@ -269,14 +270,6 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private val _extras = MutableStateFlow(DiscoverExtras())
     val extras: StateFlow<DiscoverExtras> = _extras
 
-    private fun loadExtras() {
-        val q = query.value
-        viewModelScope.launch {
-            val trending = runCatching { repo.trending(q) }.getOrNull()
-            val facets = runCatching { repo.facets(q) }.getOrNull() ?: Facets()
-            _extras.value = DiscoverExtras(trending, facets)
-        }
-    }
 
     /** A new set holding [songs] (e.g. a playlist's measured tracks). Returns its id, or null for an empty name. */
     suspend fun createSetWith(name: String, songs: List<SongSummary>): Long? {
@@ -383,10 +376,17 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     val message: StateFlow<String?> = _message
 
     private var loadJob: Job? = null
+    private var facetsJob: Job? = null
+
+    /**
+     * The query the list was last loaded for. The tab sets its starting range and loads at once; the same change then
+     * reaches the debounced reload, which must not load (and blank) the list a second time.
+     */
+    private var loadedQuery: SongQuery? = null
 
     init {
         @OptIn(FlowPreview::class)
-        viewModelScope.launch { query.drop(1).debounce(350).collect { reload() } }
+        viewModelScope.launch { query.drop(1).debounce(350).collect { if (it != loadedQuery) reload(newQuery = true) } }
         // Signing in or out changes which songs are "loved by me".
         viewModelScope.launch { application.app.account.user.map { it?.id }.distinctUntilChanged().drop(1).collect { refresh() } }
         // My measurement of a song just went up: its counters changed.
@@ -408,15 +408,27 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         refreshDetail()
     }
 
-    fun reload() {
-        loadExtras()
+    /** Loads the first page again. [newQuery]: the search or filters changed, so the songs on screen go first. */
+    fun reload(newQuery: Boolean = false) {
+        val q = query.value
+        loadedQuery = q
         loadJob?.cancel()
-        _list.update { it.copy(loading = true, error = null) }
+        facetsJob?.cancel()
+        _list.update { if (newQuery) ListState(loading = true, loadedOnce = it.loadedOnce) else it.copy(loading = true, error = null) }
+        // Facets only add pills to the filter row, which doesn't move the list: they come when they're ready.
+        facetsJob = viewModelScope.launch {
+            val facets = runCatching { repo.facets(q) }.getOrNull() ?: Facets()
+            _extras.update { it.copy(facets = facets) }
+        }
         loadJob = viewModelScope.launch {
+            // Trending sits above the songs, so it lands with them: arriving later, it pushed the list down.
+            val trending = async { runCatching { repo.trending(q) }.getOrNull() }
             try {
-                val page = repo.songs(query.value)
+                val page = repo.songs(q)
+                _extras.update { it.copy(trending = trending.await()) }
                 _list.value = ListState(page.items, page.nextCursor, loading = false, loadedOnce = true)
             } catch (e: ApiException) {
+                trending.cancel()
                 _list.update { it.copy(loading = false, error = describe(e), loadedOnce = true) }
             }
         }

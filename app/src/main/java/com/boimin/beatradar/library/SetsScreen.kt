@@ -3,6 +3,8 @@ package com.boimin.beatradar.library
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.CircleShape
 import com.boimin.beatradar.ui.BpmValue
+import com.boimin.beatradar.ui.CalmBottomSheet
+import com.boimin.beatradar.ui.rememberCalmSheetState
 import com.boimin.beatradar.ui.theme.Tone
 import com.boimin.beatradar.ui.theme.inTargetColor
 import androidx.compose.ui.graphics.compositeOver
@@ -38,7 +40,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -55,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -70,6 +72,18 @@ import com.boimin.beatradar.net.SongSummary
 import com.boimin.beatradar.ui.BpmBadge
 import com.boimin.beatradar.ui.theme.Brand
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.TextFieldValue
+import com.boimin.beatradar.ui.tempoRangeShort
 
 /** "My sets" in the Library tab: the user's song lists by tempo. */
 @Composable
@@ -124,11 +138,11 @@ fun SetsScreen(vm: LibraryViewModel, settings: Settings, actions: LibraryActions
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { creating = true }, contentPadding = PaddingValues(horizontal = 14.dp)) { Text(str(R.string.sets_new_set)) }
-                    OutlinedButton(onClick = { vm.openBuild() }, contentPadding = PaddingValues(horizontal = 14.dp)) { Text(str(R.string.sets_build_me_a_set)) }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SetsAction(R.drawable.ic_set_add, str(R.string.sets_new_set), primary = true, Modifier.weight(1f)) { creating = true }
+                    SetsAction(R.drawable.ic_queue, str(R.string.sets_build_me_a_set), primary = false, Modifier.weight(1f)) { vm.openBuild() }
+                    SetsAction(R.drawable.ic_library_music, str(R.string.playlist_title), primary = false, Modifier.weight(1f)) { vm.openPlaylist() }
                 }
-                OutlinedButton(onClick = { vm.openPlaylist() }, contentPadding = PaddingValues(horizontal = 14.dp)) { Text(str(R.string.playlist_title)) }
             }
         }
         if (sets.isEmpty()) {
@@ -152,10 +166,12 @@ fun SetsScreen(vm: LibraryViewModel, settings: Settings, actions: LibraryActions
     }
 
     if (creating) {
-        NameDialog(
+        NameSheet(
             title = str(R.string.sets_new_set),
+            body = str(R.string.sets_new_set_body),
             initial = "",
             confirm = str(R.string.sets_create),
+            suggestions = setNameSuggestions(settings),
             onDismiss = { creating = false },
             onSave = { name ->
                 creating = false
@@ -239,9 +255,9 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
             if (selecting) {
-                // Same 52 dp as the top bar it replaces, so the page does not move.
-                Box(Modifier.fillMaxWidth().padding(horizontal = 14.dp).height(52.dp).padding(vertical = 5.dp)) {
-                    SelectionBar(selected.size, onCancel = { selected = emptySet() }, modifier = Modifier.fillMaxSize()) {
+                // The bar is as tall as on Discover; it sits in the 52 dp of the top bar it replaces, so the page does not move.
+                Box(Modifier.fillMaxWidth().padding(horizontal = 18.dp).height(52.dp), contentAlignment = Alignment.Center) {
+                    SelectionBar(selected.size, onCancel = { selected = emptySet() }, modifier = Modifier.height(SelectionBarHeight)) {
                         BarIcon(R.drawable.ic_delete, str(R.string.sets_remove_selected), 22, MaterialTheme.colorScheme.error) {
                             vm.removeSongs(set.id, songs.filter { it.slug in selected })
                             selected = emptySet()
@@ -286,8 +302,8 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
                             Spacer(Modifier.width(6.dp))
                         }
                         Text(
-                            if (inTarget == songs.size) str(R.string.sets_all_in_target, settings.minBpm, settings.maxBpm)
-                            else str(R.string.sets_some_in_target, inTarget, songs.size, settings.minBpm, settings.maxBpm),
+                            if (inTarget == songs.size) str(R.string.sets_all_in_target, settings.targetRange.first, settings.targetRange.last)
+                            else str(R.string.sets_some_in_target, inTarget, songs.size, settings.targetRange.first, settings.targetRange.last),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
                             color = if (inTarget > 0) inTargetColor() else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -375,7 +391,15 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
     }
 
     if (renaming) {
-        NameDialog(str(R.string.sets_rename_title), set.name, str(R.string.sets_save), onDismiss = { renaming = false }, onSave = { renaming = false; vm.renameSet(set.id, it) })
+        NameSheet(
+            title = str(R.string.sets_rename_title),
+            body = null,
+            initial = set.name,
+            confirm = str(R.string.sets_save),
+            suggestions = emptyList(),
+            onDismiss = { renaming = false },
+            onSave = { renaming = false; vm.renameSet(set.id, it) },
+        )
     }
     if (deleting) {
         AlertDialog(
@@ -443,7 +467,7 @@ internal fun AddToSetSheet(song: SongSummary, vm: LibraryViewModel, onDismiss: (
     var newName by rememberSaveable { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetGesturesEnabled = false) {
+    CalmBottomSheet(onDismissRequest = onDismiss, sheetState = rememberCalmSheetState()) {
         Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(str(R.string.sets_add_to_set), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(
@@ -487,25 +511,139 @@ internal fun AddToSetSheet(song: SongSummary, vm: LibraryViewModel, onDismiss: (
     }
 }
 
+/** Names to start from for a new set: the target range ("160–170 BPM"), then a few common uses. */
 @Composable
-private fun NameDialog(title: String, initial: String, confirm: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
-    var name by rememberSaveable { mutableStateOf(initial) }
-    AlertDialog(
+private fun setNameSuggestions(settings: Settings): List<String> = listOf(
+    "${tempoRangeShort(settings.targetLow, settings.targetHigh)} BPM",
+    str(R.string.sets_suggest_morning_run),
+    str(R.string.sets_suggest_workout),
+    str(R.string.sets_suggest_warm_up),
+    str(R.string.sets_suggest_dj_set),
+)
+
+/**
+ * Naming a set (new or rename) in a bottom sheet: the field has the keyboard up from the start, names to tap in, a
+ * character count, and Create / Save as the big button. The keyboard's Done saves too.
+ */
+@Composable
+private fun NameSheet(
+    title: String,
+    body: String?,
+    initial: String,
+    confirm: String,
+    suggestions: List<String>,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var name by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(initial, selection = TextRange(0, initial.length))) }
+    val valid = SetRules.cleanName(name.text) != null
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    CalmBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
+        sheetState = rememberCalmSheetState(skipPartiallyExpanded = true),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = Tone.sheet,
+        // Tone.sheet isn't a theme colour, so untinted text would not follow dark mode without this.
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        dragHandle = {
+            Box(Modifier.padding(top = 10.dp, bottom = 16.dp).size(36.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(Tone.sheetLine))
+        },
+    ) {
+        Column(Modifier.imePadding().padding(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Tone.selected),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(painterResource(R.drawable.ic_set_add), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                }
+                Spacer(Modifier.width(12.dp))
+                Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+            if (body != null) {
+                Spacer(Modifier.height(10.dp))
+                Text(body, fontSize = 13.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.height(16.dp))
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it.take(SetRules.MAX_NAME) },
+                onValueChange = { name = if (it.text.length <= SetRules.MAX_NAME) it else it.copy(text = it.text.take(SetRules.MAX_NAME)) },
                 placeholder = { Text(str(R.string.sets_name_example_range)) },
                 singleLine = true,
+                shape = RoundedCornerShape(14.dp),
+                supportingText = {
+                    Text("${name.text.length} / ${SetRules.MAX_NAME}", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
+                },
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (valid) onSave(name.text) }),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus),
             )
-        },
-        confirmButton = { TextButton(onClick = { onSave(name) }, enabled = SetRules.cleanName(name) != null) { Text(confirm) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.library_cancel)) } },
-    )
+            if (suggestions.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    suggestions.forEach { suggestion ->
+                        val picked = name.text == suggestion
+                        Box(
+                            Modifier
+                                .height(32.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(if (picked) Tone.selected else Tone.track)
+                                .border(1.dp, if (picked) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(50))
+                                .clickable { name = TextFieldValue(suggestion, selection = TextRange(suggestion.length)) }
+                                .padding(horizontal = 12.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                suggestion,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = if (picked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(48.dp)) { Text(str(R.string.library_cancel)) }
+                Button(onClick = { onSave(name.text) }, enabled = valid, modifier = Modifier.weight(1f).height(48.dp)) { Text(confirm) }
+            }
+        }
+    }
 }
 
 private fun Modifier.clip16() = this.then(Modifier.clip(RoundedCornerShape(16.dp)))
 
 private fun Modifier.clip12() = this.then(Modifier.clip(RoundedCornerShape(12.dp)))
+
+/** One of the three ways to start a set on My sets: equal tiles, icon over a label of up to two lines. */
+@Composable
+private fun SetsAction(icon: Int, label: String, primary: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(14.dp)
+    val fg = if (primary) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+    Column(
+        modifier
+            .height(76.dp)
+            .clip(shape)
+            .background(if (primary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, if (primary) Color.Transparent else MaterialTheme.colorScheme.outline, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(painterResource(icon), contentDescription = null, tint = fg, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.height(4.dp))
+        Text(
+            label,
+            fontSize = 12.sp,
+            lineHeight = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (primary) fg else MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}

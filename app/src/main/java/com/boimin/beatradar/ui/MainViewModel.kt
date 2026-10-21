@@ -61,8 +61,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     @OptIn(ExperimentalCoroutinesApi::class)
     val log: StateFlow<List<BeatLogEntry>> = combine(query, onlyIdentified, onlyUnnamed) { q, i, u -> Filter(q.trim(), i, u) }
         .flatMapLatest { f -> dao.observe(f.query, false, f.identified, f.unnamed) }
-        .combine(combine(onlyInRange, settings, logBpmRange) { on, s, custom -> s?.takeIf { on }?.let { (custom ?: (it.minBpm..it.maxBpm)) to it.halfDoubleMatch } }) { entries, filter ->
-            if (filter == null) entries else entries.filter { Settings.bpmIn(it.bpm, filter.first, filter.second) }
+        .combine(
+            combine(onlyInRange, settings, logBpmRange) { on, s, custom ->
+                // The Listen target itself goes through inTarget, which knows an open end; a range set here is closed.
+                s?.takeIf { on }?.let { set -> { bpm: Float -> if (custom != null) Settings.bpmIn(bpm, custom, set.halfDoubleMatch) else set.inTarget(bpm) } }
+            },
+        ) { entries, inRange ->
+            if (inRange == null) entries else entries.filter { inRange(it.bpm) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 

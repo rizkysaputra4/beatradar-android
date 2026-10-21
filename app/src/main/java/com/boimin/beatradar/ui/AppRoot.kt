@@ -30,7 +30,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -258,7 +257,7 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                 query = query,
                 onQueryChange = { vm.query.value = it },
                 onlyInRange = onlyInRange,
-                bpmRange = logBpmRange ?: (settings.minBpm..settings.maxBpm),
+                bpmRange = logBpmRange ?: settings.targetRange,
                 bpmCustom = logBpmRange != null,
                 onBpmRange = { vm.logBpmRange.value = it },
                 onResetBpm = { vm.logBpmRange.value = null },
@@ -436,7 +435,7 @@ private fun ConsentDialog(step: String, title: String, body: String, onAllow: ()
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CoffeeSheet(state: CoffeeState, onBuy: (Coffee) -> Unit, onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetGesturesEnabled = false) {
+    CalmBottomSheet(onDismissRequest = onDismiss, sheetState = rememberCalmSheetState()) {
         Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(str(R.string.app_coffee_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             val ready = state as? CoffeeState.Ready

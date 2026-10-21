@@ -20,6 +20,10 @@ data class Settings(
     val rangeEnabled: Boolean = true,
     val minBpm: Int = 120,
     val maxBpm: Int = 130,
+    /** No lower limit ("up to [maxBpm]"). [minBpm] is kept, for when a lower limit is set again. */
+    val minOpen: Boolean = false,
+    /** No upper limit ("[minBpm] and up"). [maxBpm] is kept, for when an upper limit is set again. */
+    val maxOpen: Boolean = false,
     val vibrate: Boolean = true,
     val halfDoubleMatch: Boolean = false,
     /** Keep a short clip of songs without a name, to play to Shazam later. Clips leave the phone only with [shareClips]. */
@@ -52,7 +56,17 @@ data class Settings(
      * True when [bpm] falls in the target range set on the Listen tab (optionally counting half/double tempo), whether
      * or not its alerts are on. The log's "In target" filter uses it, so it always follows the current range.
      */
-    fun inTarget(bpm: Float): Boolean = bpmIn(bpm, minBpm..maxBpm, halfDoubleMatch)
+    fun inTarget(bpm: Float): Boolean =
+        bpmIn(bpm, (if (minOpen) 0 else minBpm)..(if (maxOpen) Int.MAX_VALUE else maxBpm), halfDoubleMatch)
+
+    /** The target's lower limit, or null when it has none. */
+    val targetLow: Int? get() = minBpm.takeUnless { minOpen }
+
+    /** The target's upper limit, or null when it has none. */
+    val targetHigh: Int? get() = maxBpm.takeUnless { maxOpen }
+
+    /** The target as a closed range, an open end standing at the edge of what BeatRadar measures. */
+    val targetRange: IntRange get() = (targetLow ?: BPM_FLOOR)..(targetHigh ?: BPM_CEILING)
 
     companion object {
         /** True when [bpm] falls in [range], optionally counting half and double tempo. */
@@ -77,6 +91,8 @@ class SettingsRepository(private val context: Context) {
         val RANGE_ENABLED = booleanPreferencesKey("range_enabled")
         val MIN_BPM = intPreferencesKey("min_bpm")
         val MAX_BPM = intPreferencesKey("max_bpm")
+        val MIN_OPEN = booleanPreferencesKey("min_open")
+        val MAX_OPEN = booleanPreferencesKey("max_open")
         val VIBRATE = booleanPreferencesKey("vibrate")
         val HALF_DOUBLE = booleanPreferencesKey("half_double")
         val SAVE_CLIPS = booleanPreferencesKey("save_clips")
@@ -99,6 +115,9 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.RANGE_ENABLED] = s.rangeEnabled
             prefs[Keys.MIN_BPM] = s.minBpm
             prefs[Keys.MAX_BPM] = s.maxBpm
+            // Both ends open is "any tempo", which the range alerts switch already covers.
+            prefs[Keys.MIN_OPEN] = s.minOpen && !s.maxOpen
+            prefs[Keys.MAX_OPEN] = s.maxOpen
             prefs[Keys.VIBRATE] = s.vibrate
             prefs[Keys.HALF_DOUBLE] = s.halfDoubleMatch
             prefs[Keys.SAVE_CLIPS] = s.saveClips
@@ -118,6 +137,8 @@ class SettingsRepository(private val context: Context) {
             rangeEnabled = this[Keys.RANGE_ENABLED] ?: d.rangeEnabled,
             minBpm = this[Keys.MIN_BPM] ?: d.minBpm,
             maxBpm = this[Keys.MAX_BPM] ?: d.maxBpm,
+            minOpen = this[Keys.MIN_OPEN] ?: d.minOpen,
+            maxOpen = this[Keys.MAX_OPEN] ?: d.maxOpen,
             vibrate = this[Keys.VIBRATE] ?: d.vibrate,
             halfDoubleMatch = this[Keys.HALF_DOUBLE] ?: d.halfDoubleMatch,
             saveClips = this[Keys.SAVE_CLIPS] ?: d.saveClips,

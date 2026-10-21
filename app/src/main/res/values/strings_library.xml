@@ -46,7 +46,9 @@
     <string name="library_decade_value">%1$ds</string>
     <string name="library_any_decade">Any decade</string>
     <string name="library_loved">♥ Loved</string>
-    <string name="library_filter_tempo">Filter Tempo: %1$d–%2$d BPM</string>
+    <string name="library_tempo_title">Tempo</string>
+    <string name="library_tempo_my_range">My range</string>
+    <string name="library_done">Done</string>
     <string name="library_sort_popular">Popular</string>
     <string name="library_sort_confirmed">Confirmed</string>
     <string name="library_sort_most_loved">Most loved</string>
@@ -115,6 +117,11 @@
     <string name="sets_empty_title">No sets yet</string>
     <string name="sets_empty_body">Create one, then open any song in Discover and tap Add to set.</string>
     <string name="sets_create">Create</string>
+    <string name="sets_new_set_body">Name it after what it\'s for. Add songs from their page or from Discover.</string>
+    <string name="sets_suggest_morning_run">Morning run</string>
+    <string name="sets_suggest_workout">Workout</string>
+    <string name="sets_suggest_warm_up">Warm-up</string>
+    <string name="sets_suggest_dj_set">DJ set</string>
     <string name="sets_add_to_set">Add to set</string>
     <string name="sets_remove_selected">Remove selected songs</string>
     <string name="sets_my_sets">My sets</string>

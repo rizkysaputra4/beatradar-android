@@ -3,7 +3,6 @@ package com.boimin.beatradar.library
 import androidx.compose.ui.draw.alpha
 import androidx.compose.material3.Button
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,8 +31,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RangeSlider
-import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -67,8 +66,17 @@ import com.boimin.beatradar.net.Facets
 import com.boimin.beatradar.net.SongSummary
 import com.boimin.beatradar.ui.BpmBadge
 import com.boimin.beatradar.ui.LogFilterPill
+import com.boimin.beatradar.ui.CalmBottomSheet
+import com.boimin.beatradar.ui.TEMPO_PRESETS
+import com.boimin.beatradar.ui.TempoRangeEditor
+import com.boimin.beatradar.ui.tempoRangeLabel
+import com.boimin.beatradar.ui.tempoRangeShort
+import com.boimin.beatradar.ui.rememberCalmSheetState
 import com.boimin.beatradar.ui.theme.Brand
+import com.boimin.beatradar.ui.theme.Tone
+import com.boimin.beatradar.ui.theme.brandSwitchColors
 import kotlin.math.roundToInt
+import com.boimin.beatradar.ui.SkeletonSongList
 
 /** What the Library needs from the rest of the app. */
 class LibraryActions(
@@ -89,7 +97,7 @@ fun LibraryScreen(vm: LibraryViewModel, settings: Settings, actions: LibraryActi
     LaunchedEffect(Unit) {
         // Starts at the user's own target range, like the Listen screen.
         if (!vm.list.value.loadedOnce && settings.rangeEnabled) {
-            vm.query.value = vm.query.value.copy(bpmMin = settings.minBpm, bpmMax = settings.maxBpm, halfDouble = settings.halfDoubleMatch)
+            vm.query.value = vm.query.value.copy(bpmMin = settings.targetLow, bpmMax = settings.targetHigh, halfDouble = settings.halfDoubleMatch)
         }
         // Discover shows live counts and loves: fresh data every time the tab is opened.
         vm.refresh()
@@ -99,12 +107,12 @@ fun LibraryScreen(vm: LibraryViewModel, settings: Settings, actions: LibraryActi
         BackHandler { vm.close() }
         SongDetailScreen(d, vm, actions, settings, modifier)
     } else {
-        SongList(vm, actions, modifier)
+        SongList(vm, settings, actions, modifier)
     }
 }
 
 @Composable
-private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Modifier) {
+private fun SongList(vm: LibraryViewModel, settings: Settings, actions: LibraryActions, modifier: Modifier) {
     val list by vm.list.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
     val extras by vm.extras.collectAsStateWithLifecycle()
@@ -123,6 +131,20 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
         derivedStateOf { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index?.let { it >= listState.layoutInfo.totalItemsCount - 5 } ?: false }
     }
     LaunchedEffect(nearEnd, list.nextCursor) { if (nearEnd && list.nextCursor != null) vm.loadMore() }
+    // A new search or filter starts a new list: from its top. (Not when the tab opens: the list keeps its place.)
+    var shownQuery by remember { mutableStateOf(query) }
+    LaunchedEffect(query) {
+        if (query != shownQuery) {
+            shownQuery = query
+            listState.scrollToItem(0)
+        }
+    }
+    val trending = extras.trending?.takeIf { query.text.isBlank() && !query.lovedOnly && it.items.isNotEmpty() }
+    // Trending now lands with the songs. On a refresh (the tab opened again) it can appear above songs already on screen,
+    // and the list keeps its place on the first song: while that list was at its very top, show the row.
+    LaunchedEffect(trending != null) {
+        if (trending != null && listState.firstVisibleItemIndex == 1 && listState.firstVisibleItemScrollOffset == 0) listState.scrollToItem(0)
+    }
 
     Column(modifier.fillMaxSize()) {
         // Low-profile Search Bar
@@ -163,21 +185,19 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
             }
         }
 
-        // The selection bar covers the filters in their own space, so the list below does not move.
-        Box {
-            Box(Modifier.alpha(if (selecting) 0f else 1f)) {
-                Filters(query, actions.signedIn, extras.facets, onChange = { vm.query.value = it })
-            }
-            if (selecting) {
-                SelectionBar(
-                    selected.size,
-                    onCancel = { selected = emptyMap() },
-                    modifier = Modifier.matchParentSize().padding(start = 18.dp, end = 18.dp, bottom = 6.dp),
-                ) {
+        // The selection bar covers the filter pills in their own space, so the list below does not move.
+        Filters(
+            query,
+            settings,
+            actions.signedIn,
+            extras.facets,
+            onChange = { vm.query.value = it },
+            selectionBar = if (!selecting) null else { barModifier ->
+                SelectionBar(selected.size, onCancel = { selected = emptyMap() }, modifier = barModifier) {
                     SelectionAction(str(R.string.sets_add_to_set)) { adding = true }
                 }
-            }
-        }
+            },
+        )
         if (adding) {
             AddManyToSetSheet(
                 songs = selected.values.toList(),
@@ -210,7 +230,7 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
         }
 
         when {
-            list.items.isEmpty() && list.loading -> Centered { CircularProgressIndicator() }
+            list.items.isEmpty() && list.loading -> SkeletonSongList(8, Modifier.padding(start = 18.dp, end = 18.dp, top = 6.dp))
             list.items.isEmpty() && list.error != null -> Message(
                 if (list.error == str(R.string.library_offline)) str(R.string.library_offline) else str(R.string.library_load_failed),
                 list.error.takeIf { it != str(R.string.library_offline) } ?: str(R.string.library_offline_body),
@@ -218,14 +238,13 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
             )
             list.items.isEmpty() && list.loadedOnce -> Message(
                 str(R.string.library_empty_title),
-                if (query.text.isNotBlank() || query.bpmMin != null || query.lovedOnly) str(R.string.library_empty_filtered) else str(R.string.library_empty_body),
+                if (query.text.isNotBlank() || query.bpmMin != null || query.bpmMax != null || query.lovedOnly) str(R.string.library_empty_filtered) else str(R.string.library_empty_body),
             )
             else -> LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                val trending = extras.trending?.takeIf { query.text.isBlank() && !query.lovedOnly && it.items.isNotEmpty() }
                 if (trending != null) {
                     item(key = "trending") {
                         TrendingRow(
@@ -248,7 +267,7 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
                         counters = { SongCounters(song.listeners, song.confirmations, song.loveCount) },
                     )
                 }
-                if (list.loading) item { Box(Modifier.fillMaxWidth().padding(12.dp), Alignment.Center) { CircularProgressIndicator(Modifier.size(24.dp)) } }
+                if (list.loading) item { SkeletonSongList(2) }
                 if (list.error != null) item { TextButton(onClick = vm::loadMore, modifier = Modifier.fillMaxWidth()) { Text(str(R.string.library_error_retry, list.error)) } }
             }
         }
@@ -282,145 +301,190 @@ private fun TrendingRow(title: String, songs: List<SongSummary>, onOpen: (String
     }
 }
 
-/** Tempo range (collapsible so more tracks fit above the fold), half/double, sort, Loved, genre and decade. */
+/**
+ * One row of pills: tempo (opens [TempoSheet]), sort, genre, decade and Loved.
+ * [selectionBar], when set, is drawn over the row (sized to it by the modifier it is given).
+ */
 @Composable
-private fun Filters(query: SongQuery, signedIn: Boolean, facets: Facets, onChange: (SongQuery) -> Unit) {
+private fun Filters(
+    query: SongQuery,
+    settings: Settings,
+    signedIn: Boolean,
+    facets: Facets,
+    onChange: (SongQuery) -> Unit,
+    selectionBar: (@Composable (Modifier) -> Unit)? = null,
+) {
     var sortOpen by remember { mutableStateOf(false) }
     var genreOpen by remember { mutableStateOf(false) }
     var decadeOpen by remember { mutableStateOf(false) }
-    var sliderExpanded by remember { mutableStateOf(false) }
-    val ranged = query.bpmMin != null && query.bpmMax != null
+    var tempoOpen by remember { mutableStateOf(false) }
+    val ranged = query.bpmMin != null || query.bpmMax != null
 
-    Row(
-        Modifier
-            .horizontalScroll(rememberScrollState())
-            .padding(start = 18.dp, end = 18.dp, bottom = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        LogFilterPill(
-            label = if (ranged) "${str(R.string.library_bpm_range, query.bpmMin, query.bpmMax)} ▾" else "${str(R.string.library_any_tempo)} ▾",
-            selected = ranged,
-            activeColor = MaterialTheme.colorScheme.primary,
-            onClick = {
-                if (!ranged) {
-                    onChange(query.copy(bpmMin = 120, bpmMax = 132))
-                    sliderExpanded = true
-                } else {
-                    sliderExpanded = !sliderExpanded
-                }
-            },
-        )
-        if (ranged) {
+    Box(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .alpha(if (selectionBar != null) 0f else 1f)
+                .horizontalScroll(rememberScrollState())
+                .padding(start = 18.dp, end = 18.dp, bottom = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
             LogFilterPill(
-                label = "½× / 2×",
-                selected = query.halfDouble,
+                label = if (ranged && query.halfDouble) "${tempoRangeLabel(query.bpmMin, query.bpmMax)} · ½×/2× ▾" else "${tempoRangeLabel(query.bpmMin, query.bpmMax)} ▾",
+                selected = ranged,
                 activeColor = MaterialTheme.colorScheme.primary,
-                onClick = { onChange(query.copy(halfDouble = !query.halfDouble)) },
+                onClick = { tempoOpen = true },
             )
-        }
-        Box {
-            LogFilterPill(
-                label = "${str(query.sort.label)} ▾",
-                selected = false,
-                activeColor = MaterialTheme.colorScheme.primary,
-                onClick = { sortOpen = true },
-            )
-            DropdownMenu(expanded = sortOpen, onDismissRequest = { sortOpen = false }) {
-                SongSort.entries.forEach { s ->
-                    DropdownMenuItem(text = { Text(str(s.label)) }, onClick = { sortOpen = false; onChange(query.copy(sort = s)) })
-                }
-            }
-        }
-        if (facets.genres.isNotEmpty() || query.genre != null) {
             Box {
                 LogFilterPill(
-                    label = "${query.genre ?: str(R.string.library_genre)} ▾",
-                    selected = query.genre != null,
+                    label = "${str(query.sort.label)} ▾",
+                    selected = false,
                     activeColor = MaterialTheme.colorScheme.primary,
-                    onClick = { genreOpen = true },
+                    onClick = { sortOpen = true },
                 )
-                DropdownMenu(expanded = genreOpen, onDismissRequest = { genreOpen = false }) {
-                    DropdownMenuItem(text = { Text(str(R.string.library_any_genre)) }, onClick = { genreOpen = false; onChange(query.copy(genre = null)) })
-                    facets.genres.forEach { g ->
-                        DropdownMenuItem(text = { Text("${g.genre} · ${g.songs}") }, onClick = { genreOpen = false; onChange(query.copy(genre = g.genre)) })
+                DropdownMenu(expanded = sortOpen, onDismissRequest = { sortOpen = false }) {
+                    SongSort.entries.forEach { s ->
+                        DropdownMenuItem(text = { Text(str(s.label)) }, onClick = { sortOpen = false; onChange(query.copy(sort = s)) })
                     }
                 }
             }
-        }
-        if (facets.decades.isNotEmpty() || query.decade != null) {
-            Box {
-                LogFilterPill(
-                    label = "${query.decade?.let { str(R.string.library_decade_value, it) } ?: str(R.string.library_decade)} ▾",
-                    selected = query.decade != null,
-                    activeColor = MaterialTheme.colorScheme.primary,
-                    onClick = { decadeOpen = true },
-                )
-                DropdownMenu(expanded = decadeOpen, onDismissRequest = { decadeOpen = false }) {
-                    DropdownMenuItem(text = { Text(str(R.string.library_any_decade)) }, onClick = { decadeOpen = false; onChange(query.copy(decade = null)) })
-                    facets.decades.forEach { d ->
-                        DropdownMenuItem(text = { Text("${str(R.string.library_decade_value, d.decade)} · ${d.songs}") }, onClick = { decadeOpen = false; onChange(query.copy(decade = d.decade)) })
+            if (facets.genres.isNotEmpty() || query.genre != null) {
+                Box {
+                    LogFilterPill(
+                        label = "${query.genre ?: str(R.string.library_genre)} ▾",
+                        selected = query.genre != null,
+                        activeColor = MaterialTheme.colorScheme.primary,
+                        onClick = { genreOpen = true },
+                    )
+                    DropdownMenu(expanded = genreOpen, onDismissRequest = { genreOpen = false }) {
+                        DropdownMenuItem(text = { Text(str(R.string.library_any_genre)) }, onClick = { genreOpen = false; onChange(query.copy(genre = null)) })
+                        facets.genres.forEach { g ->
+                            DropdownMenuItem(text = { Text("${g.genre} · ${g.songs}") }, onClick = { genreOpen = false; onChange(query.copy(genre = g.genre)) })
+                        }
                     }
                 }
             }
+            if (facets.decades.isNotEmpty() || query.decade != null) {
+                Box {
+                    LogFilterPill(
+                        label = "${query.decade?.let { str(R.string.library_decade_value, it) } ?: str(R.string.library_decade)} ▾",
+                        selected = query.decade != null,
+                        activeColor = MaterialTheme.colorScheme.primary,
+                        onClick = { decadeOpen = true },
+                    )
+                    DropdownMenu(expanded = decadeOpen, onDismissRequest = { decadeOpen = false }) {
+                        DropdownMenuItem(text = { Text(str(R.string.library_any_decade)) }, onClick = { decadeOpen = false; onChange(query.copy(decade = null)) })
+                        facets.decades.forEach { d ->
+                            DropdownMenuItem(text = { Text("${str(R.string.library_decade_value, d.decade)} · ${d.songs}") }, onClick = { decadeOpen = false; onChange(query.copy(decade = d.decade)) })
+                        }
+                    }
+                }
+            }
+            if (signedIn) {
+                LogFilterPill(
+                    label = str(R.string.library_loved),
+                    selected = query.lovedOnly,
+                    activeColor = Brand.Coral,
+                    onClick = { onChange(query.copy(lovedOnly = !query.lovedOnly)) },
+                )
+            }
         }
-        if (signedIn) {
-            LogFilterPill(
-                label = str(R.string.library_loved),
-                selected = query.lovedOnly,
-                activeColor = Brand.Coral,
-                onClick = { onChange(query.copy(lovedOnly = !query.lovedOnly)) },
-            )
-        }
+        selectionBar?.invoke(Modifier.matchParentSize().padding(start = 18.dp, end = 18.dp, bottom = 6.dp))
     }
 
-    AnimatedVisibility(ranged && sliderExpanded) {
-        val loVal = (query.bpmMin ?: 120).toFloat()
-        val hiVal = (query.bpmMax ?: 132).toFloat()
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .padding(start = 18.dp, end = 18.dp, bottom = 8.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainer)
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(14.dp))
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-        ) {
+    if (tempoOpen) TempoSheet(query, settings, onChange, onDismiss = { tempoOpen = false })
+}
+
+/**
+ * The tempo filter: Any / Between / At least / Up to with steppers, presets (the user's own target first) and
+ * half/double. Changes apply as they are made (the list reloads after a short pause); swipe down, tap outside or Done
+ * closes it.
+ */
+@Composable
+private fun TempoSheet(query: SongQuery, settings: Settings, onChange: (SongQuery) -> Unit, onDismiss: () -> Unit) {
+    val lo = query.bpmMin
+    val hi = query.bpmMax
+    fun set(a: Int?, b: Int?) = onChange(query.copy(bpmMin = a, bpmMax = b))
+    CalmBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberCalmSheetState(skipPartiallyExpanded = true),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = Tone.sheet,
+        // Tone.sheet isn't a theme colour, so untinted text would not follow dark mode without this.
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        dragHandle = {
+            Box(Modifier.padding(top = 10.dp, bottom = 16.dp).size(36.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(Tone.sheetLine))
+        },
+    ) {
+        Column(Modifier.imePadding().padding(start = 20.dp, end = 20.dp, bottom = 28.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(str(R.string.library_tempo_title), fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 Text(
-                    str(R.string.library_filter_tempo, query.bpmMin, query.bpmMax),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
+                    tempoRangeLabel(lo, hi),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (lo != null || hi != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .clickable {
-                            sliderExpanded = false
-                            onChange(query.copy(bpmMin = null, bpmMax = null))
-                        }
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                ) {
-                    Text(str(R.string.library_any_tempo), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.height(16.dp))
+            TempoRangeEditor(
+                low = lo,
+                high = hi,
+                fallbackLow = settings.minBpm,
+                fallbackHigh = settings.maxBpm,
+                allowAny = true,
+                onChange = ::set,
+            )
+            Spacer(Modifier.height(16.dp))
+            val mine = Triple(str(R.string.library_tempo_my_range), settings.targetLow, settings.targetHigh)
+            val presets = listOf(mine) + TEMPO_PRESETS
+                .filter { it.min != settings.targetLow || it.max != settings.targetHigh }
+                .map { Triple(str(it.label), it.min, it.max) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                presets.forEach { (name, a, b) ->
+                    TempoPresetTile(name, tempoRangeShort(a, b), selected = lo == a && hi == b, Modifier.weight(1f)) { set(a, b) }
                 }
             }
-            RangeSlider(
-                value = loVal..hiVal,
-                onValueChange = { r ->
-                    val lo = r.start.roundToInt()
-                    val hi = r.endInclusive.roundToInt().coerceAtLeast(lo)
-                    if (lo != query.bpmMin || hi != query.bpmMax) onChange(query.copy(bpmMin = lo, bpmMax = hi))
-                },
-                valueRange = Settings.BPM_FLOOR.toFloat()..Settings.BPM_CEILING.toFloat(),
-                colors = SliderDefaults.colors(
-                    thumbColor = MaterialTheme.colorScheme.primary,
-                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ),
-            )
+            Spacer(Modifier.height(16.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onChange(query.copy(halfDouble = !query.halfDouble)) }
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(str(R.string.settings_half_double_title), fontSize = 15.sp)
+                    Text(str(R.string.settings_half_double_desc), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(
+                    checked = query.halfDouble,
+                    onCheckedChange = { on -> onChange(query.copy(halfDouble = on)) },
+                    colors = brandSwitchColors(),
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text(str(R.string.library_done)) }
         }
+    }
+}
+
+/** A preset in [TempoSheet]: name over range, like the Listen screen's target presets. */
+@Composable
+private fun TempoPresetTile(name: String, range: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier
+            .height(52.dp)
+            .clip(shape)
+            .background(if (selected) Tone.selected else Tone.track)
+            .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(name, fontSize = 13.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(range, fontSize = 11.sp, lineHeight = 13.sp, color = if (selected) Tone.text2 else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

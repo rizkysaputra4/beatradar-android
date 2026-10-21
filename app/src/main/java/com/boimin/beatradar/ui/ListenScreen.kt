@@ -6,7 +6,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.text.font.FontFamily
 import com.boimin.beatradar.ui.theme.Tone
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import com.boimin.beatradar.ui.theme.inTargetColor
 import com.boimin.beatradar.data.BeatLogEntry
 import android.os.SystemClock
@@ -32,6 +31,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -268,8 +268,8 @@ private fun DialStatusBadge(state: MonitorState, settings: Settings, inTarget: B
         return
     }
     val label = when {
-        settings.rangeEnabled && bpm != null && bpm < settings.minBpm -> (settings.minBpm - bpm).let { strPlural(R.plurals.listen_below_target, it, it) }
-        settings.rangeEnabled && bpm != null && bpm > settings.maxBpm -> (bpm - settings.maxBpm).let { strPlural(R.plurals.listen_above_target, it, it) }
+        settings.rangeEnabled && bpm != null && settings.targetLow?.let { bpm < it } == true -> (settings.minBpm - bpm).let { strPlural(R.plurals.listen_below_target, it, it) }
+        settings.rangeEnabled && bpm != null && settings.targetHigh?.let { bpm > it } == true -> (bpm - settings.maxBpm).let { strPlural(R.plurals.listen_above_target, it, it) }
         state.bpmSettled -> str(R.string.listen_locked)
         else -> str(R.string.listen_measuring)
     }
@@ -487,7 +487,7 @@ private fun TargetChip(settings: Settings, open: Boolean, onClick: () -> Unit) {
         Text(str(R.string.listen_target), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(6.dp))
         Text(
-            if (settings.rangeEnabled) str(R.string.listen_target_range_bpm, settings.minBpm, settings.maxBpm) else str(R.string.listen_target_off),
+            if (settings.rangeEnabled) tempoRangeLabel(settings.targetLow, settings.targetHigh) else str(R.string.listen_target_off),
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
@@ -502,19 +502,17 @@ private fun TargetChip(settings: Settings, open: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** The target range: −/+ steppers for each end, presets (or "Custom"), and whether to vibrate. */
+/** The target range: Between / At least / Up to with steppers, presets (or "Custom"), and whether to vibrate. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TargetSheet(settings: Settings, onSettingsChange: ((Settings) -> Settings) -> Unit, onDismiss: () -> Unit) {
-    var typing by remember { mutableStateOf(false) }
-    fun setRange(lo: Int, hi: Int) {
-        val a = lo.coerceIn(Settings.BPM_FLOOR, Settings.BPM_CEILING)
-        val b = hi.coerceIn(Settings.BPM_FLOOR, Settings.BPM_CEILING)
-        onSettingsChange { it.copy(minBpm = minOf(a, b), maxBpm = maxOf(a, b)) }
+    // An open end keeps the number it had, so switching back to Between brings it back.
+    fun setRange(lo: Int?, hi: Int?) = onSettingsChange {
+        it.copy(minBpm = lo ?: it.minBpm, maxBpm = hi ?: it.maxBpm, minOpen = lo == null, maxOpen = hi == null)
     }
-    ModalBottomSheet(
+    CalmBottomSheet(
         onDismissRequest = onDismiss,
-        sheetGesturesEnabled = false,
+        sheetState = rememberCalmSheetState(skipPartiallyExpanded = true),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = Tone.sheet,
         // Tone.sheet isn't a theme colour, so the sheet can't work out its text colour: without this, untinted text
@@ -524,23 +522,34 @@ private fun TargetSheet(settings: Settings, onSettingsChange: ((Settings) -> Set
             Box(Modifier.padding(top = 10.dp, bottom = 16.dp).size(36.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFF3A3946)))
         },
     ) {
-        Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 28.dp)) {
+        Column(Modifier.imePadding().padding(start = 20.dp, end = 20.dp, bottom = 28.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(str(R.string.listen_target_range_title), fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 Text(str(R.string.listen_vibrates_after), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Stepper(str(R.string.listen_from), settings.minBpm, Modifier.weight(1f), onTap = { typing = true }) { setRange(settings.minBpm + it, maxOf(settings.maxBpm, settings.minBpm + it)) }
-                Stepper(str(R.string.listen_to), settings.maxBpm, Modifier.weight(1f), onTap = { typing = true }) { setRange(minOf(settings.minBpm, settings.maxBpm + it), settings.maxBpm + it) }
-            }
+            TempoRangeEditor(
+                low = settings.targetLow,
+                high = settings.targetHigh,
+                fallbackLow = settings.minBpm,
+                fallbackHigh = settings.maxBpm,
+                allowAny = false,
+                onChange = ::setRange,
+            )
             Spacer(Modifier.height(16.dp))
-            val preset = TEMPO_PRESETS.firstOrNull { it.min == settings.minBpm && it.max == settings.maxBpm }
+            val preset = TEMPO_PRESETS.firstOrNull { it.min == settings.targetLow && it.max == settings.targetHigh }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TEMPO_PRESETS.forEach { p ->
                     PresetTile(str(p.label), "${p.min}–${p.max}", selected = p == preset, Modifier.weight(1f)) { setRange(p.min, p.max) }
                 }
-                PresetTile(str(R.string.listen_preset_custom), "${settings.minBpm}–${settings.maxBpm}", selected = preset == null, Modifier.weight(1f)) { typing = true }
+                // Shows what the editor above holds when no preset matches; there is nothing more to open.
+                PresetTile(
+                    str(R.string.listen_preset_custom),
+                    tempoRangeShort(settings.targetLow, settings.targetHigh),
+                    selected = preset == null,
+                    Modifier.weight(1f),
+                    onClick = null,
+                )
             }
             Spacer(Modifier.height(20.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -553,47 +562,11 @@ private fun TargetSheet(settings: Settings, onSettingsChange: ((Settings) -> Set
             }
         }
     }
-    if (typing) {
-        CustomRangeDialog(settings.minBpm, settings.maxBpm, onDismiss = { typing = false }, onSave = { lo, hi -> typing = false; setRange(lo, hi) })
-    }
-}
-
-/** "From 171": a 56 dp field with 44 dp − and + buttons; tapping the number types a range. */
-@Composable
-private fun Stepper(label: String, value: Int, modifier: Modifier, onTap: () -> Unit, onStep: (Int) -> Unit) {
-    Row(
-        modifier
-            .height(56.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(Tone.track)
-            .padding(horizontal = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        StepButton(R.drawable.ic_remove, str(R.string.listen_step_lower, label)) { onStep(-1) }
-        Column(Modifier.weight(1f).clickable(onClick = onTap), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, fontSize = 11.sp, lineHeight = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("$value", fontSize = 20.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold)
-        }
-        StepButton(R.drawable.ic_add, str(R.string.listen_step_raise, label)) { onStep(1) }
-    }
-}
-
-@Composable
-private fun StepButton(icon: Int, description: String, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .size(44.dp)
-            .clip(CircleShape)
-            .clickable(onClickLabel = description, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(painterResource(icon), contentDescription = description, tint = Tone.text2, modifier = Modifier.size(22.dp))
-    }
 }
 
 /** A preset: 52 dp tall, name over range; the selected one filled violet-dark with a violet outline. */
 @Composable
-private fun PresetTile(name: String, range: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun PresetTile(name: String, range: String, selected: Boolean, modifier: Modifier, onClick: (() -> Unit)?) {
     val shape = RoundedCornerShape(12.dp)
     Column(
         modifier
@@ -601,7 +574,7 @@ private fun PresetTile(name: String, range: String, selected: Boolean, modifier:
             .clip(shape)
             .background(if (selected) Tone.selected else Tone.track)
             .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
-            .clickable(onClick = onClick),
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -755,50 +728,11 @@ private fun NowPlayingCard(
     }
 }
 
-private data class TempoPreset(@StringRes val label: Int, val min: Int, val max: Int)
+internal data class TempoPreset(@StringRes val label: Int, val min: Int, val max: Int)
 
-private val TEMPO_PRESETS = listOf(
+internal val TEMPO_PRESETS = listOf(
     TempoPreset(R.string.listen_preset_groove, 95, 110),
     TempoPreset(R.string.listen_preset_house, 120, 132),
     TempoPreset(R.string.listen_preset_run, 155, 175),
 )
 
-@Composable
-private fun CustomRangeDialog(minBpm: Int, maxBpm: Int, onDismiss: () -> Unit, onSave: (Int, Int) -> Unit) {
-    var minText by remember { mutableStateOf(minBpm.toString()) }
-    var maxText by remember { mutableStateOf(maxBpm.toString()) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(str(R.string.listen_custom_range_title)) },
-        text = {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = minText,
-                    onValueChange = { if (it.length <= 3 && it.all(Char::isDigit)) minText = it },
-                    label = { Text(str(R.string.listen_min_bpm)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f),
-                )
-                OutlinedTextField(
-                    value = maxText,
-                    onValueChange = { if (it.length <= 3 && it.all(Char::isDigit)) maxText = it },
-                    label = { Text(str(R.string.listen_max_bpm)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val a = (minText.toIntOrNull() ?: minBpm).coerceIn(Settings.BPM_FLOOR, Settings.BPM_CEILING)
-                    val b = (maxText.toIntOrNull() ?: maxBpm).coerceIn(Settings.BPM_FLOOR, Settings.BPM_CEILING)
-                    onSave(minOf(a, b), maxOf(a, b))
-                },
-            ) { Text(str(R.string.listen_apply)) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.listen_cancel)) } },
-    )
-}

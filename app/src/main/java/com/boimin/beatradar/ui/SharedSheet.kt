@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,9 +17,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -73,7 +72,7 @@ fun SharedSheet(load: suspend () -> SharedSummary, email: String?, onDismiss: ()
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetGesturesEnabled = false, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    CalmBottomSheet(onDismissRequest = onDismiss, sheetState = rememberCalmSheetState(skipPartiallyExpanded = true)) {
         Column(
             Modifier.verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -86,7 +85,13 @@ fun SharedSheet(load: suspend () -> SharedSummary, email: String?, onDismiss: ()
             )
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             val s = summary
-            if (s == null && error == null) CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally).padding(16.dp))
+            if (s == null && error == null) {
+                Skeleton {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        repeat(3) { SkeletonBox(Modifier.fillMaxWidth().height(58.dp), corner = 14.dp) }
+                    }
+                }
+            }
             s?.items?.forEach { k ->
                 val labels = SHARED_LABELS[k.kind]
                 val title = labels?.let { str(it.first) } ?: k.kind

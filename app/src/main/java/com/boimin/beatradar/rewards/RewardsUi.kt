@@ -1,5 +1,7 @@
 package com.boimin.beatradar.rewards
 
+import com.boimin.beatradar.ui.CalmBottomSheet
+import com.boimin.beatradar.ui.rememberCalmSheetState
 import com.boimin.beatradar.ui.theme.Tone
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
@@ -29,10 +31,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -66,6 +66,8 @@ import com.boimin.beatradar.net.Rewards
 import com.boimin.beatradar.ui.theme.Brand
 import java.text.NumberFormat
 import kotlin.math.roundToInt
+import com.boimin.beatradar.ui.Skeleton
+import com.boimin.beatradar.ui.SkeletonBox
 
 /**
  * How big the header flame is: it grows a step at a time with the beats earned by contributing, so the chip itself
@@ -137,10 +139,9 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String
     LaunchedEffect(Unit) { vm.loadRewards() }
     LaunchedEffect(allTime) { vm.loadBoard(allTime) }
 
-    ModalBottomSheet(
+    CalmBottomSheet(
         onDismissRequest = onDismiss,
-        sheetGesturesEnabled = false,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = rememberCalmSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
     ) {
@@ -196,13 +197,13 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String
             ) {
                 BentoStatCard(
                     label = str(R.string.rewards_this_week),
-                    value = number(r?.beatsWeek ?: 0),
+                    value = r?.let { number(it.beatsWeek) },
                     sub = r?.rankWeek?.let { str(R.string.rewards_rank, it) },
                     modifier = Modifier.weight(1f),
                 )
                 BentoStatCard(
                     label = str(R.string.rewards_all_time),
-                    value = number(r?.beatsAll ?: 0),
+                    value = r?.let { number(it.beatsAll) },
                     sub = r?.rankAll?.let { str(R.string.rewards_rank, it) },
                     modifier = Modifier.weight(1f),
                 )
@@ -308,7 +309,13 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String
 
             Spacer(Modifier.height(8.dp))
             val b = board
-            if (b != null) {
+            if (b == null) {
+                Skeleton {
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        repeat(5) { SkeletonBox(Modifier.fillMaxWidth().height(34.dp), corner = 10.dp) }
+                    }
+                }
+            } else {
                 if (!allTime) b.lastGrooveMaster?.let {
                     Text(
                         str(R.string.rewards_last_groove_master, it),
@@ -342,7 +349,7 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String
 }
 
 @Composable
-private fun BentoStatCard(label: String, value: String, sub: String?, modifier: Modifier = Modifier) {
+private fun BentoStatCard(label: String, value: String?, sub: String?, modifier: Modifier = Modifier) {
     Column(
         modifier
             .clip(RoundedCornerShape(14.dp))
@@ -358,7 +365,8 @@ private fun BentoStatCard(label: String, value: String, sub: String?, modifier: 
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(3.dp))
-        Text(
+        // Still loading: a bar the height of the number.
+        if (value == null) Skeleton { SkeletonBox(Modifier.padding(vertical = 3.dp).size(width = 72.dp, height = 19.dp)) } else Text(
             value,
             fontSize = 22.sp,
             lineHeight = 25.sp,
@@ -481,9 +489,9 @@ fun BadgeCelebration(badges: List<BadgeView>, onDone: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileSheet(profile: PublicProfile, onReport: () -> Unit, onDismiss: () -> Unit) {
-    ModalBottomSheet(
+    CalmBottomSheet(
         onDismissRequest = onDismiss,
-        sheetGesturesEnabled = false,
+        sheetState = rememberCalmSheetState(),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
     ) {

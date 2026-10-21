@@ -45,6 +45,26 @@ class SettingsTest {
         assertTrue(s.copy(minBpm = 135, maxBpm = 145).inTarget(140f))
     }
 
+    @Test fun openEndedTarget() {
+        val atLeast = Settings(minBpm = 140, maxBpm = 150, maxOpen = true)
+        assertTrue("no upper limit", atLeast.inTarget(190f))
+        assertFalse(atLeast.inTarget(139f))
+        assertEquals(140, atLeast.targetLow)
+        assertEquals(null, atLeast.targetHigh)
+        assertEquals(140..Settings.BPM_CEILING, atLeast.targetRange)
+
+        val upTo = Settings(minBpm = 120, maxBpm = 110, minOpen = true)
+        assertTrue("no lower limit", upTo.inTarget(70f))
+        assertFalse(upTo.inTarget(111f))
+        assertEquals(Settings.BPM_FLOOR..110, upTo.targetRange)
+    }
+
+    @Test fun openEndCountsHalfDoubleBeyondTheScale() {
+        // 105 heard as half of 210: at least 140 with half/double on.
+        assertTrue(Settings(minBpm = 140, maxOpen = true, halfDoubleMatch = true).inTarget(105f))
+        assertFalse(Settings(minBpm = 140, maxOpen = true).inTarget(105f))
+    }
+
     @Test fun anyBpmRangeWithHalfDouble() {
         assertTrue(Settings.bpmIn(100f, 95..110, halfDouble = false))
         assertFalse(Settings.bpmIn(200f, 95..110, halfDouble = false))
