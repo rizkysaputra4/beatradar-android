@@ -25,6 +25,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -71,6 +72,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -78,6 +80,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.boimin.beatradar.R
@@ -92,7 +95,10 @@ import com.boimin.beatradar.i18n.strPlural
 import androidx.annotation.StringRes
 import com.boimin.beatradar.ui.theme.Brand
 import com.boimin.beatradar.ui.theme.brandSwitchColors
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -116,50 +122,66 @@ fun ListenScreen(
     val inTarget = state.matched || (listening && state.bpm != null && settings.rangeEnabled && settings.matches(state.bpm))
     var editingTarget by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 18.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Dial(state, settings, inTarget, onToggle = if (state.active) actions.stop else actions.start)
-        if (listening && state.title != null) {
-            Spacer(Modifier.height(12.dp))
-            Text(
-                listOfNotNull(state.title, state.artist).joinToString(" · "),
-                fontSize = 14.sp,
-                color = Tone.text2,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        // On a short screen (a 320 × 569 dp phone, or a large font / display size) the dial shrinks so the target
+        // chip and the now-playing card (Name song, Pause) still show without scrolling.
+        val compact = maxHeight < COMPACT_HEIGHT
+        val dialHeight = (maxHeight - if (compact) BELOW_DIAL_COMPACT else BELOW_DIAL).coerceIn(MIN_DIAL, FULL_DIAL)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Dial(state, settings, inTarget, height = dialHeight, onToggle = if (state.active) actions.stop else actions.start)
+            if (listening && state.title != null) {
+                Spacer(Modifier.height(if (compact) 6.dp else 12.dp))
+                Text(
+                    listOfNotNull(state.title, state.artist).joinToString(" · "),
+                    fontSize = 14.sp,
+                    color = Tone.text2,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.height(if (compact) 8.dp else 18.dp))
+            TargetChip(settings, open = editingTarget, onClick = { editingTarget = true })
+            Spacer(Modifier.height(if (compact) 12.dp else 22.dp))
+            NowPlayingCard(
+                state = state,
+                suggestion = suggestion,
+                onAcceptSuggestion = onAcceptSuggestion,
+                onRejectSuggestion = onRejectSuggestion,
+                actions = actions,
             )
+            if (recent.isNotEmpty()) {
+                Spacer(Modifier.height(22.dp))
+                HeardRecently(recent, settings, onOpenSong)
+            }
+            Spacer(Modifier.height(24.dp))
         }
-        Spacer(Modifier.height(18.dp))
-        TargetChip(settings, open = editingTarget, onClick = { editingTarget = true })
-        Spacer(Modifier.height(22.dp))
-        NowPlayingCard(
-            state = state,
-            suggestion = suggestion,
-            onAcceptSuggestion = onAcceptSuggestion,
-            onRejectSuggestion = onRejectSuggestion,
-            actions = actions,
-        )
-        if (recent.isNotEmpty()) {
-            Spacer(Modifier.height(22.dp))
-            HeardRecently(recent, settings, onOpenSong)
-        }
-        Spacer(Modifier.height(24.dp))
     }
     if (editingTarget) TargetSheet(settings, onSettingsChange, onDismiss = { editingTarget = false })
 }
 
+/** The dial's full height; the ring is [RING_SHARE] of it. */
+private val FULL_DIAL = 300.dp
+private val MIN_DIAL = 130.dp
+private const val RING_SHARE = 236f / 300f
+/** Below this the screen counts as short: tighter spacing, and the dial gives up room. */
+private val COMPACT_HEIGHT = 520.dp
+/** What goes under the dial and should still fit: spacing, the 42 dp target chip and the ~76 dp now-playing card. */
+private val BELOW_DIAL = 170.dp
+private val BELOW_DIAL_COMPACT = 140.dp
+
 /**
- * The dial: a 236 dp ring, 6 dp thick, with the tempo inside and, under it, how far off it is in plain words. While
- * listening, ripples go out from it on every beat and it kicks slightly. Holding the target fills the ring in mint over
- * the 10 s it takes to lock a match; matched, the whole ring is mint with a faint mint fill.
+ * The dial: a ring (236 dp at full [height], 6 dp thick) with the tempo inside and, under it, how far off it is in
+ * plain words. While listening, ripples go out from it on every beat and it kicks slightly. Holding the target fills
+ * the ring in mint over the 10 s it takes to lock a match; matched, the whole ring is mint with a faint mint fill.
  */
 @Composable
-private fun Dial(state: MonitorState, settings: Settings, inTarget: Boolean, onToggle: () -> Unit) {
+private fun Dial(state: MonitorState, settings: Settings, inTarget: Boolean, height: Dp, onToggle: () -> Unit) {
     val listening = state.status == MonitorStatus.LISTENING
     val mint = inTargetColor()
     val accent by animateColorAsState(if (inTarget) mint else MaterialTheme.colorScheme.primary, label = "accent")
@@ -181,12 +203,15 @@ private fun Dial(state: MonitorState, settings: Settings, inTarget: Boolean, onT
     // 0..1: how sure the reading is. Sure beats send stronger ripples further out and kick the dial harder.
     val sure by animateFloatAsState(confidencePercent(state.confidence.takeIf { listening }) / 100f, tween(600), label = "sure")
 
-    Box(Modifier.fillMaxWidth().height(300.dp), contentAlignment = Alignment.Center) {
-        if (listening) SonarRings(accent)
-        if (listening) SmoothHitRipples(ripples, accent, sure)
+    val k = height / FULL_DIAL
+    val ringRadius = height * RING_SHARE / 2
+
+    Box(Modifier.fillMaxWidth().height(height), contentAlignment = Alignment.Center) {
+        if (listening && !ripples.quiet) SonarRings(accent, ringRadius)
+        if (listening) SmoothHitRipples(ripples, accent, sure, ringRadius, k)
         Box(
             Modifier
-                .size(236.dp)
+                .size(ringRadius * 2)
                 .scale(1f + (0.01f + 0.05f * sure) * pulse)
                 .clip(CircleShape)
                 .background(fill)
@@ -208,16 +233,19 @@ private fun Dial(state: MonitorState, settings: Settings, inTarget: Boolean, onT
                     Text(str(R.string.listen_bpm_label), fontSize = 13.sp, letterSpacing = 1.56.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         state.bpm.roundToInt().toString(),
-                        fontSize = 76.sp,
-                        lineHeight = 76.sp,
+                        fontSize = 76.sp * k,
+                        lineHeight = 76.sp * k,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.alpha(numberAlpha),
                     )
                     Spacer(Modifier.height(6.dp))
                     DialStatusBadge(state, settings, inTarget)
-                    Spacer(Modifier.height(4.dp))
-                    Text(str(R.string.listen_confidence_percent, (sure * 100).roundToInt()), fontSize = 13.sp, color = Tone.text3)
+                    // A small dial (a very short screen) has no room for the confidence line.
+                    if (k >= 0.6f) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(str(R.string.listen_confidence_percent, (sure * 100).roundToInt()), fontSize = 13.sp, color = Tone.text3)
+                    }
                 } else {
                     Icon(
                         painterResource(R.drawable.ic_mic),
@@ -338,11 +366,22 @@ private class HitRipples {
     private var next = 0
     private var loudness = 0.7f
     var nowMs by mutableLongStateOf(SystemClock.elapsedRealtime())
+    /** When the mic last heard a hit (or listening started). */
+    var lastSoundMs = SystemClock.elapsedRealtime()
+    /** Nothing heard for a while: the animation rests (no frames drawn) until the next hit. */
+    var quiet by mutableStateOf(false)
+    /** Counts hits, so a resting animation can wait for the next one. */
+    val hitCount = MutableStateFlow(0)
 
     fun onHit(hit: MicHit, beatFound: Boolean) {
         loudness = 0.8f * loudness + 0.2f * hit.strength
+        lastSoundMs = SystemClock.elapsedRealtime()
+        hitCount.value++
         if (!beatFound) send(hit.atMs, hit.strength)
     }
+
+    /** True while any ripple is still on its way out. */
+    fun anyAlive(now: Long): Boolean = startMs.any { now - it < RIPPLE_MS * 1.6f }
 
     fun onBeat(atMs: Long) = send(atMs, loudness.coerceIn(0.6f, 1f))
 
@@ -371,23 +410,38 @@ private fun rememberHitRipples(listening: Boolean, beat: BeatClock): HitRipples 
         launch { MicHits.hits.collect { ripples.onHit(it, beatFound = beat.anchorMs != null) } }
         var lastBeat = Long.MIN_VALUE
         var lastSentMs = Long.MIN_VALUE / 2
-        while (true) withFrameMillis {
-            val now = SystemClock.elapsedRealtime()
-            ripples.nowMs = now
-            val anchor = beat.anchorMs
-            val period = beat.periodMs
-            if (anchor != null && period > 0) {
-                val k = floor((now - anchor) / period).toLong()
-                if (k != lastBeat) {
-                    val at = anchor + (k * period).toLong()
-                    if (at - lastSentMs > period * 0.6) {
-                        ripples.onBeat(at)
-                        lastSentMs = at
+        ripples.lastSoundMs = SystemClock.elapsedRealtime()
+        ripples.quiet = false
+        while (true) {
+            // A silent room (no beat, no ripple left, nothing heard for a while): stop drawing frames, which on a
+            // low-end phone otherwise costs a steady share of a core, until the mic hears something again.
+            val idleNow = SystemClock.elapsedRealtime()
+            if (beat.anchorMs == null && !ripples.anyAlive(idleNow) && idleNow - ripples.lastSoundMs > QUIET_AFTER_MS) {
+                ripples.quiet = true
+                val seen = ripples.hitCount.value
+                // Also wakes now and then in case a beat was found without a fresh hit.
+                withTimeoutOrNull(1_000) { ripples.hitCount.first { it != seen } }
+                if (beat.anchorMs == null && ripples.hitCount.value == seen) continue
+                ripples.quiet = false
+            }
+            withFrameMillis {
+                val now = SystemClock.elapsedRealtime()
+                ripples.nowMs = now
+                val anchor = beat.anchorMs
+                val period = beat.periodMs
+                if (anchor != null && period > 0) {
+                    val k = floor((now - anchor) / period).toLong()
+                    if (k != lastBeat) {
+                        val at = anchor + (k * period).toLong()
+                        if (at - lastSentMs > period * 0.6) {
+                            ripples.onBeat(at)
+                            lastSentMs = at
+                        }
+                        lastBeat = k
                     }
-                    lastBeat = k
+                } else {
+                    lastBeat = Long.MIN_VALUE
                 }
-            } else {
-                lastBeat = Long.MIN_VALUE
             }
         }
     }
@@ -399,11 +453,11 @@ private fun rememberHitRipples(listening: Boolean, beat: BeatClock): HitRipples 
  * past the ring to ~190 dp from the centre), how long they last, how bright and how thick they are.
  */
 @Composable
-private fun SmoothHitRipples(ripples: HitRipples, accent: Color, sure: Float) {
+private fun SmoothHitRipples(ripples: HitRipples, accent: Color, sure: Float, ringRadius: Dp, scale: Float) {
     Canvas(Modifier.fillMaxSize()) {
         val now = ripples.nowMs
-        val inner = 118.dp.toPx()
-        val outer = (128 + 64 * sure).dp.toPx()
+        val inner = ringRadius.toPx()
+        val outer = inner + ((10 + 64 * sure) * scale).dp.toPx()
         val glow = (14 + 42 * sure).dp.toPx()
         val lifeMs = RIPPLE_MS * (0.7f + 0.9f * sure)
         val bright = 0.3f + 1.3f * sure
@@ -437,9 +491,13 @@ private fun SmoothHitRipples(ripples: HitRipples, accent: Color, sure: Float) {
 private const val MAX_RIPPLES = 8
 private const val RIPPLE_MS = 1_100f
 private const val KICK_MS = 220f
+/** Below this the now-playing card shows Name song as an icon only. */
+private val NARROW_CARD = 270.dp
+/** How long the room must stay silent before the dial's animation rests. */
+private const val QUIET_AFTER_MS = 4_000L
 
 @Composable
-private fun SonarRings(accent: Color) {
+private fun SonarRings(accent: Color, ringRadius: Dp) {
     val travel by rememberInfiniteTransition(label = "sonar").animateFloat(
         initialValue = 0f,
         targetValue = 1f,
@@ -447,7 +505,7 @@ private fun SonarRings(accent: Color) {
         label = "sonarTravel",
     )
     Canvas(Modifier.fillMaxSize()) {
-        val inner = 120.dp.toPx()
+        val inner = (ringRadius + 2.dp).toPx()
         val outer = size.minDimension / 2
         for (i in 0 until SONAR_RINGS) {
             val t = (travel + i.toFloat() / SONAR_RINGS) % 1f
@@ -669,44 +727,55 @@ private fun NowPlayingCard(
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(titleText, fontSize = 16.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(subText, fontSize = 13.sp, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            if (state.active) {
-                if (state.title == null) {
-                    Spacer(Modifier.width(8.dp))
-                    Row(
-                        Modifier
-                            .height(40.dp)
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(Tone.pill)
-                            .clickable(onClickLabel = str(R.string.listen_name_with_shazam), onClick = actions.identify)
-                            .padding(horizontal = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(painterResource(R.drawable.ic_search), contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(str(R.string.listen_name_song), fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    }
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            // A narrow card (a 320 dp phone, or a large font) keeps only the search icon, so the status text isn't cut.
+            val iconOnly = maxWidth < NARROW_CARD || (maxWidth < NARROW_CARD + 40.dp && LocalDensity.current.fontScale > 1.15f)
+            Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(titleText, fontSize = 16.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(subText, fontSize = 13.sp, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Spacer(Modifier.width(10.dp))
-                val paused = state.status == MonitorStatus.PAUSED
-                Box(
-                    Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(Tone.pill)
-                        .clickable(onClick = if (paused) actions.resume else actions.pause),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        painterResource(if (paused) R.drawable.ic_play else R.drawable.ic_pause),
-                        contentDescription = if (paused) str(R.string.listen_resume) else str(R.string.listen_pause),
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(20.dp),
-                    )
+                if (state.active) {
+                    if (state.title == null) {
+                        Spacer(Modifier.width(8.dp))
+                        Row(
+                            Modifier
+                                .height(40.dp)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Tone.pill)
+                                .clickable(onClickLabel = str(R.string.listen_name_with_shazam), onClick = actions.identify)
+                                .padding(horizontal = if (iconOnly) 11.dp else 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_search),
+                                contentDescription = if (iconOnly) str(R.string.listen_name_song) else null,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            if (!iconOnly) {
+                                Spacer(Modifier.width(6.dp))
+                                Text(str(R.string.listen_name_song), fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    val paused = state.status == MonitorStatus.PAUSED
+                    Box(
+                        Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Tone.pill)
+                            .clickable(onClick = if (paused) actions.resume else actions.pause),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painterResource(if (paused) R.drawable.ic_play else R.drawable.ic_pause),
+                            contentDescription = if (paused) str(R.string.listen_resume) else str(R.string.listen_pause),
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
             }
         }

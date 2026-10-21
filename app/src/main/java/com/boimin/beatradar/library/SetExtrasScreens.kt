@@ -38,6 +38,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.lazy.rememberLazyListState
 import com.boimin.beatradar.R
 import com.boimin.beatradar.data.Settings
 import com.boimin.beatradar.i18n.str
@@ -105,8 +108,16 @@ internal fun BuildSetScreen(state: BuildState, vm: LibraryViewModel, settings: S
     val range = settings.targetRange
     val scope = rememberCoroutineScope()
     val result = state.result
+    val list = rememberLazyListState()
+    // A fresh result under the fold (a short screen): bring it up, else Build seems to do nothing.
+    LaunchedEffect(result, state.loading) {
+        if (result == null || state.loading) return@LaunchedEffect
+        val header = list.layoutInfo.visibleItemsInfo.firstOrNull { it.index == RESULT_ITEM }
+        if (header == null || header.offset + header.size > list.layoutInfo.viewportEndOffset) list.animateScrollToItem(RESULT_ITEM)
+    }
     LazyColumn(
         modifier.fillMaxSize(),
+        state = list,
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -176,6 +187,9 @@ internal fun BuildSetScreen(state: BuildState, vm: LibraryViewModel, settings: S
     }
 }
 
+/** The result's header in [BuildSetScreen]'s list, after the back button and the options card. */
+private const val RESULT_ITEM = 2
+
 @Composable
 private fun Card(content: @Composable () -> Unit) {
     Column(
@@ -197,15 +211,17 @@ internal fun Chip(label: String, selected: Boolean, modifier: Modifier = Modifie
             .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainerHigh)
             .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp, horizontal = 10.dp),
+            .padding(vertical = 8.dp, horizontal = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             label,
-            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
+            softWrap = false,
+            // Four chips across a 320 dp screen with a large font: "15 min" shrinks rather than losing "min".
+            autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 12.sp),
         )
     }
 }

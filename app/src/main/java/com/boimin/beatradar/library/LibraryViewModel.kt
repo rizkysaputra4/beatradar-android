@@ -3,6 +3,7 @@ package com.boimin.beatradar.library
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.boimin.beatradar.R
 import com.boimin.beatradar.app
@@ -86,7 +87,7 @@ data class BuildState(
 /** Discover's extras for the current range: trending songs and the genre/decade filters worth offering. */
 data class DiscoverExtras(val trending: Trending? = null, val facets: Facets = Facets())
 
-class LibraryViewModel(application: Application) : AndroidViewModel(application) {
+class LibraryViewModel(application: Application, private val saved: SavedStateHandle) : AndroidViewModel(application) {
     private val repo = application.app.library
     private val setDao = application.app.database.sets()
     private val logDao = application.app.database.beatLog()
@@ -395,6 +396,11 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     /** The open song page, or null for the list. */
     val detail: StateFlow<DetailState?> = _detail
 
+    init {
+        // Android ended the app in the background with a song page open: open it again.
+        saved.get<String>(OPEN_SONG)?.let(::open)
+    }
+
     private val _profile = MutableStateFlow<PublicProfile?>(null)
     val profile: StateFlow<PublicProfile?> = _profile
 
@@ -480,11 +486,13 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun open(slug: String) {
+        saved[OPEN_SONG] = slug
         _detail.value = DetailState(slug)
         refreshDetail()
     }
 
     fun close() {
+        saved.remove<String>(OPEN_SONG)
         _detail.value = null
     }
 
@@ -586,3 +594,6 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     }
 }
+
+/** [SavedStateHandle] key: the slug of the open song page. */
+private const val OPEN_SONG = "openSong"

@@ -156,6 +156,8 @@ fun LogScreen(
                             str(R.string.log_search_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                     BasicTextField(

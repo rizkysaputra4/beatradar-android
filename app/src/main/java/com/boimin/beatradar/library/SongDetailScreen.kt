@@ -46,6 +46,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -259,9 +261,11 @@ private fun SongPage(
                 Spacer(Modifier.width(8.dp))
                 Text(
                     if (inSets.isNotEmpty()) strPlural(R.plurals.song_in_sets, inSets.size, inSets.size) else str(R.string.sets_add_to_set),
-                    fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
                     color = Color.White,
+                    maxLines = 1,
+                    softWrap = false,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 13.sp, maxFontSize = 16.sp),
                 )
             }
             Row(
@@ -300,7 +304,13 @@ private fun SongPage(
                             .clickable { actions.openUrl(link.url) },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(SERVICES[link.service] ?: link.service, fontSize = 14.sp, maxLines = 1)
+                        Text(
+                            SERVICES[link.service] ?: link.service,
+                            maxLines = 1,
+                            softWrap = false,
+                            autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 14.sp),
+                            modifier = Modifier.padding(horizontal = 6.dp),
+                        )
                     }
                 }
             }
@@ -353,17 +363,25 @@ private val SERVICES = linkedMapOf("spotify" to "Spotify", "apple_music" to "App
 private fun PillButton(icon: Int, label: String, modifier: Modifier, onClick: () -> Unit) {
     Row(
         modifier
-            .height(44.dp)
+            .heightIn(min = 44.dp)
             .clip(RoundedCornerShape(22.dp))
             .background(Tone.pill)
             .clickable(onClick = onClick)
-            .padding(horizontal = 6.dp),
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(painterResource(icon), contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(6.dp))
-        Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false)
+        // Half a 320 dp screen, a large font or a longer language: the label shrinks, then takes a second line.
+        Text(
+            label,
+            fontWeight = FontWeight.Medium,
+            lineHeight = 15.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 14.sp),
+        )
     }
 }
 

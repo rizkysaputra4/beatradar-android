@@ -1,5 +1,6 @@
 package com.boimin.beatradar.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxHeight
 import com.boimin.beatradar.ui.theme.Tone
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,6 +13,17 @@ import com.boimin.beatradar.app
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -192,6 +204,12 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
         }
     }
     LaunchedEffect(celebrate) { if (celebrate.isNotEmpty()) actions.celebrateHaptic() }
+    // Back from another tab goes to Listen first, as in most Android apps; only Listen leaves the app. An open song
+    // page or set handles Back itself (registered later, so it goes first).
+    BackHandler(enabled = tab != TAB_LISTEN) {
+        libraryVm.close()
+        tab = TAB_LISTEN
+    }
 
     val requireSignIn: (() -> Unit) -> Unit = { then ->
         accountVm.setAfterSignIn(then)
@@ -211,7 +229,7 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                         TAB_SETS -> AnnotatedString(str(R.string.app_title_my_sets))
                         else -> AnnotatedString(str(R.string.app_title_discover))
                     },
-                    rewards = { BeatsChip(rewards) { showRewards = true } },
+                    rewards = { compact -> BeatsChip(rewards, compact) { showRewards = true } },
                     onSettings = { showSettings = true },
                 )
             }
@@ -472,41 +490,63 @@ private fun wordmark(): AnnotatedString = buildAnnotatedString {
 
 /** Slim header: squircle logo badge + title on the left, beats chip and bordered settings button on the right. */
 @Composable
-private fun Header(title: AnnotatedString, rewards: @Composable () -> Unit, onSettings: () -> Unit) {
+private fun Header(title: AnnotatedString, rewards: @Composable (compact: Boolean) -> Unit, onSettings: () -> Unit) {
     // Design: a 40 dp logo tile, the title at 20 sp bold, the beats chip and a bare 36 dp settings button.
-    Row(
+    BoxWithConstraints(
         Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .height(60.dp)
-            .padding(start = 18.dp, end = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            // In landscape the navigation bar can sit at a side; keep the settings button clear of it.
+            .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal)),
     ) {
-        Box(
+        // A narrow header (a 320 dp phone, or a large font / display size): the chip drops the beats count, and the
+        // title shrinks to fit on one line rather than breaking mid-word.
+        val compact = maxWidth < COMPACT_HEADER || (maxWidth < COMPACT_HEADER + 40.dp && LocalDensity.current.fontScale > 1.15f)
+        Row(
             Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Tone.logoTile),
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .height(60.dp)
+                .padding(start = if (compact) 14.dp else 18.dp, end = if (compact) 8.dp else 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // The app logo in its own colours, half the tile like the launcher icon.
-            Icon(painterResource(R.drawable.ic_logo), contentDescription = null, tint = Color.Unspecified, modifier = Modifier.size(20.dp))
-        }
-        Spacer(Modifier.width(10.dp))
-        Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-        rewards()
-        Spacer(Modifier.width(6.dp))
-        Box(
-            Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .clickable(onClick = onSettings),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(painterResource(R.drawable.ic_settings), contentDescription = str(R.string.app_settings), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Tone.logoTile),
+                contentAlignment = Alignment.Center,
+            ) {
+                // The app logo in its own colours, half the tile like the launcher icon.
+                Icon(painterResource(R.drawable.ic_logo), contentDescription = null, tint = Color.Unspecified, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.width(10.dp))
+            Text(
+                title,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                autoSize = TextAutoSize.StepBased(minFontSize = 15.sp, maxFontSize = 20.sp),
+                modifier = Modifier.weight(1f),
+            )
+            rewards(compact)
+            Spacer(Modifier.width(6.dp))
+            Box(
+                Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onSettings),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(painterResource(R.drawable.ic_settings), contentDescription = str(R.string.app_settings), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            }
         }
     }
 }
+
+/** Below this width the header goes compact. */
+private val COMPACT_HEADER = 340.dp
 
 /** The floating tab bar: a 62 dp pill, four 48 dp items, the active one filled. */
 @Composable

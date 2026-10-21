@@ -37,8 +37,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.LineBreak
+import androidx.compose.ui.text.style.Hyphens
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.em
+import androidx.compose.foundation.text.TextAutoSize
 import com.boimin.beatradar.R
 import com.boimin.beatradar.i18n.appLocale
 import com.boimin.beatradar.i18n.str
@@ -227,13 +232,16 @@ private fun BadgeTile(badge: BadgeView, modifier: Modifier, onClick: () -> Unit)
         Box(Modifier.height(28.dp), contentAlignment = Alignment.Center) {
             Text(
                 badgeName(badge.code, badge.name),
-                fontSize = 11.sp,
-                lineHeight = 13.sp,
+                lineHeight = 1.18.em,
                 fontWeight = FontWeight.Bold,
                 color = if (earned) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+                // A narrow tile (320 dp phone, large font): the name shrinks to keep two lines, and a long word is
+                // hyphenated rather than cut anywhere.
+                autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 11.sp),
+                style = LocalTextStyle.current.copy(hyphens = Hyphens.Auto, lineBreak = LineBreak.Simple),
             )
         }
         Text(

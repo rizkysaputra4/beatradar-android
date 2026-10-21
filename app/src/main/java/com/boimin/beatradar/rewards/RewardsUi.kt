@@ -84,9 +84,12 @@ object Flame {
     fun sizeDp(beats: Long): Int = MIN_DP + STEP_DP * level(beats)
 }
 
-/** Header chip: a flame that grows with contributions, then streak and all-time beats, e.g. "🔥 7d · 1,240". */
+/**
+ * Header chip: a flame that grows with contributions, then streak and all-time beats, e.g. "🔥 7d · 1,240". [compact]
+ * (a narrow header) leaves out the beats, which the sheet behind the chip shows anyway.
+ */
 @Composable
-fun BeatsChip(rewards: Rewards?, onClick: () -> Unit) {
+fun BeatsChip(rewards: Rewards?, compact: Boolean = false, onClick: () -> Unit) {
     val beats = rewards?.beatsAll ?: 0L
     val size by animateDpAsState(Flame.sizeDp(beats).dp, spring(dampingRatio = 0.5f, stiffness = 300f), label = "flame")
     // A quick pop each time new beats come in while the app is open.
@@ -108,7 +111,7 @@ fun BeatsChip(rewards: Rewards?, onClick: () -> Unit) {
             .background(Tone.chip)
             .border(1.dp, Tone.line, RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp),
+            .padding(horizontal = if (compact) 8.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -119,10 +122,12 @@ fun BeatsChip(rewards: Rewards?, onClick: () -> Unit) {
         )
         Spacer(Modifier.width(3.dp))
         Text("${rewards?.streak ?: 0}", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-        Spacer(Modifier.width(10.dp))
-        Icon(painterResource(R.drawable.ic_note), contentDescription = str(R.string.rewards_chip_beats_description), tint = Tone.primarySoft, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(2.dp))
-        Text(number(beats), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+        if (!compact) {
+            Spacer(Modifier.width(10.dp))
+            Icon(painterResource(R.drawable.ic_note), contentDescription = str(R.string.rewards_chip_beats_description), tint = Tone.primarySoft, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(2.dp))
+            Text(number(beats), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+        }
     }
 }
 

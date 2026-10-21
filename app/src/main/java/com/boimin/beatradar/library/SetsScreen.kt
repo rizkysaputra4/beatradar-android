@@ -60,6 +60,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.em
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.boimin.beatradar.R
 import com.boimin.beatradar.data.SetRules
@@ -791,15 +793,16 @@ private fun SetsAction(icon: Int, label: String, primary: Boolean, modifier: Mod
     ) {
         Icon(painterResource(icon), contentDescription = null, tint = fg, modifier = Modifier.size(22.dp))
         Spacer(Modifier.height(4.dp))
+        // Three tiles across a 320 dp screen with a large font: the label shrinks to keep both lines.
         Text(
             label,
-            fontSize = 12.sp,
-            lineHeight = 14.sp,
+            lineHeight = 1.17.em,
             fontWeight = FontWeight.SemiBold,
             color = if (primary) fg else MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 12.sp),
         )
     }
 }
