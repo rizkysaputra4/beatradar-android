@@ -1,5 +1,6 @@
 package com.boimin.beatradar.library
 
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -110,16 +111,19 @@ internal fun LibrarySongRow(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SwipeToDelete(onDelete: () -> Unit, enabled: Boolean = true, content: @Composable () -> Unit) {
-    val state = rememberSwipeToDismissBoxState()
-    val scope = rememberCoroutineScope()
+    val latest by rememberUpdatedState(onDelete)
+    // The swipe never settles as "dismissed": it reports the delete and springs back. A dismissed state would be saved
+    // with the row's key and, when an undone song comes back, restored as a second swipe.
+    val state = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) latest()
+            false
+        },
+    )
     SwipeToDismissBox(
         state = state,
         enableDismissFromStartToEnd = false,
         gesturesEnabled = enabled,
-        onDismiss = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) onDelete()
-            scope.launch { state.reset() }
-        },
         backgroundContent = {
             // Only while the row is being swiped: at rest nothing is behind it.
             if (state.dismissDirection == SwipeToDismissBoxValue.EndToStart) Box(

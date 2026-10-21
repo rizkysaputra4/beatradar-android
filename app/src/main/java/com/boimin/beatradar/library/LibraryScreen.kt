@@ -75,6 +75,8 @@ class LibraryActions(
     val openUrl: (String) -> Unit,
     /** The share sheet with plain text (e.g. a Set's song list). */
     val shareText: (String) -> Unit,
+    /** Changes a setting (e.g. the app sets play in). */
+    val updateSettings: ((Settings) -> Settings) -> Unit = {},
 )
 
 @Composable
@@ -88,69 +90,12 @@ fun LibraryScreen(vm: LibraryViewModel, settings: Settings, actions: LibraryActi
         // Discover shows live counts and loves: fresh data every time the tab is opened.
         vm.refresh()
     }
-    var showSets by rememberSaveable { mutableStateOf(false) }
-    // A playlist link shared from Spotify or YouTube Music opens "BPM of a playlist" under My sets.
-    val sharedPlaylist by vm.sharedPlaylistLink.collectAsStateWithLifecycle()
-    val sharedSetLink by vm.sharedSetLink.collectAsStateWithLifecycle()
-    LaunchedEffect(sharedSetLink) {
-        sharedSetLink?.let { slug ->
-            vm.close()
-            showSets = true
-            vm.openSharedSet(slug)
-            vm.sharedSetLink.value = null
-        }
-    }
-    LaunchedEffect(sharedPlaylist) {
-        sharedPlaylist?.let { link ->
-            vm.close()
-            showSets = true
-            vm.openPlaylist(link)
-            vm.sharedPlaylistLink.value = null
-        }
-    }
     val d = detail
     if (d != null) {
         BackHandler { vm.close() }
-        SongDetailScreen(d, vm, actions, modifier)
+        SongDetailScreen(d, vm, actions, settings, modifier)
     } else {
-        Column(modifier.fillMaxSize()) {
-            LibrarySwitch(showSets, onSelect = { showSets = it })
-            if (showSets) SetsScreen(vm, settings, actions) else SongList(vm, actions, Modifier)
-        }
-    }
-}
-
-/** Discover (the public library) or My sets (the user's own song lists by tempo), inside the one Library tab. */
-@Composable
-private fun LibrarySwitch(showSets: Boolean, onSelect: (Boolean) -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(start = 18.dp, end = 18.dp, top = 2.dp, bottom = 8.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
-            .padding(3.dp),
-    ) {
-        listOf(false to "Discover", true to "My sets").forEach { (value, label) ->
-            val selected = showSets == value
-            Box(
-                Modifier
-                    .weight(1f)
-                    .height(32.dp)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                    .clickable { onSelect(value) },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    label,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        SongList(vm, actions, modifier)
     }
 }
 
@@ -269,7 +214,7 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
                 contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                val trending = extras.trending?.takeIf { query.text.isBlank() && !query.lovedOnly && it.items.isNotEmpty() && !selecting }
+                val trending = extras.trending?.takeIf { query.text.isBlank() && !query.lovedOnly && it.items.isNotEmpty() }
                 if (trending != null) {
                     item(key = "trending") {
                         TrendingRow(

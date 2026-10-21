@@ -64,6 +64,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** The last three songs heard, for "Heard recently" on the Listen tab. */
+    val recent: StateFlow<List<BeatLogEntry>> = dao.observe("", false, false, false).map { it.take(3) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val unnamedWithClip: StateFlow<Int> = dao.observeUnnamedWithClip()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
@@ -144,8 +148,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Plays a saved clip once, so the user can recall which song it was. */
+    /** Plays an unnamed song's clip; tapping the one playing stops it. */
     fun playClip(entry: BeatLogEntry) {
-        entry.clipPath?.let { runCatching { ClipStore.play(it, times = 1) } }
+        val path = entry.clipPath ?: return
+        if (ClipStore.playing.value == path) ClipStore.stop() else runCatching { ClipStore.play(path, times = 1) }
     }
 
     private val signedIn: Boolean get() = getApplication<Application>().app.account.user.value != null

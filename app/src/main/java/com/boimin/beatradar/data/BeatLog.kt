@@ -353,7 +353,7 @@ interface BeatLogDao {
 
 @Database(
     entities = [BeatLogEntry::class, Fingerprint::class, UnnamedForget::class, SongSet::class, SetSong::class, WorkoutPlan::class],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -490,9 +490,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v8: a set's songs keep their length, for the set's total time. */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `set_song` ADD COLUMN `durationMs` INTEGER")
+            }
+        }
+
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "beatradar.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                 .addCallback(object : Callback() {
                     // Room doesn't know triggers: fresh installs get them here, upgrades in MIGRATION_4_5.
                     override fun onCreate(db: SupportSQLiteDatabase) = FORGET_TRIGGERS.forEach(db::execSQL)

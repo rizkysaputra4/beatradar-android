@@ -1,5 +1,6 @@
 package com.boimin.beatradar.rewards
 
+import com.boimin.beatradar.ui.theme.Tone
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -95,29 +96,29 @@ fun BeatsChip(rewards: Rewards?, onClick: () -> Unit) {
             pop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = 400f))
         }
     }
+    // Design: a 38 dp chip, the day streak by a flame and all-time beats by a note.
     Row(
         Modifier
-            .clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(50))
+            .height(38.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Tone.chip)
+            .border(1.dp, Tone.line, RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 5.dp),
+            .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             painterResource(R.drawable.ic_fire),
             contentDescription = "Your beats",
-            // No contributions yet: a small, faint flame.
-            tint = if (beats > 0) Brand.Coral else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            modifier = Modifier.size(size).scale(pop.value),
+            tint = if (beats > 0) Brand.Flame else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            modifier = Modifier.size(18.dp).scale(pop.value),
         )
-        Spacer(Modifier.width(4.dp))
-        Text(
-            "${rewards?.streak ?: 0}d · ${number(beats)}",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        Spacer(Modifier.width(3.dp))
+        Text("${rewards?.streak ?: 0}", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+        Spacer(Modifier.width(10.dp))
+        Icon(painterResource(R.drawable.ic_note), contentDescription = "Beats", tint = Tone.primarySoft, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(2.dp))
+        Text(number(beats), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 

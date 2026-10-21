@@ -10,6 +10,8 @@ data class MonitorState(
     val status: MonitorStatus = MonitorStatus.STOPPED,
     /** Live tempo, or null while no beat is heard. */
     val bpm: Float? = null,
+    /** How clearly the beat stands out (0..1), while a tempo is shown. */
+    val confidence: Float? = null,
     /** False while [bpm] is still a quick first guess from the first seconds of a song. */
     val bpmSettled: Boolean = false,
     /** When the latest beat landed, on the [android.os.SystemClock.elapsedRealtime] clock. */
@@ -27,6 +29,8 @@ data class MonitorState(
     val entryId: Long? = null,
     /** App playing on this phone (the mic is probably hearing its speaker), if any. */
     val phoneApp: String? = null,
+    /** Since when the tempo has stayed in the target range ([android.os.SystemClock.elapsedRealtime]), or null. */
+    val inTargetSinceMs: Long? = null,
 ) {
     val active: Boolean get() = status != MonitorStatus.STOPPED
 }

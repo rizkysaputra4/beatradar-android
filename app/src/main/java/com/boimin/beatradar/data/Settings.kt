@@ -42,6 +42,8 @@ data class Settings(
      */
     val sharingConsentAsked: Boolean = false,
     val theme: ThemeMode = ThemeMode.SYSTEM,
+    /** The app sets play in: "youtube" (the whole set as one queue) or "spotify" (a song at a time). */
+    val playApp: String = "youtube",
 ) {
     /** True when [bpm] falls in the user's range and range alerts are on (they vibrate). */
     fun matches(bpm: Float): Boolean = rangeEnabled && inTarget(bpm)
@@ -84,6 +86,7 @@ class SettingsRepository(private val context: Context) {
         val SHARE_CLIPS = booleanPreferencesKey("share_clips")
         val SHARING_CONSENT = booleanPreferencesKey("sharing_consent_asked")
         val THEME = stringPreferencesKey("theme")
+        val PLAY_APP = stringPreferencesKey("play_app")
     }
 
     val settings: Flow<Settings> = context.dataStore.data
@@ -105,6 +108,7 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.SHARE_CLIPS] = s.shareClips
             prefs[Keys.SHARING_CONSENT] = s.sharingConsentAsked
             prefs[Keys.THEME] = s.theme.name
+            prefs[Keys.PLAY_APP] = s.playApp
         }
     }
 
@@ -123,6 +127,7 @@ class SettingsRepository(private val context: Context) {
             shareClips = this[Keys.SHARE_CLIPS] ?: d.shareClips,
             sharingConsentAsked = this[Keys.SHARING_CONSENT] ?: d.sharingConsentAsked,
             theme = enumOrDefault(this[Keys.THEME], d.theme),
+            playApp = this[Keys.PLAY_APP]?.takeIf { it == "youtube" || it == "spotify" } ?: d.playApp,
         )
     }
 

@@ -304,7 +304,7 @@ class CaptureService : Service() {
         override fun onSilenceChanged(silent: Boolean) {
             if (silent) scope.launch(serial) {
                 resetSong()
-                Monitor.update { it.copy(bpm = null, lastBeatAtMs = null, matchProgress = 0f, matched = false) }
+                Monitor.update { it.copy(bpm = null, confidence = null, lastBeatAtMs = null, matchProgress = 0f, matched = false) }
             }
         }
     }
@@ -319,10 +319,13 @@ class CaptureService : Service() {
         Monitor.update {
             it.copy(
                 bpm = if (hearing) u.bpm else null,
+                confidence = if (hearing) u.confidence else null,
                 bpmSettled = hearing && u.settled,
                 lastBeatAtMs = if (hearing) u.lastBeatAtMs else null,
                 matchProgress = verdict.progress,
                 matched = verdict.matched,
+                // "In target · 8 s": the clock starts when the tempo enters the range and stops when it leaves.
+                inTargetSinceMs = if (hearing && (verdict.progress > 0f || verdict.matched)) it.inTargetSinceMs ?: u.timeMs else null,
                 alreadyListed = verdict.matched && it.alreadyListed,
             )
         }

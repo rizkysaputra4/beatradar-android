@@ -46,6 +46,8 @@ data class SetSong(
     val bpm: Float,
     val artworkUrl: String? = null,
     val addedAt: Long,
+    /** Length from the Library (filled in when the set is opened); null = not looked up yet, 0 = unknown. */
+    val durationMs: Int? = null,
 )
 
 /** A set with what its list card shows. */
@@ -114,6 +116,10 @@ interface SetDao {
 
     @Query("UPDATE song_set SET updatedAt = :now, $SET_CHANGED WHERE id = :id")
     suspend fun touch(id: Long, now: Long)
+
+    /** Lengths are looked up once per song; they don't change the set (no backup push). */
+    @Query("UPDATE set_song SET durationMs = :durationMs WHERE slug = :slug")
+    suspend fun setDuration(slug: String, durationMs: Int)
 
     @Query("UPDATE song_set SET shareSlug = :slug WHERE id = :id")
     suspend fun setShareSlug(id: Long, slug: String)

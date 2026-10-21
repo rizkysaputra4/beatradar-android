@@ -1,5 +1,12 @@
 package com.boimin.beatradar.ui
 
+import androidx.compose.foundation.layout.fillMaxHeight
+import com.boimin.beatradar.ui.theme.Tone
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.ui.unit.sp
+import com.boimin.beatradar.library.SetsScreen
 import androidx.compose.ui.platform.LocalContext
 import com.boimin.beatradar.app
 import androidx.compose.foundation.border
@@ -31,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -95,11 +103,13 @@ class AppActions(
 private const val TAB_LISTEN = 0
 private const val TAB_LOG = 1
 private const val TAB_LIBRARY = 2
+private const val TAB_SETS = 3
 
 @Composable
 fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryViewModel, settings: Settings, actions: AppActions) {
     val monitor by vm.monitor.collectAsStateWithLifecycle()
     val log by vm.log.collectAsStateWithLifecycle()
+    val playingClip by com.boimin.beatradar.data.ClipStore.playing.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
     val onlyInRange by vm.onlyInRange.collectAsStateWithLifecycle()
     val logBpmRange by vm.logBpmRange.collectAsStateWithLifecycle()
@@ -140,14 +150,41 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
             vm.openSong.value = null
         }
     }
-    // A playlist link shared to BeatRadar: the Library tab opens it.
+    // A playlist or set link shared to BeatRadar opens in the Sets tab.
     val sharedPlaylist by libraryVm.sharedPlaylistLink.collectAsStateWithLifecycle()
-    LaunchedEffect(sharedPlaylist) { if (sharedPlaylist != null) tab = TAB_LIBRARY }
+    LaunchedEffect(sharedPlaylist) {
+        sharedPlaylist?.let { link ->
+            tab = TAB_SETS
+            libraryVm.close()
+            libraryVm.openPlaylist(link)
+            libraryVm.sharedPlaylistLink.value = null
+        }
+    }
     val sharedSetLink by libraryVm.sharedSetLink.collectAsStateWithLifecycle()
-    LaunchedEffect(sharedSetLink) { if (sharedSetLink != null) tab = TAB_LIBRARY }
+    LaunchedEffect(sharedSetLink) {
+        sharedSetLink?.let { slug ->
+            tab = TAB_SETS
+            libraryVm.close()
+            libraryVm.openSharedSet(slug)
+            libraryVm.sharedSetLink.value = null
+        }
+    }
+    val recent by vm.recent.collectAsStateWithLifecycle()
+    val songOpen by libraryVm.detail.collectAsStateWithLifecycle()
+    val setOpen by libraryVm.openSetId.collectAsStateWithLifecycle()
     LaunchedEffect(accountToast) { accountToast?.let { snackbar.showSnackbar(it); accountVm.toastShown() } }
     LaunchedEffect(logMessage) { logMessage?.let { snackbar.showSnackbar(it); vm.messageShown() } }
     LaunchedEffect(libraryMessage) { libraryMessage?.let { snackbar.showSnackbar(it); libraryVm.messageShown() } }
+    // "Removed … · Undo".
+    val undo by libraryVm.undo.collectAsStateWithLifecycle()
+    LaunchedEffect(undo) {
+        undo?.let { u ->
+            // Cleared only after the snackbar closes: clearing it first would cancel this effect, and the snackbar with it.
+            val result = snackbar.showSnackbar(u.text, actionLabel = "Undo", duration = SnackbarDuration.Short)
+            libraryVm.undoShown()
+            if (result == SnackbarResult.ActionPerformed) u.undo()
+        }
+    }
     LaunchedEffect(celebrate) { if (celebrate.isNotEmpty()) actions.celebrateHaptic() }
 
     val requireSignIn: (() -> Unit) -> Unit = { then ->
@@ -158,20 +195,44 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            Header(
-                when (tab) {
-                    TAB_LISTEN -> "BeatRadar"
-                    TAB_LOG -> "Activity Log"
-                    else -> "Discover"
-                },
-                rewards = { BeatsChip(rewards) { showRewards = true } },
-                onSettings = { showSettings = true },
-            )
+            // A song page has its own bar (back, share, ⋮), so the app header steps aside.
+            // An open set has its own bar too (back, share, ⋮).
+            if (!(songOpen != null && (tab == TAB_LIBRARY || tab == TAB_SETS)) && !(tab == TAB_SETS && setOpen != null)) {
+                Header(
+                    when (tab) {
+                        TAB_LISTEN -> "BeatRadar"
+                        TAB_LOG -> "Activity Log"
+                        TAB_SETS -> "My sets"
+                        else -> "Discover"
+                    },
+                    rewards = { BeatsChip(rewards) { showRewards = true } },
+                    onSettings = { showSettings = true },
+                )
+            }
         },
-        bottomBar = { TabBar(selected = tab, onSelect = { tab = it }) },
-        snackbarHost = { SnackbarHost(snackbar) },
+        bottomBar = {
+            TabBar(selected = tab, onSelect = {
+                // Another tab: any open song page closes.
+                if (it != tab) libraryVm.close()
+                tab = it
+            })
+        },
+        snackbarHost = {
+            // Design: a light card on the dark app, its action in deep violet.
+            SnackbarHost(snackbar) { data ->
+                Snackbar(
+                    data,
+                    shape = RoundedCornerShape(12.dp),
+                    containerColor = Color(0xFFECE9F5),
+                    contentColor = Color(0xFF16151D),
+                    actionColor = Color(0xFF4A3FC2),
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+            }
+        },
     ) { padding ->
-        val modifier = Modifier.padding(padding)
+        Box(Modifier.padding(padding).fillMaxSize()) {
+        val modifier = Modifier
         when (tab) {
             TAB_LISTEN -> ListenScreen(
                 state = monitor,
@@ -181,6 +242,8 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                 suggestion = currentEntry?.takeIf { it.title == null }?.suggestion,
                 onAcceptSuggestion = { currentEntry?.let(vm::acceptSuggestion) },
                 onRejectSuggestion = { currentEntry?.let(vm::rejectSuggestion) },
+                recent = recent,
+                onOpenSong = { slug -> tab = TAB_LIBRARY; libraryVm.open(slug) },
                 modifier = modifier,
             )
             TAB_LOG -> LogScreen(
@@ -204,6 +267,7 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                 onToggleUnnamed = { vm.onlyUnnamed.value = !onlyUnnamed },
                 onIdentify = actions.identifyClip,
                 onPlayClip = vm::playClip,
+                playingClip = playingClip,
                 onRename = vm::rename,
                 onOpenSong = { slug -> tab = TAB_LIBRARY; libraryVm.open(slug) },
                 refreshing = refreshing,
@@ -219,18 +283,30 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                 onClear = vm::clearLog,
                 modifier = modifier,
             )
-            else -> LibraryScreen(
-                vm = libraryVm,
-                settings = settings,
-                actions = LibraryActions(
+            else -> {
+                val libraryActions = LibraryActions(
                     signedIn = user != null,
                     requireSignIn = requireSignIn,
                     share = actions.shareSong,
                     openUrl = actions.openUrl,
                     shareText = actions.shareText,
-                ),
-                modifier = modifier,
-            )
+                    updateSettings = vm::updateSettings,
+                )
+                if (tab == TAB_SETS) {
+                    SetsScreen(vm = libraryVm, settings = settings, actions = libraryActions, modifier = modifier)
+                } else {
+                    LibraryScreen(vm = libraryVm, settings = settings, actions = libraryActions, modifier = modifier)
+                }
+            }
+        }
+        // A fade above the floating tab bar, so it never cuts content off abruptly.
+        Box(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(24.dp)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background))),
+        )
         }
     }
 
@@ -386,91 +462,76 @@ private fun CoffeeSheet(state: CoffeeState, onBuy: (Coffee) -> Unit, onDismiss: 
 /** Slim header: squircle logo badge + title on the left, beats chip and bordered settings button on the right. */
 @Composable
 private fun Header(title: String, rewards: @Composable () -> Unit, onSettings: () -> Unit) {
+    // Design: a 40 dp logo tile, the title at 20 sp bold, the beats chip and a bare 36 dp settings button.
     Row(
         Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .height(54.dp)
-            .padding(horizontal = 18.dp),
+            .height(60.dp)
+            .padding(start = 18.dp, end = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             Modifier
-                .size(28.dp)
-                .clip(RoundedCornerShape(9.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Tone.logoTile),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                painterResource(R.drawable.ic_radar),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(16.dp),
-            )
+            Icon(painterResource(R.drawable.ic_graphic_eq), contentDescription = null, tint = Tone.logo, modifier = Modifier.size(24.dp))
         }
-        Spacer(Modifier.width(9.dp))
-        Text(
-            title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f),
-        )
+        Spacer(Modifier.width(10.dp))
+        Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
         rewards()
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(6.dp))
         Box(
             Modifier
-                .size(32.dp)
+                .size(36.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainer)
-                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
                 .clickable(onClick = onSettings),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                painterResource(R.drawable.ic_settings),
-                contentDescription = "Settings",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp),
-            )
+            Icon(painterResource(R.drawable.ic_settings), contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
         }
     }
 }
 
-/** Floating Pill Dock navigation bar, matching the surface cards and 1.dp outline system. */
+/** The floating tab bar: a 62 dp pill, four 48 dp items, the active one filled. */
 @Composable
 private fun TabBar(selected: Int, onSelect: (Int) -> Unit) {
-    val tabs = listOf("Listen" to R.drawable.ic_radar, "Log" to R.drawable.ic_list, "Library" to R.drawable.ic_library)
+    val tabs = listOf(
+        "Listen" to R.drawable.ic_graphic_eq,
+        "Log" to R.drawable.ic_history,
+        "Library" to R.drawable.ic_library_music,
+        "Sets" to R.drawable.ic_queue,
+    )
     Row(
         Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 18.dp, vertical = 10.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
-            .padding(5.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 10.dp)
+            .height(62.dp)
+            .clip(RoundedCornerShape(31.dp))
+            .background(Tone.sheet)
+            .border(1.dp, Tone.sheetLine, RoundedCornerShape(31.dp))
+            .padding(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         tabs.forEachIndexed { i, (label, icon) ->
             val active = i == selected
-            Row(
+            Column(
                 Modifier
                     .weight(1f)
-                    .height(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(25.dp))
                     .background(if (active) MaterialTheme.colorScheme.primary else Color.Transparent)
                     .clickable { onSelect(i) },
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
-                val tint = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                Icon(painterResource(icon), contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    label,
-                    color = tint,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                val tint = if (active) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                Icon(painterResource(icon), contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+                Text(label, color = tint, fontSize = 11.sp, lineHeight = 13.sp, fontWeight = if (active) FontWeight.Medium else FontWeight.Normal)
             }
         }
     }

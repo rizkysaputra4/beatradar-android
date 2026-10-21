@@ -1,5 +1,10 @@
 package com.boimin.beatradar.ui
 
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import com.boimin.beatradar.library.SongArtwork
+import com.boimin.beatradar.ui.theme.Tone
+import com.boimin.beatradar.ui.theme.inTargetColor
 import android.text.format.DateUtils
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -92,6 +97,8 @@ fun LogScreen(
     onToggleUnnamed: () -> Unit,
     onIdentify: (BeatLogEntry) -> Unit,
     onPlayClip: (BeatLogEntry) -> Unit,
+    /** The clip playing now (its ▶ shows ■ to stop it). */
+    playingClip: String? = null,
     onRename: (BeatLogEntry, String, String) -> Unit,
     /** Opens a song's Library page (entries the server knows). */
     onOpenSong: (String) -> Unit,
@@ -191,7 +198,7 @@ fun LogScreen(
             LogFilterPill(
                 label = "● BPM ${bpmRange.first}–${bpmRange.last}",
                 selected = onlyInRange,
-                activeColor = Brand.Coral,
+                activeColor = inTargetColor(),
                 onClick = onToggleInRange,
             )
             LogFilterPill(
@@ -232,6 +239,7 @@ fun LogScreen(
                                 entry = entry,
                                 inTarget = inTarget(entry.bpm),
                                 onIdentify = { onIdentify(entry) },
+                                clipPlaying = entry.clipPath != null && entry.clipPath == playingClip,
                                 onPlayClip = { onPlayClip(entry) },
                                 onRename = { renaming = entry },
                                 onOpenSong = entry.songSlug?.let { slug -> { onOpenSong(slug) } },
@@ -377,10 +385,17 @@ private fun SwipeToDelete(onDelete: () -> Unit, content: @Composable () -> Unit)
     ) { content() }
 }
 
+/**
+ * A logged song, laid out like the Library rows: artwork, title and "artist · source · when", the BPM badge on the right.
+ * Unnamed songs with a clip get ▶ Play clip (■ Stop while it plays) and Shazam under the title. Tap opens the song in
+ * the Library when it is known there, otherwise renames it; long-press always renames.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LogRow(
     entry: BeatLogEntry,
     inTarget: Boolean,
+    clipPlaying: Boolean,
     onIdentify: () -> Unit,
     onPlayClip: () -> Unit,
     onRename: () -> Unit,
@@ -397,44 +412,28 @@ private fun LogRow(
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
-            .clickable(onClick = onRename)
-            .padding(12.dp),
+            .combinedClickable(onClick = onOpenSong ?: onRename, onLongClick = onRename)
+            .padding(11.dp),
     ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            BpmBadge(entry.bpm, inTarget)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            SongArtwork(null, sizeDp = 46, cornerDp = 11)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        if (unnamed && entry.placeholderNo != null) "Unnamed Track #${entry.placeholderNo}" else entry.label,
+                        if (unnamed && entry.placeholderNo != null) "Unnamed song #${entry.placeholderNo}" else entry.label,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (unnamed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
                     if (entry.playCount > 1) {
                         Spacer(Modifier.width(6.dp))
-                        Box(
-                            Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                .padding(horizontal = 5.dp, vertical = 1.dp),
-                        ) {
-                            Text(
-                                "${entry.playCount}×",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        Text("${entry.playCount}×", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                Spacer(Modifier.height(2.dp))
                 Text(
                     compactMetaLine(entry),
                     style = MaterialTheme.typography.labelSmall,
@@ -442,85 +441,28 @@ private fun LogRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-            }
-            Spacer(Modifier.width(8.dp))
-            if (unnamed) {
-                if (entry.clipPath != null) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                .clickable(onClick = onPlayClip),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                painterResource(R.drawable.ic_play),
-                                contentDescription = "Play clip",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(13.dp),
-                            )
-                        }
-                        Box(
-                            Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
-                                .clickable(onClick = onIdentify)
-                                .padding(horizontal = 9.dp, vertical = 5.dp),
-                        ) {
-                            Text(
-                                "Shazam",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
-                } else {
-                    Box(
-                        Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                            .clickable(onClick = onRename),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.ic_edit),
-                            contentDescription = "Rename",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(13.dp),
+                if (unnamed && entry.clipPath != null) {
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        RowAction(
+                            if (clipPlaying) R.drawable.ic_stop else R.drawable.ic_play,
+                            if (clipPlaying) "Stop" else "Play clip",
+                            highlighted = clipPlaying,
+                            onClick = onPlayClip,
                         )
+                        RowAction(null, "Shazam", highlighted = false, onClick = onIdentify)
                     }
                 }
-            } else if (onOpenSong != null) {
-                Box(
-                    Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .clickable(onClick = onOpenSong),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        painterResource(R.drawable.ic_open),
-                        contentDescription = "Open in Library",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(13.dp),
-                    )
-                }
             }
+            Spacer(Modifier.width(10.dp))
+            BpmBadge(entry.bpm, inRange = inTarget)
         }
 
         if (suggestion != null) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-            Spacer(Modifier.height(7.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 val sugLabel = buildString {
                     append(suggestion.title)
                     if (suggestion.artist.isNotBlank()) append(" · ${suggestion.artist}")
@@ -539,26 +481,39 @@ private fun LogRow(
                     modifier = Modifier.weight(1f),
                 )
                 Spacer(Modifier.width(8.dp))
+                RowAction(null, "Accept", highlighted = true, onClick = onAccept)
+                Spacer(Modifier.width(4.dp))
                 Box(
                     Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
-                        .clickable(onClick = onAccept)
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                ) {
-                    Text("Accept", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                }
-                Spacer(Modifier.width(2.dp))
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(15.dp))
                         .clickable(onClick = onReject)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
                 ) {
-                    Text("Dismiss", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Dismiss", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
+    }
+}
+
+/** A small 30 dp pill in a log row: Play clip / Stop, Shazam, Accept. */
+@Composable
+private fun RowAction(icon: Int?, label: String, highlighted: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .height(30.dp)
+            .clip(RoundedCornerShape(15.dp))
+            .background(if (highlighted) MaterialTheme.colorScheme.primary else Tone.pill)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val tint = if (highlighted) Color.White else MaterialTheme.colorScheme.onSurface
+        if (icon != null) {
+            Icon(painterResource(icon), contentDescription = null, tint = tint, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(5.dp))
+        }
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = tint, maxLines = 1)
     }
 }
 
@@ -604,10 +559,11 @@ private fun relativeTime(timestamp: Long): String {
 /** 48dp rounded squircle BPM badge (Coral tinted when in target range, neutral surfaceHigh otherwise). */
 @Composable
 internal fun BpmBadge(bpm: Float, inRange: Boolean) {
-    val bg = if (inRange) Brand.Coral.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainerHigh
-    val border = if (inRange) Brand.Coral.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outline
-    val numColor = if (inRange) Brand.Coral else MaterialTheme.colorScheme.onSurface
-    val subColor = if (inRange) Brand.Coral.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
+    val mint = inTargetColor()
+    val bg = if (inRange) mint.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainerHigh
+    val border = if (inRange) mint.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outline
+    val numColor = if (inRange) mint else MaterialTheme.colorScheme.onSurface
+    val subColor = if (inRange) mint.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
     Box(
         Modifier
             .size(48.dp)

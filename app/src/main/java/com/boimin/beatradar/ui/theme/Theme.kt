@@ -1,5 +1,6 @@
 package com.boimin.beatradar.ui.theme
 
+import androidx.compose.ui.graphics.luminance
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +23,42 @@ object Brand {
     val Coral = Color(0xFFFF5A5F)
     val OnCoral = Color.White
     val Success = Color(0xFF10B981)
+    /** "In target": the one colour for a tempo inside the user's range (red is only for destructive actions). */
+    val Mint = Color(0xFF51DAA7)
+    /** The day-streak flame. */
+    val Flame = Color(0xFFF88F4F)
+    /** Love hearts. */
+    val Heart = Color(0xFFF08AA8)
+    /** Mint dark enough to read on light backgrounds. */
+    val MintDeep = Color(0xFF0E9F6E)
+}
+
+/** The "in target" colour for the current theme. */
+@Composable
+fun inTargetColor(): Color = if (isDark()) Brand.Mint else Brand.MintDeep
+
+@Composable
+private fun isDark(): Boolean = MaterialTheme.colorScheme.background.luminance() < 0.5f
+
+/**
+ * The design's extra tones (BeatRadar Fixes, turn 1) beyond Material's roles: a softer second text colour, a fainter
+ * third, the dial ring and scale track, filled pill buttons, chips and their outlines, and the selected-chip fill.
+ */
+object Tone {
+    val text2: Color @Composable get() = if (isDark()) Color(0xFFC9C7D4) else Color(0xFF45434E)
+    val text3: Color @Composable get() = if (isDark()) Color(0xFF8D8B9A) else Color(0xFF6A6874)
+    val track: Color @Composable get() = if (isDark()) Color(0xFF1E1D27) else Color(0xFFE9E8EF)
+    val ring: Color @Composable get() = if (isDark()) Color(0xFF2A2935) else Color(0xFFDCDAE3)
+    val pill: Color @Composable get() = if (isDark()) Color(0xFF24222F) else Color(0xFFEDEBF4)
+    val chip: Color @Composable get() = if (isDark()) Color(0xFF17151F) else Color.White
+    val line: Color @Composable get() = if (isDark()) Color(0xFF2F2E3B) else Color(0xFFDCDAE3)
+    val chipLine: Color @Composable get() = if (isDark()) Color(0xFF3A3550) else Color(0xFFD5D0EC)
+    val selected: Color @Composable get() = if (isDark()) Color(0xFF211D38) else Color(0xFFECE9FF)
+    val sheet: Color @Composable get() = if (isDark()) Color(0xFF17161E) else Color.White
+    val sheetLine: Color @Composable get() = if (isDark()) Color(0xFF262532) else Color(0xFFE2E1EA)
+    val primarySoft: Color @Composable get() = if (isDark()) Color(0xFFB8AEF7) else Color(0xFF4A3FC2)
+    val logoTile: Color @Composable get() = if (isDark()) Color(0xFF1E1B33) else Color(0xFFECE9FF)
+    val logo: Color @Composable get() = if (isDark()) Color(0xFF9D90FF) else Color(0xFF5B4FD6)
 }
 
 private val LightColors = lightColorScheme(
@@ -51,7 +88,7 @@ private val LightColors = lightColorScheme(
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFF7C6CF6),
+    primary = Color(0xFF7B6CF0),
     onPrimary = Color.White,
     primaryContainer = Color(0xFF231F42),
     onPrimaryContainer = Color(0xFFE5DEFF),
@@ -61,19 +98,19 @@ private val DarkColors = darkColorScheme(
     onSecondaryContainer = Color(0xFFF4F4F8),
     tertiary = Brand.Coral,
     onTertiary = Color.White,
-    background = Color(0xFF0B0B10),
-    onBackground = Color(0xFFF4F4F8),
-    surface = Color(0xFF0B0B10),
-    onSurface = Color(0xFFF4F4F8),
+    background = Color(0xFF0C0B10),
+    onBackground = Color(0xFFF1F0F5),
+    surface = Color(0xFF0C0B10),
+    onSurface = Color(0xFFF1F0F5),
     surfaceVariant = Color(0xFF1D1D2B),
-    onSurfaceVariant = Color(0xFF8E8EA0),
-    surfaceContainerLowest = Color(0xFF0B0B10),
-    surfaceContainerLow = Color(0xFF111119),
-    surfaceContainer = Color(0xFF14141D),
-    surfaceContainerHigh = Color(0xFF1D1D2B),
-    surfaceContainerHighest = Color(0xFF262636),
-    outline = Color(0xFF262636),
-    outlineVariant = Color(0xFF1F1F2E),
+    onSurfaceVariant = Color(0xFFA09FAE),
+    surfaceContainerLowest = Color(0xFF0C0B10),
+    surfaceContainerLow = Color(0xFF121118),
+    surfaceContainer = Color(0xFF16151D),
+    surfaceContainerHigh = Color(0xFF24222F),
+    surfaceContainerHighest = Color(0xFF2A2935),
+    outline = Color(0xFF2F2E3B),
+    outlineVariant = Color(0xFF262532),
 )
 
 @Composable

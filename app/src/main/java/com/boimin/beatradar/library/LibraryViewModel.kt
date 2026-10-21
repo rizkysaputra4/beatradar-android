@@ -60,6 +60,9 @@ data class DetailState(
     val similar: List<SongSummary> = emptyList(),
 )
 
+/** A change that can be taken back from the snackbar. */
+class Undoable(val text: String, val undo: () -> Unit)
+
 /** A set someone shared (`/set/<slug>`), opened to view and copy. */
 data class SharedSetState(val slug: String, val set: SharedSet? = null, val error: String? = null)
 
@@ -138,12 +141,46 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    /** Several songs out of a set at once (the set's selection). */
-    fun removeSongs(setId: Long, slugs: Collection<String>) {
+    /** Songs out of a set, with an Undo snackbar to put them back. */
+    fun removeSongs(setId: Long, songs: List<SetSong>) {
+        if (songs.isEmpty()) return
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            slugs.forEach { setDao.remove(setId, it, now) }
+            songs.forEach { setDao.remove(setId, it.slug, now) }
             setsChanged()
+            _undo.value = Undoable(
+                if (songs.size == 1) "Removed “${songs[0].title}”" else "Removed ${songs.size} songs",
+            ) {
+                viewModelScope.launch {
+                    setDao.insertSongs(songs)
+                    setDao.touch(setId, System.currentTimeMillis())
+                    setsChanged()
+                }
+            }
+        }
+    }
+
+    private val _undo = MutableStateFlow<Undoable?>(null)
+    /** A change the snackbar offers to undo. */
+    val undo: StateFlow<Undoable?> = _undo
+
+    fun undoShown() {
+        _undo.value = null
+    }
+
+    /** Looks up the length of a set's songs that don't have one yet, for the set's total time. */
+    fun fillDurations(songs: List<SetSong>) {
+        val missing = songs.filter { it.durationMs == null }.map { it.slug }.distinct()
+        if (missing.isEmpty()) return
+        viewModelScope.launch {
+            for (slug in missing) {
+                val ms = try {
+                    repo.song(slug).durationMs ?: 0
+                } catch (e: ApiException) {
+                    if (e.offline) return@launch else 0
+                }
+                setDao.setDuration(slug, ms)
+            }
         }
     }
 
@@ -244,8 +281,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     private val linkCache = mutableMapOf<String, List<SongLink>>()
 
-    /** The app the open set plays in (set id to app), picked at its first play; forgotten when the set is closed. */
-    var playChoice: Pair<Long, PlayLinks.Service>? = null
+    /** The set open in the Sets tab, or null for the list (the app header hides while one is open). */
+    val openSetId = MutableStateFlow<Long?>(null)
+
 
     /**
      * The song in [service]: its own track page when the Library knows it, else a search there. Offline, the search

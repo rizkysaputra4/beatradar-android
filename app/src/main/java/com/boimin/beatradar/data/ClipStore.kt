@@ -1,5 +1,7 @@
 package com.boimin.beatradar.data
 
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
@@ -18,6 +20,10 @@ object ClipStore {
     const val SECONDS = 12
 
     private var player: MediaPlayer? = null
+    private val _playing = MutableStateFlow<String?>(null)
+
+    /** The clip playing now, if any. */
+    val playing: StateFlow<String?> = _playing
 
     fun save(context: Context, entryId: Long, pcm: ShortArray): String {
         val dir = File(context.filesDir, "clips").apply { mkdirs() }
@@ -61,11 +67,13 @@ object ClipStore {
             prepare()
             start()
         }
+        _playing.value = path
     }
 
     fun stop() {
         player?.release()
         player = null
+        _playing.value = null
     }
 
     private fun wavHeader(dataBytes: Int): ByteArray = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN).apply {

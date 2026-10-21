@@ -1,5 +1,6 @@
 package com.boimin.beatradar.ui
 
+import com.boimin.beatradar.ui.theme.inTargetColor
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -80,7 +81,8 @@ private fun Stat(label: String, value: String, modifier: Modifier) {
             .padding(12.dp),
     ) {
         Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+        // One line always: "120–129" must not wrap in a third of the width.
+        Text(value, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, softWrap = false)
     }
 }
 
@@ -94,7 +96,7 @@ private fun Histogram(recap: Recap) {
                     .weight(1f)
                     .fillMaxHeight(fraction = (plays.toFloat() / max).coerceAtLeast(0.04f))
                     .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
-                    .background(if (band == recap.topBand) Brand.Coral else MaterialTheme.colorScheme.primary.copy(alpha = if (plays > 0) 0.8f else 0.15f)),
+                    .background(if (band == recap.topBand) inTargetColor() else MaterialTheme.colorScheme.primary.copy(alpha = if (plays > 0) 0.8f else 0.15f)),
             )
         }
     }
