@@ -35,11 +35,11 @@ class BeatEngineTest {
         val rec = Recorder()
         val engine = BeatEngine(rate, rec)
         engine.play(TestSignals.toPcm16(TestSignals.clickTrack(128.0, 13.0, rate)), 0)
-        // A quick guess after ~1.5 s, settled from ~3 s, then every 0.5 s: about 23 readings in 13 s.
+        // A quick guess after ~1.5 s, settled from ~4 s, then every 0.5 s: about 23 readings in 13 s.
         assertTrue("got ${rec.beats.size}", rec.beats.size in 21..25)
         assertTrue("first at ${rec.beats.first().timeMs}", rec.beats.first().timeMs <= 2_100)
         val settled = rec.beats.filter { it.settled }
-        assertTrue("first settled at ${settled.first().timeMs}", settled.first().timeMs <= 3_600)
+        assertTrue("first settled at ${settled.first().timeMs}", settled.first().timeMs <= 4_600)
         settled.drop(2).forEach { assertEquals(128f, it.bpm, 2f) }
     }
 

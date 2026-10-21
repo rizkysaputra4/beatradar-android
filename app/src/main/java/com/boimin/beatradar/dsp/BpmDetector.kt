@@ -24,6 +24,9 @@ interface BpmDetector {
 
     /** Strongest onset (beat-like hit) seen since the last call, in detector units; 0 if none. */
     fun takeOnsetPeak(): Double = 0.0
+
+    /** Readings that flip an octave should be folded back onto the current tempo (it can't tell them apart well). */
+    val foldsOctaves: Boolean get() = true
 }
 
 /**

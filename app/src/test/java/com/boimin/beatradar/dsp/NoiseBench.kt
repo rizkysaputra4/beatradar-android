@@ -183,7 +183,7 @@ class NoiseBench {
         val pcm = ShortArray(signal.size) { ((signal[it] * scale).coerceIn(-1.0, 1.0) * 32767).toInt().toShort() }
         val updates = mutableListOf<BeatUpdate>()
         val hits = mutableListOf<Long>()
-        val engine = BeatEngine(sr, object : BeatEngine.Listener {
+        val engine = BeatEngine(sr, detectorFactory = if (System.getenv("NOISE_BENCH_DETECTOR") == "onset") { r -> OnsetBpmDetector(sampleRate = r) } else { _ -> BeatNetDetector() }, listener = object : BeatEngine.Listener {
             override fun onBeat(update: BeatUpdate) { updates += update }
             override fun onHit(atMs: Long, strength: Float) { hits += atMs }
         })

@@ -1,5 +1,6 @@
 package com.boimin.beatradar.sync
 
+import com.boimin.beatradar.dsp.BeatEngine
 import com.boimin.beatradar.data.BeatLogEntry
 import com.boimin.beatradar.data.NameSource
 import com.boimin.beatradar.data.SyncState
@@ -67,7 +68,7 @@ class SyncRulesTest {
     }
 
     @Test fun legacyZeroConfidenceSendsTheFloor() {
-        assertEquals(0.15f, UploadRules.measurement(entry().copy(confidence = 0f), null)!!.confidence)
+        assertEquals(BeatEngine.MIN_CONFIDENCE, UploadRules.measurement(entry().copy(confidence = 0f), null)!!.confidence)
     }
 
     @Test fun batchesOfAtMost100() {

@@ -20,6 +20,8 @@ class BeatEngine(
     private val silenceResetMs: Long = 3_000,
     /** Time between sound reaching the mic and the buffer being read. */
     private val inputLatencyMs: Long = 0,
+    /** Builds the tempo detector for the decimated rate (~11 kHz): the trained network, which needs exactly 11 025 Hz. */
+    detectorFactory: (Int) -> BpmDetector = { rate -> if (rate == TARGET_RATE) BeatNetDetector() else OnsetBpmDetector(sampleRate = rate) },
 ) {
     interface Listener {
         fun onBeat(update: BeatUpdate) {}
@@ -29,7 +31,7 @@ class BeatEngine(
     }
 
     private val decimation = (inputSampleRate / TARGET_RATE).coerceAtLeast(1)
-    private val detector: BpmDetector = OnsetBpmDetector(sampleRate = inputSampleRate / decimation)
+    private val detector: BpmDetector = detectorFactory(inputSampleRate / decimation)
     private val fingerprinter = Fingerprinter(sampleRate = inputSampleRate / decimation)
     private val landmarks = ArrayList<Landmark>()
 
@@ -126,10 +128,13 @@ class BeatEngine(
         onsetCeiling = 1e-6
     }
 
-    /** Median of the last three readings, folding octave flips onto the current tempo so the number stays steady. */
+    /**
+     * Median of the last three readings. For a detector that can't tell octaves apart well, octave flips are folded
+     * onto the current tempo so the number stays steady.
+     */
     private fun smooth(raw: Float): Float {
         val ref = recent.lastOrNull()
-        val value = if (ref == null) raw else {
+        val value = if (ref == null || !detector.foldsOctaves) raw else {
             listOf(raw, raw * 2, raw / 2).minBy { abs(it - ref) }.takeIf { abs(it - ref) / ref < 0.04f } ?: raw
         }
         recent.addLast(value)
@@ -158,10 +163,14 @@ class BeatEngine(
         const val SILENCE_RMS = 1e-4
         /** About -60 dBFS: a quiet room, no music worth measuring. */
         const val QUIET_RMS = 1e-3
-        /** Noise scores 0.04–0.12 on this detector; real rhythms score 0.25 and up. */
-        const val MIN_CONFIDENCE = 0.15f
-        /** Quick first guesses from noise score up to ~0.26; real rhythms ~0.75. */
-        const val MIN_EARLY_CONFIDENCE = 0.4f
+        /**
+         * The network's confidence is the share of its tempo vote on the reading, so it reads as a probability. On
+         * held-out songs through a simulated phone, readings at 0.4 and up are shown for ~91% of songs and right for
+         * ~85% (MusicBench); room noise, chatter and clatter alone stay under it nearly always (NoiseBench).
+         */
+        const val MIN_CONFIDENCE = 0.4f
+        /** Quick first guesses (before ~4 s) must be surer. */
+        const val MIN_EARLY_CONFIDENCE = 0.5f
         /** Weaker hits than this (relative to the song's strongest) are not reported. */
         const val HIT_MIN = 0.3f
         /** One hit can spill over two reads; hits closer than this count once. */

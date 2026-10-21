@@ -10,7 +10,7 @@ class SongJudgeTest {
     private val range = { bpm: Float -> bpm in 120f..130f }
 
     /** Feeds one reading every 500 ms from [fromMs] to [toMs] (exclusive) and returns all verdicts. */
-    private fun SongJudge.run(bpm: (Long) -> Float, fromMs: Long, toMs: Long, conf: Float = 0.3f, rangeOn: Boolean = true) =
+    private fun SongJudge.run(bpm: (Long) -> Float, fromMs: Long, toMs: Long, conf: Float = 0.8f, rangeOn: Boolean = true) =
         (fromMs until toMs step 500).map { t -> onBeat(bpm(t), conf, t, rangeOn, range) }
 
     @Test fun matchesAfterTenSecondsInRange() {
