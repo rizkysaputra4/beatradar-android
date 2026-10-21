@@ -1,5 +1,10 @@
 package com.boimin.beatradar.library
 
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -19,7 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -85,11 +89,8 @@ internal fun LibrarySongRow(
             .padding(11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (selected != null) {
-            Checkbox(checked = selected, onCheckedChange = { onClick() })
-            Spacer(Modifier.width(4.dp))
-        }
-        SongArtwork(artworkUrl, sizeDp = 46, cornerDp = 11)
+        // A selected song shows a check where its artwork is, so the row keeps its size and layout.
+        if (selected == true) SelectTile(sizeDp = 46, cornerDp = 11) else SongArtwork(artworkUrl, sizeDp = 46, cornerDp = 11)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -102,6 +103,20 @@ internal fun LibrarySongRow(
         Spacer(Modifier.width(10.dp))
         BpmBadge(bpm, inRange = inTarget)
         trailing?.invoke()
+    }
+}
+
+/** The check that stands in for a selected song's artwork: violet with a tick. */
+@Composable
+internal fun SelectTile(sizeDp: Int, cornerDp: Int) {
+    Box(
+        Modifier
+            .size(sizeDp.dp)
+            .clip(RoundedCornerShape(cornerDp.dp))
+            .background(MaterialTheme.colorScheme.primary),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(painterResource(R.drawable.ic_check), contentDescription = "Selected", tint = Color.White, modifier = Modifier.size(24.dp))
     }
 }
 
@@ -142,18 +157,48 @@ internal fun SwipeToDelete(onDelete: () -> Unit, enabled: Boolean = true, conten
 
 /** The bar shown while selecting songs: how many, an action, and a way out. */
 @Composable
-internal fun SelectionBar(count: Int, onCancel: () -> Unit, action: @Composable () -> Unit) {
+internal fun SelectionBar(count: Int, onCancel: () -> Unit, modifier: Modifier = Modifier, action: @Composable () -> Unit) {
+    // Fills the space of what it covers (the filters, the top bar), so nothing under it moves. It also takes the taps
+    // meant for what it covers.
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
-            .padding(start = 4.dp, end = 8.dp, top = 2.dp, bottom = 2.dp),
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f).compositeOver(MaterialTheme.colorScheme.background))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+            .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        androidx.compose.material3.TextButton(onClick = onCancel) { Text("Cancel") }
-        Text("$count selected", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        Box(
+            Modifier
+                .fillMaxHeight()
+                .padding(vertical = 3.dp)
+                .clip(RoundedCornerShape(50))
+                .clickable(onClick = onCancel)
+                .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("Cancel", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
+        }
+        Text("$count selected", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
         action()
+    }
+}
+
+/** The small filled action in a [SelectionBar], e.g. "Add to set". */
+@Composable
+internal fun SelectionAction(label: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxHeight()
+            .padding(vertical = 3.dp)
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.primary)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.White)
     }
 }
 

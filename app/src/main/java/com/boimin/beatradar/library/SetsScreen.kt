@@ -237,13 +237,12 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
             if (selecting) {
-                Box(Modifier.padding(horizontal = 18.dp, vertical = 4.dp)) {
-                    SelectionBar(selected.size, onCancel = { selected = emptySet() }) {
-                        IconButton(onClick = {
+                // Same 52 dp as the top bar it replaces, so the page does not move.
+                Box(Modifier.fillMaxWidth().padding(horizontal = 14.dp).height(52.dp).padding(vertical = 5.dp)) {
+                    SelectionBar(selected.size, onCancel = { selected = emptySet() }, modifier = Modifier.fillMaxSize()) {
+                        BarIcon(R.drawable.ic_delete, "Remove selected songs", 22, MaterialTheme.colorScheme.error) {
                             vm.removeSongs(set.id, songs.filter { it.slug in selected })
                             selected = emptySet()
-                        }) {
-                            Icon(painterResource(R.drawable.ic_delete), contentDescription = "Remove selected songs", tint = MaterialTheme.colorScheme.error)
                         }
                     }
                 }

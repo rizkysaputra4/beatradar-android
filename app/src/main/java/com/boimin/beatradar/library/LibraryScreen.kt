@@ -1,5 +1,6 @@
 package com.boimin.beatradar.library
 
+import androidx.compose.ui.draw.alpha
 import androidx.compose.material3.Button
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -158,14 +159,20 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
             }
         }
 
-        if (selecting) {
-            Box(Modifier.padding(horizontal = 18.dp, vertical = 4.dp)) {
-                SelectionBar(selected.size, onCancel = { selected = emptyMap() }) {
-                    Button(onClick = { adding = true }, contentPadding = PaddingValues(horizontal = 14.dp)) { Text("Add to set") }
+        // The selection bar covers the filters in their own space, so the list below does not move.
+        Box {
+            Box(Modifier.alpha(if (selecting) 0f else 1f)) {
+                Filters(query, actions.signedIn, extras.facets, onChange = { vm.query.value = it })
+            }
+            if (selecting) {
+                SelectionBar(
+                    selected.size,
+                    onCancel = { selected = emptyMap() },
+                    modifier = Modifier.matchParentSize().padding(start = 18.dp, end = 18.dp, bottom = 6.dp),
+                ) {
+                    SelectionAction("Add to set") { adding = true }
                 }
             }
-        } else {
-            Filters(query, actions.signedIn, extras.facets, onChange = { vm.query.value = it })
         }
         if (adding) {
             AddManyToSetSheet(
