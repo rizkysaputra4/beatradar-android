@@ -1,10 +1,13 @@
 package com.boimin.beatradar
 
 import android.Manifest
+import android.animation.ObjectAnimator
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings as AndroidSettings
+import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.core.animation.doOnEnd
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -68,6 +72,19 @@ class MainActivity : ComponentActivity() {
         val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
         splash.setKeepOnScreenCondition { vm.settings.value == null }
+        splash.setOnExitAnimationListener { splashScreenViewProvider ->
+            val fadeOut = ObjectAnimator.ofFloat(
+                splashScreenViewProvider.view,
+                View.ALPHA,
+                1f,
+                0f
+            ).apply {
+                duration = 200L
+                interpolator = AccelerateDecelerateInterpolator()
+                doOnEnd { splashScreenViewProvider.remove() }
+            }
+            fadeOut.start()
+        }
         enableEdgeToEdge()
         coffee = CoffeeBilling(this, onPurchased = { product, token ->
             app.library.claimSupporter(product, token)
@@ -100,7 +117,7 @@ class MainActivity : ComponentActivity() {
 
             LaunchedEffect(settings) {
                 if (settings != null) {
-                    delay(1100) // Allows the draw-in, ripple, and wordmark animation to play smoothly
+                    delay(800) // Optimal branded window before dissolving into main UI
                     showSplash = false
                 }
             }
