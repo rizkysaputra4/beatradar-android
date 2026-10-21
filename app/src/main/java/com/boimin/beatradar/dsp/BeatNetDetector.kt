@@ -345,9 +345,9 @@ class BeatNetDetector(private val net: Weights = Weights.bundled()) : BpmDetecto
         const val HOP = 128
         const val FPS = RATE / HOP
         const val ACT_FRAMES = 688
-        /** A first reading after 1.5 s, settled after 4 s. */
+        /** A first reading after 1.5 s, settled ("Locked") after 3 s: on held-out songs that is as accurate later on as 4 s. */
         const val MIN_FRAMES = 129
-        const val SETTLE_FRAMES = 344
+        const val SETTLE_FRAMES = 258
         const val ESTIMATE_EVERY = 43
     }
 }

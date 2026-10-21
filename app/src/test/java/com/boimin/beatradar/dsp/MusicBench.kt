@@ -44,6 +44,16 @@ class MusicBench {
         /** The engine's last reading, whatever its confidence. */
         val last: BeatUpdate?,
         val falseGaps: Int = 0,
+        /** When a number first appears on screen (ms), and whether that first number is right. */
+        val firstShownMs: Long? = null,
+        val firstShownRight: Boolean = false,
+        /** When the screen first shows the right tempo (ms). */
+        val firstRightMs: Long? = null,
+        /** Share of the time a number is on screen in the first 15 s that it is a wrong one. */
+        val earlyWrongShare: Double = 0.0,
+        /** When the number first shows as "Locked" (settled and confident), and whether it is right then. */
+        val lockedMs: Long? = null,
+        val lockedRight: Boolean = false,
     ) {
         val verdict10 = verdict(at10, clip.bpm)
         val verdictEnd = verdict(atEnd, clip.bpm)
@@ -129,6 +139,14 @@ class MusicBench {
             last = updates.lastOrNull(),
             // A gap inside one song (not its fade-out at the very end) would wrongly end it.
             falseGaps = gaps.count { it < endMs - 3_000 },
+            firstShownMs = updates.firstOrNull { it.confidence >= minConfidence }?.timeMs,
+            firstShownRight = updates.firstOrNull { it.confidence >= minConfidence }?.let { verdict(it.bpm, clip.bpm) == Verdict.EXACT } ?: false,
+            firstRightMs = updates.firstOrNull { it.confidence >= minConfidence && verdict(it.bpm, clip.bpm) == Verdict.EXACT }?.timeMs,
+            lockedMs = updates.firstOrNull { it.settled && it.confidence >= minConfidence }?.timeMs,
+            lockedRight = updates.firstOrNull { it.settled && it.confidence >= minConfidence }?.let { verdict(it.bpm, clip.bpm) == Verdict.EXACT } ?: false,
+            earlyWrongShare = updates.filter { it.timeMs <= 15_000 && it.confidence >= minConfidence }.let { shownEarly ->
+                if (shownEarly.isEmpty()) 0.0 else shownEarly.count { verdict(it.bpm, clip.bpm) != Verdict.EXACT }.toDouble() / shownEarly.size
+            },
         )
     }
 
@@ -154,6 +172,21 @@ class MusicBench {
                     rs.map { it.confidence }.average(),
                 ),
             )
+        }
+        // How quickly a number appears, and whether it can be trusted when it does (phone).
+        run {
+            val rs = results.filter { it.mode == "phone" }
+            fun med(v: List<Long>) = if (v.isEmpty()) Double.NaN else v.sorted()[v.size / 2] / 1000.0
+            val shownAt = rs.mapNotNull { it.firstShownMs }
+            val rightAt = rs.mapNotNull { it.firstRightMs }
+            val lockedAt = rs.mapNotNull { it.lockedMs }
+            println(String.format(Locale.US, "locked phone: \"Locked\" at median %.1f s; right when locked %.1f%%",
+                med(lockedAt), 100.0 * rs.count { it.lockedRight } / rs.size))
+            println(String.format(Locale.US,
+                "speed phone: first number at median %.1f s (%d%% of songs get one); first number right %.1f%%; right number at median %.1f s " +
+                    "(%.1f%% of songs by 10 s); wrong number on screen in the first 15 s %.1f%% of the time",
+                med(shownAt), 100 * shownAt.size / rs.size, 100.0 * rs.count { it.firstShownRight } / rs.size, med(rightAt),
+                100.0 * rs.count { (it.firstRightMs ?: Long.MAX_VALUE) <= 10_000 } / rs.size, 100 * rs.map { it.earlyWrongShare }.average()))
         }
         for (mode in listOf("clean", "phone")) {
             val rs = results.filter { it.mode == mode }

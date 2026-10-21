@@ -87,7 +87,10 @@ class BeatEngineTest {
         val before = rec.beats.size
         engine.play(TestSignals.toPcm16(TestSignals.clickTrack(100.0, 6.0, rate)), t)
         assertEquals(listOf(true, false), rec.silence)
-        assertEquals(100f, rec.beats.last().bpm, 2f)
+        // The new song is read afresh, not the old 128. A bare click has no bass to tell 100 from 200 by, so either
+        // octave counts.
+        val last = rec.beats.last().bpm
+        assertTrue("read $last", kotlin.math.abs(last - 100f) <= 2f || kotlin.math.abs(last - 200f) <= 4f)
         assertTrue(rec.beats.size > before)
     }
 

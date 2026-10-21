@@ -48,6 +48,8 @@ class BeatEngine(
     private var silent = false
     private val resetRequested = AtomicBoolean(false)
     private val recent = ArrayDeque<Float>()
+    /** For each of the last few readings: was it an octave away from the tempo shown? */
+    private val octaveVotes = ArrayDeque<Boolean>()
     private var level = 0.0
     private var onsetBaseline = 0.0
     private var onsetCeiling = 1e-6
@@ -98,7 +100,10 @@ class BeatEngine(
         }
         if (estimate == null) return
         // Once the window is long enough to trust, start the smoothing over: an early guess may be an octave off.
-        if (estimate.settled && !settled) recent.clear()
+        if (estimate.settled && !settled) {
+            recent.clear()
+            octaveVotes.clear()
+        }
         settled = estimate.settled
         val bpm = smooth(estimate.bpm)
         val beatAt = nowMs - inputLatencyMs - (estimate.secondsSinceBeat * 1000).toLong()
@@ -153,6 +158,7 @@ class BeatEngine(
     private fun reset() {
         detector.reset()
         recent.clear()
+        octaveVotes.clear()
         settled = false
         onsetReads = 0
         onsetBaseline = 0.0
@@ -161,12 +167,23 @@ class BeatEngine(
 
     /**
      * Median of the last three readings. For a detector that can't tell octaves apart well, octave flips are folded
-     * onto the current tempo so the number stays steady.
+     * onto the current tempo so the number stays steady. For one that can, the number moves to the other octave once
+     * [OCTAVE_SWITCH] of the last [OCTAVE_WINDOW] readings are there: a correction sticks, a one-off wobble doesn't
+     * make the number jump.
      */
     private fun smooth(raw: Float): Float {
         val ref = recent.lastOrNull()
-        val value = if (ref == null || !detector.foldsOctaves) raw else {
-            listOf(raw, raw * 2, raw / 2).minBy { abs(it - ref) }.takeIf { abs(it - ref) / ref < 0.04f } ?: raw
+        val folded = ref?.let { r -> listOf(raw, raw * 2, raw / 2).minBy { abs(it - r) }.takeIf { abs(it - r) / r < 0.04f } }
+        val otherOctave = ref != null && folded != null && folded != raw
+        if (!detector.foldsOctaves) {
+            octaveVotes.addLast(otherOctave)
+            if (octaveVotes.size > OCTAVE_WINDOW) octaveVotes.removeFirst()
+        }
+        val value = when {
+            !otherOctave -> raw
+            detector.foldsOctaves -> folded!!
+            octaveVotes.count { it } >= OCTAVE_SWITCH -> { octaveVotes.clear(); recent.clear(); raw }
+            else -> folded!!
         }
         recent.addLast(value)
         if (recent.size > 3) recent.removeFirst()
@@ -211,6 +228,9 @@ class BeatEngine(
         /** Time constants: the short level follows ~0.2 s; the music level sinks by e in 10 s. */
         const val SHORT_LEVEL_MS = 200.0
         const val MUSIC_LEVEL_MS = 10_000.0
+        /** The other octave is shown once it has this many of the last [OCTAVE_WINDOW] readings (0.5 s apart). */
+        const val OCTAVE_SWITCH = 3
+        const val OCTAVE_WINDOW = 4
         /** Weaker hits than this (relative to the song's strongest) are not reported. */
         const val HIT_MIN = 0.3f
         /** One hit can spill over two reads; hits closer than this count once. */
