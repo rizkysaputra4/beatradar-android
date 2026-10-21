@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/ic_splash_logo_base">
+    <target
+        android:name="pulse"
+        android:animation="@animator/pulse_draw" />
+    <target
+        android:name="arc1"
+        android:animation="@animator/arc1_fade" />
+    <target
+        android:name="arc2"
+        android:animation="@animator/arc2_fade" />
+    <target
+        android:name="arc3"
+        android:animation="@animator/arc3_fade" />
+</animated-vector>
+

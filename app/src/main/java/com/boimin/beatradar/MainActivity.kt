@@ -100,7 +100,7 @@ class MainActivity : ComponentActivity() {
 
             LaunchedEffect(settings) {
                 if (settings != null) {
-                    delay(750) // Seamless branded pulse before transitioning to main UI
+                    delay(1100) // Allows the draw-in, ripple, and wordmark animation to play smoothly
                     showSplash = false
                 }
             }
