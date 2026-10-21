@@ -14,18 +14,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.core.animation.doOnEnd
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -34,7 +23,6 @@ import androidx.core.net.toUri
 import com.boimin.beatradar.account.AccountViewModel
 import com.boimin.beatradar.billing.CoffeeBilling
 import com.boimin.beatradar.capture.CaptureService
-import com.boimin.beatradar.data.ThemeMode
 import com.boimin.beatradar.library.LibraryViewModel
 import com.boimin.beatradar.library.PlayLinks
 import com.boimin.beatradar.net.SongSummary
@@ -49,7 +37,6 @@ import com.boimin.beatradar.meta.ShazamBridge
 import com.boimin.beatradar.ui.AppActions
 import com.boimin.beatradar.ui.AppRoot
 import com.boimin.beatradar.ui.MainViewModel
-import com.boimin.beatradar.ui.SplashView
 import com.boimin.beatradar.ui.theme.BeatRadarTheme
 
 class MainActivity : ComponentActivity() {
@@ -113,29 +100,9 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val settings by vm.settings.collectAsStateWithLifecycle()
-            var showSplash by rememberSaveable { mutableStateOf(true) }
-
-            LaunchedEffect(settings) {
-                if (settings != null) {
-                    delay(800) // Optimal branded window before dissolving into main UI
-                    showSplash = false
-                }
-            }
-
-            val currentTheme = settings?.theme ?: ThemeMode.DARK
-            BeatRadarTheme(currentTheme) {
-                Box(Modifier.fillMaxSize()) {
-                    settings?.let { s ->
-                        AppRoot(vm = vm, accountVm = accountVm, libraryVm = libraryVm, settings = s, actions = actions)
-                    }
-
-                    AnimatedVisibility(
-                        visible = showSplash,
-                        enter = fadeIn(),
-                        exit = fadeOut(animationSpec = tween(350))
-                    ) {
-                        SplashView()
-                    }
+            settings?.let { s ->
+                BeatRadarTheme(s.theme) {
+                    AppRoot(vm = vm, accountVm = accountVm, libraryVm = libraryVm, settings = s, actions = actions)
                 }
             }
         }
