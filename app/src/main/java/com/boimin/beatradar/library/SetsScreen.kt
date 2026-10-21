@@ -84,6 +84,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
 import com.boimin.beatradar.ui.tempoRangeShort
+import com.boimin.beatradar.ui.tempoRangeLabel
 
 /** "My sets" in the Library tab: the user's song lists by tempo. */
 @Composable
@@ -101,6 +102,10 @@ fun SetsScreen(vm: LibraryViewModel, settings: Settings, actions: LibraryActions
     val openSet by vm.openSetId.collectAsStateWithLifecycle()
     var creating by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val artwork by vm.setArtwork.collectAsStateWithLifecycle()
+    val fromLog by remember(settings) { vm.logSuggestion(settings) }.collectAsStateWithLifecycle(emptyList())
+    // "Not now" hides the log card until the app is opened again.
+    var logLater by rememberSaveable { mutableStateOf(false) }
 
     val open = openSet?.let { id -> sets.firstOrNull { it.id == id } }
     if (open != null) {
@@ -162,7 +167,32 @@ fun SetsScreen(vm: LibraryViewModel, settings: Settings, actions: LibraryActions
                 }
             }
         }
-        items(sets, key = { it.id }) { set -> SetCard(set, onClick = { vm.openSetId.value = set.id }) }
+        if (fromLog.size >= LOG_CARD_MIN && !logLater) {
+            item(key = "from-log") {
+                val name = str(R.string.sets_from_log_name, tempoRangeShort(settings.targetLow, settings.targetHigh))
+                FromLogCard(
+                    songs = fromLog,
+                    range = tempoRangeLabel(settings.targetLow, settings.targetHigh),
+                    onMake = { scope.launch { vm.createSetWith(name, fromLog)?.let { vm.openSetId.value = it } } },
+                    onLater = { logLater = true },
+                )
+            }
+        }
+        fun playFromCard(set: SetSummary) {
+            scope.launch { playSet(vm, actions, settings.playApp, vm.setSongsNow(set.id), from = 0) }
+        }
+        sets.firstOrNull()?.let { latest ->
+            item(key = "latest-label") { SectionLabel(str(R.string.sets_latest)) }
+            item(key = latest.id) {
+                LatestSetCard(latest, artwork[latest.id].orEmpty(), playAppName(settings.playApp), onClick = { vm.openSetId.value = latest.id }, onPlay = { playFromCard(latest) })
+            }
+        }
+        if (sets.size > 1) {
+            item(key = "more-label") { SectionLabel(str(R.string.sets_more_sets)) }
+            items(sets.drop(1), key = { it.id }) { set ->
+                SetCard(set, artwork[set.id].orEmpty(), onClick = { vm.openSetId.value = set.id }, onPlay = { playFromCard(set) })
+            }
+        }
     }
 
     if (creating) {
@@ -181,8 +211,9 @@ fun SetsScreen(vm: LibraryViewModel, settings: Settings, actions: LibraryActions
     }
 }
 
+/** Sets other than the latest: the cover, name, songs · tempo span · length, and Play. */
 @Composable
-private fun SetCard(set: SetSummary, onClick: () -> Unit) {
+private fun SetCard(set: SetSummary, covers: List<String>, onClick: () -> Unit, onPlay: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -190,26 +221,164 @@ private fun SetCard(set: SetSummary, onClick: () -> Unit) {
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(14.dp),
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier.size(44.dp).clip12().background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(painterResource(R.drawable.ic_list), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-        }
+        SetCover(covers, sizeDp = 52, cornerDp = 12)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(set.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                "${strPlural(R.plurals.sets_song_count, set.songs, set.songs)} · ${bpmSpan(set.minBpm, set.maxBpm)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text(setFacts(set), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (set.songs > 0) {
+            Spacer(Modifier.width(8.dp))
+            PlayButton(str(R.string.sets_play_song, set.name), onPlay)
         }
     }
 }
+
+/** The set changed most recently, large: a bigger cover, its facts, and a full-width Play. */
+@Composable
+private fun LatestSetCard(set: SetSummary, covers: List<String>, appName: String, onClick: () -> Unit, onPlay: () -> Unit) {
+    val shape = RoundedCornerShape(18.dp)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SetCover(covers, sizeDp = 88, cornerDp = 14)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(set.name, fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(4.dp))
+                Text(setFacts(set), fontSize = 13.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (set.songs > 0) {
+            Spacer(Modifier.height(12.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(MaterialTheme.colorScheme.primary)
+                    .clickable(onClick = onPlay),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(painterResource(R.drawable.ic_play), contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(str(R.string.sets_play_in, appName), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            }
+        }
+    }
+}
+
+/**
+ * "From your log": songs heard this past week in the target range that are in no set yet. One tap makes them a set;
+ * "Not now" hides the card until the app opens again.
+ */
+@Composable
+private fun FromLogCard(songs: List<SongSummary>, range: String, onMake: () -> Unit, onLater: () -> Unit) {
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f).compositeOver(MaterialTheme.colorScheme.surfaceContainer))
+            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), shape)
+            .padding(14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(painterResource(R.drawable.ic_history), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(5.dp))
+            Text(str(R.string.sets_from_log_label), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, color = MaterialTheme.colorScheme.primary)
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(strPlural(R.plurals.sets_from_log_title, songs.size, songs.size, range), fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            songs.take(3).joinToString(" · ") { it.title },
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Button(onClick = onMake, modifier = Modifier.height(40.dp), contentPadding = PaddingValues(horizontal = 18.dp)) {
+                Text(str(R.string.sets_from_log_make))
+            }
+            Spacer(Modifier.width(4.dp))
+            TextButton(onClick = onLater) { Text(str(R.string.sets_from_log_later)) }
+        }
+    }
+}
+
+/** A set's cover: four song covers in a square, one cover when it has fewer, or the set icon before any. */
+@Composable
+private fun SetCover(covers: List<String>, sizeDp: Int, cornerDp: Int) {
+    when {
+        covers.size >= 4 -> Column(Modifier.size(sizeDp.dp).clip(RoundedCornerShape(cornerDp.dp))) {
+            covers.take(4).chunked(2).forEach { row ->
+                Row { row.forEach { SongArtwork(it, sizeDp = sizeDp / 2, cornerDp = 0) } }
+            }
+        }
+        covers.isNotEmpty() -> SongArtwork(covers.first(), sizeDp = sizeDp, cornerDp = cornerDp)
+        else -> Box(
+            Modifier.size(sizeDp.dp).clip(RoundedCornerShape(cornerDp.dp)).background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(painterResource(R.drawable.ic_list), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size((sizeDp * 0.42f).dp))
+        }
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 0.8.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 8.dp),
+    )
+}
+
+/** "12 songs · 120–132 BPM · 48 min" (the length once known; "about" while some songs' lengths aren't). */
+@Composable
+private fun setFacts(set: SetSummary): String = listOfNotNull(
+    strPlural(R.plurals.sets_song_count, set.songs, set.songs),
+    bpmSpan(set.minBpm, set.maxBpm).takeIf { set.songs > 0 },
+    (set.knownMs / 60_000).takeIf { it > 0 }?.let { str(if (set.allTimed) R.string.sets_minutes else R.string.sets_about_minutes, it.toInt()) },
+).joinToString(" · ")
+
+private fun playAppName(playApp: String) = if (playApp == "spotify") "Spotify" else "YouTube"
+
+/**
+ * Plays [songs] from [from] in the app sets play in: YouTube as one queue to the end of the set, Spotify a song at a
+ * time (its own page when the Library knows it, else a search).
+ */
+private suspend fun playSet(vm: LibraryViewModel, actions: LibraryActions, playApp: String, songs: List<SetSong>, from: Int) {
+    val song = songs.getOrNull(from) ?: return
+    if (playApp == "spotify") {
+        actions.openUrl(vm.playUrl(song.slug, song.title, song.artist, PlayLinks.Service.SPOTIFY))
+    } else {
+        val q = vm.youtubeQueue(songs.drop(from).map { it.slug })
+        actions.openUrl(
+            q?.url ?: ("https://www.youtube.com/results?search_query=" + java.net.URLEncoder.encode("${song.artist} ${song.title}", "UTF-8")),
+        )
+    }
+}
+
+/** "From your log" shows once this many songs are waiting. */
+private const val LOG_CARD_MIN = 3
 
 @Composable
 private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings, actions: LibraryActions, onBack: () -> Unit, modifier: Modifier) {
@@ -229,20 +398,7 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
     val appName = if (service == PlayLinks.Service.SPOTIFY) "Spotify" else "YouTube"
 
     fun play(from: Int) {
-        val song = songs.getOrNull(from) ?: return
-        scope.launch {
-            when (service) {
-                PlayLinks.Service.SPOTIFY -> actions.openUrl(vm.playUrl(song.slug, song.title, song.artist, service))
-                // YouTube plays from this song to the end of the set as one queue.
-                PlayLinks.Service.YOUTUBE_MUSIC -> {
-                    val q = vm.youtubeQueue(songs.drop(from).map { it.slug })
-                    actions.openUrl(
-                        q?.url ?: ("https://www.youtube.com/results?search_query=" +
-                            java.net.URLEncoder.encode("${song.artist} ${song.title}", "UTF-8")),
-                    )
-                }
-            }
-        }
+        scope.launch { playSet(vm, actions, settings.playApp, songs, from) }
     }
     fun toggle(slug: String) {
         selected = if (slug in selected) selected - slug else selected + slug

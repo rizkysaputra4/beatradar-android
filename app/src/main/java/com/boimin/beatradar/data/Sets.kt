@@ -61,7 +61,16 @@ data class SetSummary(
     val songs: Int,
     val minBpm: Float?,
     val maxBpm: Float?,
-)
+    /** Total length of the songs whose length is known, and how many those are. */
+    val knownMs: Long = 0,
+    val timedSongs: Int = 0,
+) {
+    /** True when every song's length is known, so [knownMs] is the set's real length. */
+    val allTimed: Boolean get() = songs > 0 && timedSongs == songs
+}
+
+/** One song's artwork in a set, for the cover mosaic on its card. */
+data class SetArt(val setId: Long, val artworkUrl: String)
 
 /** Marks a set changed for the backup (a tombstone stays one). */
 private const val SET_CHANGED = "syncState = CASE WHEN syncState = 2 THEN 2 ELSE 1 END"
@@ -69,7 +78,9 @@ private const val SET_CHANGED = "syncState = CASE WHEN syncState = 2 THEN 2 ELSE
 @Dao
 interface SetDao {
     @Query(
-        """SELECT s.id, s.name, s.updatedAt, COUNT(x.slug) AS songs, MIN(x.bpm) AS minBpm, MAX(x.bpm) AS maxBpm
+        """SELECT s.id, s.name, s.updatedAt, COUNT(x.slug) AS songs, MIN(x.bpm) AS minBpm, MAX(x.bpm) AS maxBpm,
+                  COALESCE(SUM(CASE WHEN x.durationMs > 0 THEN x.durationMs ELSE 0 END), 0) AS knownMs,
+                  COALESCE(SUM(CASE WHEN x.durationMs > 0 THEN 1 ELSE 0 END), 0) AS timedSongs
            FROM song_set s LEFT JOIN set_song x ON x.setId = s.id
            WHERE s.syncState != 2
            GROUP BY s.id ORDER BY s.updatedAt DESC""",
@@ -81,6 +92,14 @@ interface SetDao {
 
     @Query("SELECT * FROM set_song WHERE setId = :setId ORDER BY bpm ASC, title COLLATE NOCASE ASC")
     suspend fun songs(setId: Long): List<SetSong>
+
+    /** Artwork of the songs in every set, in tempo order, for the covers on My sets. */
+    @Query("SELECT setId, artworkUrl FROM set_song WHERE artworkUrl IS NOT NULL ORDER BY setId, bpm")
+    fun observeArtwork(): Flow<List<SetArt>>
+
+    /** Every song that is in at least one set. */
+    @Query("SELECT DISTINCT x.slug FROM set_song x JOIN song_set s ON s.id = x.setId WHERE s.syncState != 2")
+    fun observeSlugsInSets(): Flow<List<String>>
 
     /** Sets the song is in, for the "Add to set" sheet. */
     @Query("SELECT x.setId FROM set_song x JOIN song_set s ON s.id = x.setId WHERE x.slug = :slug AND s.syncState != 2")
@@ -121,8 +140,8 @@ interface SetDao {
     suspend fun touch(id: Long, now: Long)
 
     /** Lengths are looked up once per song; they don't change the set (no backup push). */
-    @Query("UPDATE set_song SET durationMs = :durationMs WHERE slug = :slug")
-    suspend fun setDuration(slug: String, durationMs: Int)
+    @Query("UPDATE set_song SET durationMs = :durationMs, artworkUrl = COALESCE(artworkUrl, :artworkUrl) WHERE slug = :slug")
+    suspend fun fillFromLibrary(slug: String, durationMs: Int, artworkUrl: String?)
 
     @Query("UPDATE song_set SET shareSlug = :slug WHERE id = :id")
     suspend fun setShareSlug(id: Long, slug: String)

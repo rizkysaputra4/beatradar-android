@@ -117,6 +117,16 @@
     <string name="sets_empty_title">No sets yet</string>
     <string name="sets_empty_body">Create one, then open any song in Discover and tap Add to set.</string>
     <string name="sets_create">Create</string>
+    <string name="sets_latest">LATEST</string>
+    <string name="sets_more_sets">YOUR SETS</string>
+    <string name="sets_from_log_label">FROM YOUR LOG</string>
+    <plurals name="sets_from_log_title">
+        <item quantity="one">%1$d song you heard at %2$s this week isn\'t in a set yet</item>
+        <item quantity="other">%1$d songs you heard at %2$s this week aren\'t in a set yet</item>
+    </plurals>
+    <string name="sets_from_log_make">Make a set</string>
+    <string name="sets_from_log_later">Not now</string>
+    <string name="sets_from_log_name">Heard this week · %1$s</string>
     <string name="sets_new_set_body">Name it after what it\'s for. Add songs from their page or from Discover.</string>
     <string name="sets_suggest_morning_run">Morning run</string>
     <string name="sets_suggest_workout">Workout</string>

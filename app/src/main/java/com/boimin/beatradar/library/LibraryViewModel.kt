@@ -33,6 +33,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import com.boimin.beatradar.data.Settings
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.async
@@ -87,6 +89,7 @@ data class DiscoverExtras(val trending: Trending? = null, val facets: Facets = F
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
     private val repo = application.app.library
     private val setDao = application.app.database.sets()
+    private val logDao = application.app.database.beatLog()
     private val signedIn: Boolean get() = getApplication<Application>().app.account.user.value != null
     private val context: Context get() = getApplication()
 
@@ -103,6 +106,29 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     val sets: StateFlow<List<SetSummary>> = setDao.observeSets().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun setSongs(setId: Long): Flow<List<SetSong>> = setDao.observeSongs(setId)
+
+    /** A set's songs right now (to play it from its card). */
+    suspend fun setSongsNow(setId: Long): List<SetSong> = setDao.songs(setId)
+
+    /** Up to four covers per set, for the mosaic on its card. */
+    val setArtwork: StateFlow<Map<Long, List<String>>> = setDao.observeArtwork()
+        .map { art -> art.groupBy({ it.setId }, { it.artworkUrl }).mapValues { (_, urls) -> urls.distinct().take(4) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /**
+     * "From your log": named songs heard this past week in the target range that are in no set yet, newest first.
+     * Only from this phone's log, so it works offline.
+     */
+    fun logSuggestion(settings: Settings): Flow<List<SongSummary>> =
+        combine(logDao.observe("", false, true, false), setDao.observeSlugsInSets()) { log, inSets ->
+            val since = System.currentTimeMillis() - LOG_SUGGESTION_DAYS * 24 * 60 * 60 * 1000L
+            val taken = inSets.toSet()
+            log.asSequence()
+                .filter { it.songSlug != null && it.title != null && it.timestamp >= since && it.songSlug !in taken && settings.inTarget(it.bpm) }
+                .distinctBy { it.songSlug }
+                .map { SongSummary(slug = it.songSlug!!, title = it.title!!, artist = it.artist.orEmpty(), bpm = it.bpm) }
+                .toList()
+        }
 
     /** Ids of the sets [slug] is in. */
     fun setsWith(slug: String): Flow<List<Long>> = setDao.observeSetsWith(slug)
@@ -182,12 +208,13 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         if (missing.isEmpty()) return
         viewModelScope.launch {
             for (slug in missing) {
-                val ms = try {
-                    repo.song(slug).durationMs ?: 0
+                // The length, and the cover for songs added from the log (which has none).
+                val song = try {
+                    repo.song(slug)
                 } catch (e: ApiException) {
-                    if (e.offline) return@launch else 0
+                    if (e.offline) return@launch else null
                 }
-                setDao.setDuration(slug, ms)
+                setDao.fillFromLibrary(slug, song?.durationMs ?: 0, song?.artworkUrl)
             }
         }
     }
@@ -544,6 +571,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     companion object {
+        /** How far back "From your log" looks. */
+        const val LOG_SUGGESTION_DAYS = 7
+
         /** The user's words for a failed call: the app's own for common cases, else the server's message. */
         fun describe(context: Context, e: ApiException): String = when {
             e.offline -> context.str(R.string.library_offline)
