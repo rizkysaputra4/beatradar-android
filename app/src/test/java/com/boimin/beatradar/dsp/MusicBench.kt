@@ -20,7 +20,8 @@ import kotlin.random.Random
  *
  * Opt-in and slow: `MUSIC_BENCH=<dir> gradlew :app:testDebugUnitTest --tests '*MusicBench*' -i`, where `<dir>` holds
  * - `BallroomData/` (ISMIR 2004 Ballroom audio) and `BallroomAnnotations/` (CPJKU beat annotations), and/or
- * - `genres/` (GTZAN audio) and `gtzan_tempo_beat/` (tempo and beat annotations).
+ * - `genres/` (GTZAN audio) and `gtzan_tempo_beat/` (tempo and beat annotations), and/or
+ * - `giantsteps_wav/` (held-out GiantSteps clips with tempo only, written by the training scripts' prep.py).
  * `MUSIC_BENCH_LIST=<file>` keeps only the clips named in it. `MUSIC_BENCH_LIMIT=<n>` takes every k-th clip so about n run; results also go to `<dir>/results-<label>.csv`.
  */
 class MusicBench {
@@ -42,6 +43,7 @@ class MusicBench {
         val confidence: Double,
         /** The engine's last reading, whatever its confidence. */
         val last: BeatUpdate?,
+        val falseGaps: Int = 0,
     ) {
         val verdict10 = verdict(at10, clip.bpm)
         val verdictEnd = verdict(atEnd, clip.bpm)
@@ -54,7 +56,7 @@ class MusicBench {
         val root = System.getenv("MUSIC_BENCH")?.let(::File)
         assumeTrue("set MUSIC_BENCH to run", root != null && root.isDirectory)
         root!!
-        var clips = ballroom(root) + gtzan(root)
+        var clips = ballroom(root) + gtzan(root) + giantsteps(root)
         assumeTrue("no clips found in $root", clips.isNotEmpty())
         // Only the clips named in a list (one name per line), e.g. the held-out songs the network never trained on.
         System.getenv("MUSIC_BENCH_LIST")?.let { list ->
@@ -90,10 +92,12 @@ class MusicBench {
     /** Feeds the clip through the engine in 20 ms buffers, as the phone does, and scores the readings. */
     private fun run(clip: Clip, audio: Audio, mode: String): Result {
         val updates = ArrayList<BeatUpdate>()
+        val gaps = ArrayList<Long>()
         val engine = BeatEngine(
             audio.rate,
             object : BeatEngine.Listener {
                 override fun onBeat(update: BeatUpdate) { updates += update }
+                override fun onSongGap() { gaps += 0L }
             },
             // MUSIC_BENCH_DETECTOR=onset: the hand-written detector the network replaced, for comparison.
             detectorFactory = if (System.getenv("MUSIC_BENCH_DETECTOR") == "onset") { r -> OnsetBpmDetector(sampleRate = r) } else { _ -> BeatNetDetector() },
@@ -104,7 +108,9 @@ class MusicBench {
             val n = minOf(chunk, audio.pcm.size - i)
             val buf = audio.pcm.copyOfRange(i, i + n)
             i += n
+            val before = gaps.size
             engine.feed(buf, n, i * 1000L / audio.rate)
+            if (gaps.size > before) gaps[gaps.size - 1] = i * 1000L / audio.rate
         }
         // What the screen shows: a reading only while it is confident.
         fun shown(atMs: Long): Float? = updates.lastOrNull { it.timeMs <= atMs }
@@ -121,6 +127,8 @@ class MusicBench {
             onBeat = if (exact.isEmpty()) 0.0 else onBeat.toDouble() / exact.size,
             confidence = updates.filter { it.timeMs >= 5_000 }.map { it.confidence.toDouble() }.average().takeIf { !it.isNaN() } ?: 0.0,
             last = updates.lastOrNull(),
+            // A gap inside one song (not its fade-out at the very end) would wrongly end it.
+            falseGaps = gaps.count { it < endMs - 3_000 },
         )
     }
 
@@ -129,6 +137,7 @@ class MusicBench {
         println("\n=== MusicBench [$label]: ${results.size / 2} clips ===")
         println(String.format(Locale.US, "%-22s %-6s %5s | %-7s %-7s %-7s %-7s | %-7s %-7s | %-7s %-7s", "group", "mode", "n", "exact", "half", "double", "wrong", "exact10", "steady", "onBeat", "conf"))
         val groups = results.groupBy { it.clip.set to it.mode }.toSortedMap(compareBy({ it.first }, { it.second })) +
+            results.filter { it.clip.bpm >= 160 }.groupBy { "fast >=160 BPM" to it.mode }.toSortedMap(compareBy({ it.first }, { it.second })) +
             results.groupBy { "${it.clip.set}/${it.clip.genre}" to it.mode }.toSortedMap(compareBy({ it.first }, { it.second }))
         for ((key, rs) in groups) {
             val n = rs.size
@@ -145,6 +154,11 @@ class MusicBench {
                     rs.map { it.confidence }.average(),
                 ),
             )
+        }
+        for (mode in listOf("clean", "phone")) {
+            val rs = results.filter { it.mode == mode }
+            println("gaps $mode: ${rs.count { it.falseGaps > 0 }} of ${rs.size} songs had a gap mid-song (${rs.sumOf { it.falseGaps }} in all): " +
+                rs.filter { it.falseGaps > 0 }.take(8).joinToString { it.clip.name })
         }
         // Where to draw the line between showing a reading and showing nothing.
         for (mode in listOf("clean", "phone")) {
@@ -188,6 +202,17 @@ class MusicBench {
                 ?.mapNotNull { it.trim().split(Regex("\\s+")).firstOrNull()?.toDoubleOrNull() }?.toDoubleArray() ?: DoubleArray(0)
             Clip("gtzan", genre, "${genre}_$no", f, bpm, beats)
         }.toList()
+    }
+
+    /** `giantsteps_wav/` (written by prep.py): held-out GiantSteps clips as WAV, tempo in a .bpm file; no beats. */
+    private fun giantsteps(root: File): List<Clip> {
+        val dir = File(root, "giantsteps_wav")
+        if (!dir.isDirectory) return emptyList()
+        return dir.listFiles { f -> f.extension == "wav" }.orEmpty().sortedBy { it.name }.mapNotNull { f ->
+            val bpm = File(dir, f.nameWithoutExtension + ".bpm").takeIf { it.exists() }?.readText()?.trim()?.toDoubleOrNull()
+                ?: return@mapNotNull null
+            Clip("giantsteps", "edm", f.nameWithoutExtension, f, bpm, DoubleArray(0))
+        }
     }
 
     // --- Audio ---
@@ -252,7 +277,7 @@ class MusicBench {
     private fun phone(a: Audio, seed: Int): Audio {
         val x = DoubleArray(a.pcm.size) { a.pcm[it] / 32768.0 }
         var y = biquad(biquad(x, a.rate, 180.0, highPass = true), a.rate, 180.0, highPass = true)
-        y = biquad(y, a.rate, 7_000.0, highPass = false)
+        y = biquad(y, a.rate, minOf(7_000.0, 0.45 * a.rate), highPass = false)
         val d1 = (0.023 * a.rate).toInt()
         val d2 = (0.041 * a.rate).toInt()
         for (i in y.indices.reversed()) {
