@@ -33,7 +33,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import com.boimin.beatradar.R
 import com.boimin.beatradar.data.Recap
+import com.boimin.beatradar.i18n.str
+import com.boimin.beatradar.i18n.strPlural
 import com.boimin.beatradar.ui.theme.Brand
 import java.io.File
 import java.text.DateFormat
@@ -44,30 +47,30 @@ import java.util.Date
 @Composable
 fun RecapSheet(recap: Recap, streak: Long?, beatsWeek: Long?, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetGesturesEnabled = false) {
         Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Your week in tempo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+            Text(str(R.string.recap_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
             Text(period(recap), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (recap.songs == 0) {
-                Text("Nothing logged this week yet. Tap the dial near some music.", style = MaterialTheme.typography.bodyMedium)
+                Text(str(R.string.recap_empty), style = MaterialTheme.typography.bodyMedium)
                 return@Column
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Stat("SONGS", recap.songs.toString(), Modifier.weight(1f))
-                Stat("YOUR BPM", recap.topBand?.let { "$it–${it + 9}" } ?: "—", Modifier.weight(1f))
-                Stat("IN TARGET", recap.inTarget.toString(), Modifier.weight(1f))
+                Stat(str(R.string.recap_stat_songs), recap.songs.toString(), Modifier.weight(1f))
+                Stat(str(R.string.recap_stat_your_bpm), recap.topBand?.let { "$it–${it + 9}" } ?: "—", Modifier.weight(1f))
+                Stat(str(R.string.recap_stat_in_target), recap.inTarget.toString(), Modifier.weight(1f))
             }
             Histogram(recap)
             val extras = listOfNotNull(
-                recap.averageBpm?.let { "average $it BPM" },
-                streak?.takeIf { it > 0 }?.let { "$it-day streak" },
-                beatsWeek?.takeIf { it > 0 }?.let { "$it beats" },
+                recap.averageBpm?.let { str(R.string.recap_average, it) },
+                streak?.takeIf { it > 0 }?.let { strPlural(R.plurals.recap_streak, it.toInt(), it) },
+                beatsWeek?.takeIf { it > 0 }?.let { strPlural(R.plurals.recap_beats, it.toInt(), it) },
             )
             if (extras.isNotEmpty()) Text(extras.joinToString(" · "), style = MaterialTheme.typography.bodyMedium)
             recap.topSongs.firstOrNull()?.let { (label, plays) ->
-                Text("Most played: $label${if (plays > 1) " ($plays×)" else ""}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (plays > 1) str(R.string.recap_most_played_times, label, plays) else str(R.string.recap_most_played, label), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Button(onClick = { shareRecap(context, recap, streak, beatsWeek) }) { Text("Share card") }
+            Button(onClick = { shareRecap(context, recap, streak, beatsWeek) }) { Text(str(R.string.recap_share_card)) }
         }
     }
 }
@@ -103,7 +106,7 @@ private fun Histogram(recap: Recap) {
     Row(Modifier.fillMaxWidth()) {
         Text("${recap.bands.first().first}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Box(Modifier.weight(1f))
-        Text("${recap.bands.last().first + 10} BPM", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(str(R.string.recap_bpm_value, recap.bands.last().first + 10), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -127,10 +130,10 @@ private fun shareRecap(context: Context, r: Recap, streak: Long?, beatsWeek: Lon
         this.color = color
         typeface = Typeface.create(Typeface.DEFAULT, if (bold) Typeface.BOLD else Typeface.NORMAL)
     }
-    c.drawText("BeatRadar · my week in tempo", 80f, 140f, paint(44f, violet, true))
+    c.drawText(context.str(R.string.recap_card_title), 80f, 140f, paint(44f, violet, true))
     c.drawText(period(r), 80f, 200f, paint(36f, violet))
     c.drawText(r.topBand?.let { "$it–${it + 9}" } ?: "—", 80f, 420f, paint(200f, white, true))
-    c.drawText("BPM I lived in", 80f, 490f, paint(44f, coral, true))
+    c.drawText(context.str(R.string.recap_card_bpm_lived_in), 80f, 490f, paint(44f, coral, true))
     // Histogram
     val max = r.bands.maxOf { it.second }.coerceAtLeast(1)
     val left = 80f
@@ -143,13 +146,16 @@ private fun shareRecap(context: Context, r: Recap, streak: Long?, beatsWeek: Lon
         c.drawRoundRect(RectF(left + i * barW + 4, bottom - bh.coerceAtLeast(6f), left + (i + 1) * barW - 4, bottom), 8f, 8f, p)
     }
     c.drawText("${r.bands.first().first}", left, bottom + 50, paint(30f, violet))
-    val endLabel = "${r.bands.last().first + 10} BPM"
+    val endLabel = context.str(R.string.recap_bpm_value, r.bands.last().first + 10)
     val endPaint = paint(30f, violet)
     c.drawText(endLabel, right - endPaint.measureText(endLabel), bottom + 50, endPaint)
     val lines = listOfNotNull(
-        "${r.songs} songs · ${r.inTarget} in my target",
-        r.averageBpm?.let { "Average $it BPM" },
-        listOfNotNull(streak?.takeIf { it > 0 }?.let { "$it-day streak" }, beatsWeek?.takeIf { it > 0 }?.let { "$it beats" }).joinToString(" · ").ifEmpty { null },
+        context.strPlural(R.plurals.recap_card_songs_in_target, r.songs, r.songs, r.inTarget),
+        r.averageBpm?.let { context.str(R.string.recap_card_average, it) },
+        listOfNotNull(
+            streak?.takeIf { it > 0 }?.let { context.strPlural(R.plurals.recap_streak, it.toInt(), it) },
+            beatsWeek?.takeIf { it > 0 }?.let { context.strPlural(R.plurals.recap_beats, it.toInt(), it) },
+        ).joinToString(" · ").ifEmpty { null },
     )
     lines.forEachIndexed { i, line -> c.drawText(line, 80f, 1060f + i * 70, paint(46f, white, i == 0)) }
     val dir = File(context.cacheDir, "shared").apply { mkdirs() }
@@ -160,7 +166,7 @@ private fun shareRecap(context: Context, r: Recap, streak: Long?, beatsWeek: Lon
     val send = Intent(Intent.ACTION_SEND)
         .setType("image/png")
         .putExtra(Intent.EXTRA_STREAM, uri)
-        .putExtra(Intent.EXTRA_TEXT, "My week in tempo on BeatRadar")
+        .putExtra(Intent.EXTRA_TEXT, context.str(R.string.recap_share_text))
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }

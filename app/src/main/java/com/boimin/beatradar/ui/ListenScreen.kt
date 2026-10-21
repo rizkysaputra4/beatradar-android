@@ -87,6 +87,9 @@ import com.boimin.beatradar.capture.MonitorState
 import com.boimin.beatradar.capture.MonitorStatus
 import com.boimin.beatradar.data.NameSuggestion
 import com.boimin.beatradar.data.Settings
+import com.boimin.beatradar.i18n.str
+import com.boimin.beatradar.i18n.strPlural
+import androidx.annotation.StringRes
 import com.boimin.beatradar.ui.theme.Brand
 import com.boimin.beatradar.ui.theme.brandSwitchColors
 import kotlinx.coroutines.launch
@@ -197,12 +200,12 @@ private fun Dial(state: MonitorState, settings: Settings, inTarget: Boolean, onT
                         drawArc(mint, -90f, 360f * lock.coerceIn(0f, 1f), false, corner, arcSize, style = Stroke(w, cap = StrokeCap.Round))
                     }
                 }
-                .clickable(onClickLabel = if (state.active) "Stop listening" else "Start listening", onClick = onToggle),
+                .clickable(onClickLabel = if (state.active) str(R.string.listen_stop_listening) else str(R.string.listen_start_listening), onClick = onToggle),
             contentAlignment = Alignment.Center,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 if (listening && state.bpm != null) {
-                    Text("BPM", fontSize = 13.sp, letterSpacing = 1.56.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(str(R.string.listen_bpm_label), fontSize = 13.sp, letterSpacing = 1.56.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         state.bpm.roundToInt().toString(),
                         fontSize = 76.sp,
@@ -214,7 +217,7 @@ private fun Dial(state: MonitorState, settings: Settings, inTarget: Boolean, onT
                     Spacer(Modifier.height(6.dp))
                     DialStatusBadge(state, settings, inTarget)
                     Spacer(Modifier.height(4.dp))
-                    Text("${(sure * 100).roundToInt()}%", fontSize = 13.sp, color = Tone.text3)
+                    Text(str(R.string.listen_confidence_percent, (sure * 100).roundToInt()), fontSize = 13.sp, color = Tone.text3)
                 } else {
                     Icon(
                         painterResource(R.drawable.ic_mic),
@@ -225,9 +228,9 @@ private fun Dial(state: MonitorState, settings: Settings, inTarget: Boolean, onT
                     Spacer(Modifier.height(10.dp))
                     Text(
                         when (state.status) {
-                            MonitorStatus.LISTENING -> "Listening…"
-                            MonitorStatus.PAUSED -> "Paused"
-                            else -> "Tap to listen"
+                            MonitorStatus.LISTENING -> str(R.string.listen_listening)
+                            MonitorStatus.PAUSED -> str(R.string.listen_paused)
+                            else -> str(R.string.listen_tap_to_listen)
                         },
                         fontSize = 15.sp,
                         color = Tone.text2,
@@ -260,15 +263,15 @@ private fun DialStatusBadge(state: MonitorState, settings: Settings, inTarget: B
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(painterResource(R.drawable.ic_check_circle), contentDescription = null, tint = inTargetColor(), modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(4.dp))
-            Text("In target · $held s", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = inTargetColor())
+            Text(str(R.string.listen_in_target_held, held), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = inTargetColor())
         }
         return
     }
     val label = when {
-        settings.rangeEnabled && bpm != null && bpm < settings.minBpm -> "${settings.minBpm - bpm} below target"
-        settings.rangeEnabled && bpm != null && bpm > settings.maxBpm -> "${bpm - settings.maxBpm} above target"
-        state.bpmSettled -> "Locked"
-        else -> "Measuring…"
+        settings.rangeEnabled && bpm != null && bpm < settings.minBpm -> (settings.minBpm - bpm).let { strPlural(R.plurals.listen_below_target, it, it) }
+        settings.rangeEnabled && bpm != null && bpm > settings.maxBpm -> (bpm - settings.maxBpm).let { strPlural(R.plurals.listen_above_target, it, it) }
+        state.bpmSettled -> str(R.string.listen_locked)
+        else -> str(R.string.listen_measuring)
     }
     Text(label, fontSize = 15.sp, color = Tone.text2, maxLines = 1)
 }
@@ -470,7 +473,7 @@ private fun TargetChip(settings: Settings, open: Boolean, onClick: () -> Unit) {
             .clip(shape)
             .background(if (open) Tone.selected else Tone.chip)
             .border(1.dp, if (open) MaterialTheme.colorScheme.primary else Tone.chipLine, shape)
-            .clickable(onClickLabel = "Edit target range", onClick = onClick)
+            .clickable(onClickLabel = str(R.string.listen_edit_target_range), onClick = onClick)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -481,10 +484,10 @@ private fun TargetChip(settings: Settings, open: Boolean, onClick: () -> Unit) {
                 .background(if (settings.rangeEnabled) inTargetColor() else Tone.text3),
         )
         Spacer(Modifier.width(6.dp))
-        Text("Target", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(str(R.string.listen_target), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(6.dp))
         Text(
-            if (settings.rangeEnabled) "${settings.minBpm}–${settings.maxBpm} BPM" else "off",
+            if (settings.rangeEnabled) str(R.string.listen_target_range_bpm, settings.minBpm, settings.maxBpm) else str(R.string.listen_target_off),
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
@@ -511,33 +514,37 @@ private fun TargetSheet(settings: Settings, onSettingsChange: ((Settings) -> Set
     }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetGesturesEnabled = false,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = Tone.sheet,
+        // Tone.sheet isn't a theme colour, so the sheet can't work out its text colour: without this, untinted text
+        // takes whatever the caller had (black outside a Surface) and disappears in dark mode.
+        contentColor = MaterialTheme.colorScheme.onSurface,
         dragHandle = {
             Box(Modifier.padding(top = 10.dp, bottom = 16.dp).size(36.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFF3A3946)))
         },
     ) {
         Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 28.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Target range", fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Text("Vibrates after 10 s in range", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(str(R.string.listen_target_range_title), fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text(str(R.string.listen_vibrates_after), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Stepper("From", settings.minBpm, Modifier.weight(1f), onTap = { typing = true }) { setRange(settings.minBpm + it, maxOf(settings.maxBpm, settings.minBpm + it)) }
-                Stepper("To", settings.maxBpm, Modifier.weight(1f), onTap = { typing = true }) { setRange(minOf(settings.minBpm, settings.maxBpm + it), settings.maxBpm + it) }
+                Stepper(str(R.string.listen_from), settings.minBpm, Modifier.weight(1f), onTap = { typing = true }) { setRange(settings.minBpm + it, maxOf(settings.maxBpm, settings.minBpm + it)) }
+                Stepper(str(R.string.listen_to), settings.maxBpm, Modifier.weight(1f), onTap = { typing = true }) { setRange(minOf(settings.minBpm, settings.maxBpm + it), settings.maxBpm + it) }
             }
             Spacer(Modifier.height(16.dp))
             val preset = TEMPO_PRESETS.firstOrNull { it.min == settings.minBpm && it.max == settings.maxBpm }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TEMPO_PRESETS.forEach { p ->
-                    PresetTile(p.label.substringBefore(' '), "${p.min}–${p.max}", selected = p == preset, Modifier.weight(1f)) { setRange(p.min, p.max) }
+                    PresetTile(str(p.label), "${p.min}–${p.max}", selected = p == preset, Modifier.weight(1f)) { setRange(p.min, p.max) }
                 }
-                PresetTile("Custom", "${settings.minBpm}–${settings.maxBpm}", selected = preset == null, Modifier.weight(1f)) { typing = true }
+                PresetTile(str(R.string.listen_preset_custom), "${settings.minBpm}–${settings.maxBpm}", selected = preset == null, Modifier.weight(1f)) { typing = true }
             }
             Spacer(Modifier.height(20.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Range alerts", fontSize = 15.sp, modifier = Modifier.weight(1f))
+                Text(str(R.string.listen_range_alerts), fontSize = 15.sp, modifier = Modifier.weight(1f))
                 Switch(
                     checked = settings.rangeEnabled,
                     onCheckedChange = { on -> onSettingsChange { it.copy(rangeEnabled = on) } },
@@ -562,12 +569,12 @@ private fun Stepper(label: String, value: Int, modifier: Modifier, onTap: () -> 
             .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StepButton(R.drawable.ic_remove, "Lower $label") { onStep(-1) }
+        StepButton(R.drawable.ic_remove, str(R.string.listen_step_lower, label)) { onStep(-1) }
         Column(Modifier.weight(1f).clickable(onClick = onTap), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(label, fontSize = 11.sp, lineHeight = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("$value", fontSize = 20.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold)
         }
-        StepButton(R.drawable.ic_add, "Raise $label") { onStep(1) }
+        StepButton(R.drawable.ic_add, str(R.string.listen_step_raise, label)) { onStep(1) }
     }
 }
 
@@ -607,7 +614,7 @@ private fun PresetTile(name: String, range: String, selected: Boolean, modifier:
 @Composable
 private fun HeardRecently(recent: List<BeatLogEntry>, settings: Settings, onOpenSong: (String) -> Unit) {
     Column(Modifier.fillMaxWidth()) {
-        Text("Heard recently", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
+        Text(str(R.string.listen_heard_recently), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
         recent.forEach { e ->
             val inTarget = settings.inTarget(e.bpm)
             Row(
@@ -621,9 +628,9 @@ private fun HeardRecently(recent: List<BeatLogEntry>, settings: Settings, onOpen
                 Box(Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(Tone.pill))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(e.title ?: "Unnamed song", fontSize = 15.sp, lineHeight = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(e.title ?: str(R.string.listen_unnamed_song), fontSize = 15.sp, lineHeight = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        listOfNotNull(e.artist ?: if (e.clipPath != null) "Clip saved" else null, ago(e.timestamp)).joinToString(" · "),
+                        listOfNotNull(e.artist ?: if (e.clipPath != null) str(R.string.listen_clip_saved) else null, ago(e.timestamp)).joinToString(" · "),
                         fontSize = 13.sp,
                         lineHeight = 15.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -673,14 +680,14 @@ private fun NowPlayingCard(
     val unnamed = state.title == null && state.placeholderNo != null && state.active
     val titleText = when {
         state.title != null -> state.title
-        state.status == MonitorStatus.LISTENING -> "Listening…"
-        state.status == MonitorStatus.PAUSED -> "Paused"
-        else -> "Ready to detect tempo"
+        state.status == MonitorStatus.LISTENING -> str(R.string.listen_listening)
+        state.status == MonitorStatus.PAUSED -> str(R.string.listen_paused)
+        else -> str(R.string.listen_ready_to_detect)
     }
     val subText = when {
-        state.title != null -> listOfNotNull(state.artist, state.phoneApp).joinToString(" · ").ifEmpty { "Heard around you" }
-        state.active -> "Song not named yet"
-        else -> "Hold the phone near the music and tap the dial"
+        state.title != null -> listOfNotNull(state.artist, state.phoneApp).joinToString(" · ").ifEmpty { str(R.string.listen_heard_around_you) }
+        state.active -> str(R.string.listen_song_not_named)
+        else -> str(R.string.listen_hold_phone_hint)
     }
     Column(
         Modifier
@@ -702,13 +709,13 @@ private fun NowPlayingCard(
                             .height(40.dp)
                             .clip(RoundedCornerShape(20.dp))
                             .background(Tone.pill)
-                            .clickable(onClickLabel = "Name this song with Shazam", onClick = actions.identify)
+                            .clickable(onClickLabel = str(R.string.listen_name_with_shazam), onClick = actions.identify)
                             .padding(horizontal = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(painterResource(R.drawable.ic_search), contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Name song", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text(str(R.string.listen_name_song), fontSize = 14.sp, fontWeight = FontWeight.Medium)
                     }
                 }
                 Spacer(Modifier.width(10.dp))
@@ -723,7 +730,7 @@ private fun NowPlayingCard(
                 ) {
                     Icon(
                         painterResource(if (paused) R.drawable.ic_play else R.drawable.ic_pause),
-                        contentDescription = if (paused) "Resume" else "Pause",
+                        contentDescription = if (paused) str(R.string.listen_resume) else str(R.string.listen_pause),
                         tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(20.dp),
                     )
@@ -734,26 +741,26 @@ private fun NowPlayingCard(
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Is this ${suggestion.title}${if (suggestion.artist.isNotBlank()) " · ${suggestion.artist}" else ""}?",
+                    str(R.string.listen_suggestion_question, "${suggestion.title}${if (suggestion.artist.isNotBlank()) " · ${suggestion.artist}" else ""}"),
                     fontSize = 13.sp,
                     color = Tone.text2,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = onAcceptSuggestion) { Text("Yes") }
-                TextButton(onClick = onRejectSuggestion) { Text("No", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                TextButton(onClick = onAcceptSuggestion) { Text(str(R.string.listen_suggestion_yes)) }
+                TextButton(onClick = onRejectSuggestion) { Text(str(R.string.listen_suggestion_no), color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
     }
 }
 
-private data class TempoPreset(val label: String, val min: Int, val max: Int)
+private data class TempoPreset(@StringRes val label: Int, val min: Int, val max: Int)
 
 private val TEMPO_PRESETS = listOf(
-    TempoPreset("Groove 95–110", 95, 110),
-    TempoPreset("House 120–132", 120, 132),
-    TempoPreset("Run 155–175", 155, 175),
+    TempoPreset(R.string.listen_preset_groove, 95, 110),
+    TempoPreset(R.string.listen_preset_house, 120, 132),
+    TempoPreset(R.string.listen_preset_run, 155, 175),
 )
 
 @Composable
@@ -762,13 +769,13 @@ private fun CustomRangeDialog(minBpm: Int, maxBpm: Int, onDismiss: () -> Unit, o
     var maxText by remember { mutableStateOf(maxBpm.toString()) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Custom BPM Range") },
+        title = { Text(str(R.string.listen_custom_range_title)) },
         text = {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
                     value = minText,
                     onValueChange = { if (it.length <= 3 && it.all(Char::isDigit)) minText = it },
-                    label = { Text("Min BPM") },
+                    label = { Text(str(R.string.listen_min_bpm)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f),
@@ -776,7 +783,7 @@ private fun CustomRangeDialog(minBpm: Int, maxBpm: Int, onDismiss: () -> Unit, o
                 OutlinedTextField(
                     value = maxText,
                     onValueChange = { if (it.length <= 3 && it.all(Char::isDigit)) maxText = it },
-                    label = { Text("Max BPM") },
+                    label = { Text(str(R.string.listen_max_bpm)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f),
@@ -790,8 +797,8 @@ private fun CustomRangeDialog(minBpm: Int, maxBpm: Int, onDismiss: () -> Unit, o
                     val b = (maxText.toIntOrNull() ?: maxBpm).coerceIn(Settings.BPM_FLOOR, Settings.BPM_CEILING)
                     onSave(minOf(a, b), maxOf(a, b))
                 },
-            ) { Text("Apply") }
+            ) { Text(str(R.string.listen_apply)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.listen_cancel)) } },
     )
 }

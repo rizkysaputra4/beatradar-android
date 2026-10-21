@@ -1,6 +1,9 @@
 package com.boimin.beatradar.library
 
+import android.content.Context
+import com.boimin.beatradar.R
 import com.boimin.beatradar.data.SetSong
+import com.boimin.beatradar.i18n.str
 import com.boimin.beatradar.net.SongLink
 import java.net.URLEncoder
 import kotlin.math.roundToInt
@@ -32,17 +35,11 @@ object PlayLinks {
         return "https://music.youtube.com/watch?v=$id"
     }
 
-    /** "Morning run" then one numbered line per song, for the share sheet. */
-    fun setText(name: String, songs: List<SetSong>): String = buildString {
-        append(name)
-        append(" (BeatRadar set)")
-        songs.forEachIndexed { i, s -> append("\n${i + 1}. ${s.title} – ${s.artist} · ${s.bpm.roundToInt()} BPM") }
-    }
-
     /** True when shared text holds a Spotify or YouTube playlist link (the server checks it properly). */
     fun looksLikePlaylist(text: String): Boolean =
         text.contains("spotify.com/playlist/") || text.contains("spotify.com/intl-") && text.contains("/playlist/") ||
             text.contains("spotify:playlist:") || (text.contains("youtube.com/") || text.contains("youtu.be/")) && text.contains("list=")
 
-    private fun encode(s: String): String = URLEncoder.encode(s, Charsets.UTF_8)
+    // The charset-name overload: encode(String, Charset) is API 33+ and would crash on Android 10–12.
+    private fun encode(s: String): String = URLEncoder.encode(s, "UTF-8")
 }

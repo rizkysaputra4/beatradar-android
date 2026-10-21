@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Notifier: the ongoing "listening" notification -->
+    <string name="notif_listening_paused">Paused</string>
+    <string name="notif_listening_waiting">Listening for a beat…</string>
+    <string name="notif_listening_bpm_match">%1$d BPM · match!</string>
+    <string name="notif_listening_bpm_progress">%1$d BPM · in range %2$d/10 s</string>
+    <string name="notif_listening_bpm">%1$d BPM</string>
+    <string name="notif_listening_mic">Listening through the microphone</string>
+    <string name="notif_action_resume">Resume</string>
+    <string name="notif_action_pause">Pause</string>
+    <string name="notif_action_stop">Stop</string>
+
+    <!-- Notifier: a song in the BPM range -->
+    <string name="notif_match_title">%1$d BPM — in your range</string>
+    <string name="notif_match_text_unnamed">Tap Identify to name this song</string>
+    <string name="notif_match_action_shazam">Identify with Shazam</string>
+
+    <!-- Notifier: a song the user brought in reached a listener milestone. %1$s = song title, %2$s = number -->
+    <plurals name="notif_milestone_title">
+        <item quantity="one">%1$s reached %2$s listener</item>
+        <item quantity="other">%1$s reached %2$s listeners</item>
+    </plurals>
+    <!-- %1$s = artist, %2$s = number of listeners -->
+    <plurals name="notif_milestone_text">
+        <item quantity="one">You brought this song in. %1$s · now %2$s listener</item>
+        <item quantity="other">You brought this song in. %1$s · now %2$s listeners</item>
+    </plurals>
+
+    <!-- Notifier: Sunday weekly recap -->
+    <string name="notif_recap_title">Your week in tempo</string>
+    <plurals name="notif_recap_text">
+        <item quantity="one">%1$d song. See your recap and share it.</item>
+        <item quantity="other">%1$d songs. See your recap and share it.</item>
+    </plurals>
+    <!-- %2$d–%3$d = the BPM band played most -->
+    <plurals name="notif_recap_text_band">
+        <item quantity="one">%1$d song, mostly at %2$d–%3$d BPM. See your recap and share it.</item>
+        <item quantity="other">%1$d songs, mostly at %2$d–%3$d BPM. See your recap and share it.</item>
+    </plurals>
+
+    <!-- Notifier: the system ended audio capture -->
+    <string name="notif_stopped_title">Listening stopped</string>
+    <string name="notif_stopped_text">Android ended audio capture. Tap to start again.</string>
+
+    <!-- Notification channels (shown in Android's notification settings) -->
+    <string name="notif_channel_listening_name">Listening</string>
+    <string name="notif_channel_listening_description">Shows the current BPM while BeatRadar listens</string>
+    <string name="notif_channel_matches_name">BPM matches</string>
+    <string name="notif_channel_matches_description">When a song\'s tempo is inside your range</string>
+    <string name="notif_channel_songs_name">Songs you brought in</string>
+    <string name="notif_channel_songs_description">When a song you first added reaches 10, 100 or 1,000 listeners</string>
+
+    <!-- Home-screen widget -->
+    <string name="widget_bpm">%1$d BPM</string>
+    <string name="widget_in_range">In your range</string>
+    <string name="widget_listening">Listening…</string>
+    <string name="widget_paused">Paused</string>
+    <string name="widget_tap_to_listen">Tap ▶ to listen</string>
+    <string name="widget_toggle_description">Start or stop listening</string>
+
+    <!-- Quick Settings tile subtitle -->
+    <string name="tile_bpm">%1$d BPM</string>
+    <string name="tile_listening">Listening</string>
+    <string name="tile_paused">Paused</string>
+    <string name="tile_off">Off</string>
+
+    <!-- MainActivity: toasts and share text -->
+    <string name="main_activity_mic_permission_needed">BeatRadar needs audio permission to hear the beat</string>
+    <string name="main_activity_share_playlist_hint">Share a Spotify or YouTube playlist to see its BPMs</string>
+    <string name="main_activity_no_app_for_link">No app can open this link</string>
+    <string name="main_activity_playing_clip_for_shazam">Playing the clip for Shazam. Keep the volume up.</string>
+    <!-- Shared song: %1$s = title, %2$s = artist, %3$d = BPM, %4$s = link -->
+    <string name="main_activity_share_song">%1$s – %2$s · %3$d BPM on BeatRadar %4$s</string>
+
+    <!-- Log entries without a name -->
+    <string name="data_song_placeholder">Song #%1$d</string>
+    <string name="data_unknown_song">Unknown song</string>
+
+    <!-- Rewards: header chip -->
+    <string name="rewards_chip_streak_description">Your beats</string>
+    <string name="rewards_chip_beats_description">Beats</string>
+
+    <!-- Rewards sheet -->
+    <string name="rewards_title">Your Beats</string>
+    <plurals name="rewards_streak_days">
+        <item quantity="one">%1$d Day Streak</item>
+        <item quantity="other">%1$d Day Streak</item>
+    </plurals>
+    <string name="rewards_this_week">THIS WEEK</string>
+    <string name="rewards_all_time">ALL TIME</string>
+    <string name="rewards_rank">Rank #%1$d</string>
+    <string name="rewards_sign_in_prompt">Sign in to keep your beats and join the leaderboard →</string>
+    <string name="rewards_badges_header">BADGES</string>
+    <!-- %1$s = number of songs -->
+    <string name="rewards_brought_in_header">SONGS YOU BROUGHT IN · %1$s</string>
+    <string name="rewards_leaderboard_header">LEADERBOARD</string>
+    <string name="rewards_toggle_week">Week</string>
+    <string name="rewards_toggle_all_time">All Time</string>
+    <!-- %1$s = nickname -->
+    <string name="rewards_last_groove_master">Last week\'s Groove Master: %1$s</string>
+    <string name="rewards_board_empty">Nobody on the board yet. Measure a song to be first.</string>
+    <string name="rewards_board_rank">#%1$d</string>
+    <string name="rewards_groove_master">Groove Master</string>
+    <!-- The user's own row on the leaderboard. %1$s = nickname -->
+    <string name="rewards_board_you">%1$s (You)</string>
+    <!-- Songs you brought in -->
+    <string name="rewards_discovery_artist_bpm">%1$s · %2$d BPM</string>
+    <plurals name="rewards_discovery_listeners">
+        <item quantity="one">%1$s listener</item>
+        <item quantity="other">%1$s listeners</item>
+    </plurals>
+    <string name="rewards_discovery_milestone">%1$s+ reached</string>
+
+    <!-- Rewards: someone's public profile -->
+    <plurals name="rewards_profile_beats">
+        <item quantity="one">%1$s beat</item>
+        <item quantity="other">%1$s beats</item>
+    </plurals>
+    <string name="rewards_groove_master_count">Groove Master ×%1$d</string>
+    <string name="rewards_profile_no_badges">No badges yet</string>
+    <string name="rewards_profile_report">Report this nickname</string>
+
+    <!-- Badges. The app names them by code; the server's English name is only a fallback for codes it doesn't know. -->
+    <!-- %1$s = badge name, %2$d = times earned -->
+    <string name="badge_name_count">%1$s ×%2$d</string>
+    <string name="badge_progress">%1$s / %2$s</string>
+    <string name="badge_earned">Earned</string>
+    <string name="badge_locked">Locked</string>
+    <!-- Badges header count. %1$d = earned, %2$d = all -->
+    <string name="badge_count">%1$d of %2$d</string>
+    <string name="badge_tier_bronze">Bronze</string>
+    <string name="badge_tier_silver">Silver</string>
+    <string name="badge_tier_gold">Gold</string>
+    <!-- Times a weekly badge was earned, on its tile. %1$d = times -->
+    <string name="badge_times_short">×%1$d</string>
+    <!-- Badge detail -->
+    <string name="badge_detail_tiers">TIERS</string>
+    <!-- %1$s = tier or "Earned", %2$s = date -->
+    <string name="badge_detail_since">%1$s · since %2$s</string>
+    <plurals name="badge_detail_times">
+        <item quantity="one">Earned once</item>
+        <item quantity="other">Earned %1$d times</item>
+    </plurals>
+    <!-- %1$s = next tier, e.g. "Gold" -->
+    <string name="badge_detail_to">To %1$s</string>
+    <string name="badge_detail_to_earn">To earn it</string>
+    <!-- %1$s = number still needed -->
+    <string name="badge_detail_more">%1$s more</string>
+    <string name="badge_detail_done">Done</string>
+    <string name="badge_first_beat">First Beat</string>
+    <string name="badge_first_beat_desc">Your first counted measurement.</string>
+    <string name="badge_tempo_keeper">Tempo Keeper</string>
+    <string name="badge_tempo_keeper_desc">Measurements that matched the song\'s confirmed BPM.</string>
+    <string name="badge_trailblazer">Trailblazer</string>
+    <string name="badge_trailblazer_desc">New songs you brought in that others confirmed.</string>
+    <string name="badge_on_beat">On Beat</string>
+    <string name="badge_on_beat_desc">Days in a row with a measurement.</string>
+    <string name="badge_full_spectrum">Full Spectrum</string>
+    <string name="badge_full_spectrum_desc">A song in every 10-BPM band from 60 to 200.</string>
+    <string name="badge_crowd_pleaser">Crowd Pleaser</string>
+    <string name="badge_crowd_pleaser_desc">Loves on songs you brought in.</string>
+    <string name="badge_fact_checker">Fact Checker</string>
+    <string name="badge_fact_checker_desc">Reports of a wrong tempo that were accepted.</string>
+    <string name="badge_top_10">Top 10</string>
+    <string name="badge_top_10_desc">Finish a week in the top 10 of the leaderboard.</string>
+    <string name="badge_groove_master">Groove Master</string>
+    <string name="badge_groove_master_desc">Finish a week at #1 on the leaderboard.</string>
+    <string name="badge_cadence_runner">Cadence Runner</string>
+    <string name="badge_cadence_runner_desc">Different songs measured at running cadence, 160–190 BPM.</string>
+    <string name="badge_cool_down">Cool Down</string>
+    <string name="badge_cool_down_desc">Different songs measured under 100 BPM, for easy runs and stretching.</string>
+    <string name="badge_collector">Collector</string>
+    <string name="badge_collector_desc">Different songs measured.</string>
+    <string name="badge_marathon">Marathon</string>
+    <string name="badge_marathon_desc">42 measurements in one day.</string>
+    <string name="badge_podium">Podium</string>
+    <string name="badge_podium_desc">Finish a week in the top 3 of the leaderboard.</string>
+    <string name="badge_founding">Founding Runner</string>
+    <string name="badge_founding_desc">Joined in the app\'s first month.</string>
+    <string name="badge_supporter">Supporter</string>
+    <string name="badge_supporter_desc">Bought the team a coffee. Thank you!</string>
+    <plurals name="badge_celebration_title">
+        <item quantity="one">New badge!</item>
+        <item quantity="other">%1$d new badges!</item>
+    </plurals>
+    <string name="badge_celebration_ok">Nice</string>
+</resources>

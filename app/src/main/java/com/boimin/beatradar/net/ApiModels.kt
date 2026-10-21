@@ -242,6 +242,10 @@ val ApiJson = Json {
     val count: Int = 0,
     val progress: Long = 0,
     val nextAt: Long? = null,
+    /** What each tier takes, e.g. [10, 100, 1000]. */
+    val tiers: List<Long> = emptyList(),
+    /** Earned again each time (weekly finishes): a count instead of tiers. */
+    val repeatable: Boolean = false,
     val earnedAt: String? = null,
 ) {
     /** Tier 0 = locked; 1–3 = bronze, silver, gold. */

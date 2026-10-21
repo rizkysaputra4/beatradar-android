@@ -55,11 +55,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.boimin.beatradar.R
+import com.boimin.beatradar.i18n.str
 import com.boimin.beatradar.account.AccountViewModel
 import com.boimin.beatradar.account.SignInSheet
 import com.boimin.beatradar.billing.Coffee
@@ -176,11 +181,13 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
     LaunchedEffect(logMessage) { logMessage?.let { snackbar.showSnackbar(it); vm.messageShown() } }
     LaunchedEffect(libraryMessage) { libraryMessage?.let { snackbar.showSnackbar(it); libraryVm.messageShown() } }
     // "Removed … · Undo".
+    val undoLabel = str(R.string.app_undo)
+    val songRemoved = str(R.string.app_song_removed)
     val undo by libraryVm.undo.collectAsStateWithLifecycle()
     LaunchedEffect(undo) {
         undo?.let { u ->
             // Cleared only after the snackbar closes: clearing it first would cancel this effect, and the snackbar with it.
-            val result = snackbar.showSnackbar(u.text, actionLabel = "Undo", duration = SnackbarDuration.Short)
+            val result = snackbar.showSnackbar(u.text, actionLabel = undoLabel, duration = SnackbarDuration.Short)
             libraryVm.undoShown()
             if (result == SnackbarResult.ActionPerformed) u.undo()
         }
@@ -200,10 +207,10 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
             if (!(songOpen != null && (tab == TAB_LIBRARY || tab == TAB_SETS)) && !(tab == TAB_SETS && setOpen != null)) {
                 Header(
                     when (tab) {
-                        TAB_LISTEN -> "BeatRadar"
-                        TAB_LOG -> "Activity Log"
-                        TAB_SETS -> "My sets"
-                        else -> "Discover"
+                        TAB_LISTEN -> wordmark()
+                        TAB_LOG -> AnnotatedString(str(R.string.app_title_activity_log))
+                        TAB_SETS -> AnnotatedString(str(R.string.app_title_my_sets))
+                        else -> AnnotatedString(str(R.string.app_title_discover))
                     },
                     rewards = { BeatsChip(rewards) { showRewards = true } },
                     onSettings = { showSettings = true },
@@ -276,7 +283,7 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                 onDelete = { entry ->
                     vm.delete(entry)
                     scope.launch {
-                        val result = snackbar.showSnackbar("Song removed", actionLabel = "Undo", withDismissAction = true)
+                        val result = snackbar.showSnackbar(songRemoved, actionLabel = undoLabel, withDismissAction = true)
                         if (result == SnackbarResult.ActionPerformed) vm.restore(entry) else vm.forgetClip(entry)
                     }
                 },
@@ -356,10 +363,10 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
         // PLAN §7a: keep = the local copy stays and stops syncing; remove = cleared here, still in the account.
         AlertDialog(
             onDismissRequest = { confirmSignOut = false },
-            title = { Text("Keep this phone's log?") },
-            text = { Text("Your log stays backed up in your account either way.") },
-            confirmButton = { TextButton(onClick = { confirmSignOut = false; accountVm.signOut(keepLog = true) }) { Text("Keep") } },
-            dismissButton = { TextButton(onClick = { confirmSignOut = false; accountVm.signOut(keepLog = false) }) { Text("Remove") } },
+            title = { Text(str(R.string.app_sign_out_title)) },
+            text = { Text(str(R.string.app_sign_out_body)) },
+            confirmButton = { TextButton(onClick = { confirmSignOut = false; accountVm.signOut(keepLog = true) }) { Text(str(R.string.app_sign_out_keep)) } },
+            dismissButton = { TextButton(onClick = { confirmSignOut = false; accountVm.signOut(keepLog = false) }) { Text(str(R.string.app_sign_out_remove)) } },
         )
     }
     if (!settings.sharingConsentAsked) {
@@ -383,21 +390,17 @@ private fun SharingConsent(onAnswer: (contribute: Boolean, shareClips: Boolean) 
     var step by rememberSaveable { mutableIntStateOf(1) }
     if (step == 1) {
         ConsentDialog(
-            step = "1 of 2",
-            title = "Contribute to the Library?",
-            body = "BeatRadar can share the titles, tempos and audio fingerprints of the songs it hears, so anyone can " +
-                "search a public tempo library. Fingerprints can't be turned back into sound, voices or words. " +
-                "No account needed; if you sign in, your nickname shows on leaderboards.",
+            step = str(R.string.app_consent_step, 1, 2),
+            title = str(R.string.app_consent_library_title),
+            body = str(R.string.app_consent_library_body),
             onAllow = { step = 2 },
             onDeny = { onAnswer(false, false) },
         )
     } else {
         ConsentDialog(
-            step = "2 of 2",
-            title = "Help name unknown songs?",
-            body = "When BeatRadar can't name a song, it can send a 12-second clip of it, so an admin can listen and name " +
-                "it for everyone. Only music is clipped, clips are deleted within 30 days, and turning this off later " +
-                "deletes yours from the server.",
+            step = str(R.string.app_consent_step, 2, 2),
+            title = str(R.string.app_consent_clips_title),
+            body = str(R.string.app_consent_clips_body),
             onAllow = { onAnswer(true, true) },
             onDeny = { onAnswer(true, false) },
         )
@@ -418,14 +421,14 @@ private fun ConsentDialog(step: String, title: String, body: String, onAllow: ()
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(body)
                 Text(
-                    "You can change this anytime in Settings.",
+                    str(R.string.app_consent_change_later),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },
-        confirmButton = { Button(onClick = onAllow) { Text("Allow") } },
-        dismissButton = { TextButton(onClick = onDeny) { Text("Don't allow") } },
+        confirmButton = { Button(onClick = onAllow) { Text(str(R.string.app_consent_allow)) } },
+        dismissButton = { TextButton(onClick = onDeny) { Text(str(R.string.app_consent_deny)) } },
     )
 }
 
@@ -433,17 +436,17 @@ private fun ConsentDialog(step: String, title: String, body: String, onAllow: ()
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CoffeeSheet(state: CoffeeState, onBuy: (Coffee) -> Unit, onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetGesturesEnabled = false) {
         Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Buy me a coffee ☕", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(str(R.string.app_coffee_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             val ready = state as? CoffeeState.Ready
             when {
-                ready == null -> Text("Tips aren't available on this device.")
-                ready.thanks -> Text("Thank you! That keeps BeatRadar going. 💜", style = MaterialTheme.typography.bodyLarge)
-                ready.pending -> Text("Thanks! Your payment is pending; it completes once your payment method confirms it.")
+                ready == null -> Text(str(R.string.app_coffee_unavailable))
+                ready.thanks -> Text(str(R.string.app_coffee_thanks), style = MaterialTheme.typography.bodyLarge)
+                ready.pending -> Text(str(R.string.app_coffee_pending))
                 else -> {
                     Text(
-                        "BeatRadar is free and stays free. A tip unlocks nothing; it just says thanks.",
+                        str(R.string.app_coffee_intro),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -459,9 +462,18 @@ private fun CoffeeSheet(state: CoffeeState, onBuy: (Coffee) -> Unit, onDismiss: 
     }
 }
 
+/** "BeatRadar" as on the splash (drawable/splash_branding.xml): "Beat" in the text colour, "Radar" in violet, extra bold. */
+@Composable
+private fun wordmark(): AnnotatedString = buildAnnotatedString {
+    withStyle(SpanStyle(fontWeight = FontWeight.ExtraBold)) {
+        append("Beat")
+        withStyle(SpanStyle(color = Tone.wordmarkAccent)) { append("Radar") }
+    }
+}
+
 /** Slim header: squircle logo badge + title on the left, beats chip and bordered settings button on the right. */
 @Composable
-private fun Header(title: String, rewards: @Composable () -> Unit, onSettings: () -> Unit) {
+private fun Header(title: AnnotatedString, rewards: @Composable () -> Unit, onSettings: () -> Unit) {
     // Design: a 40 dp logo tile, the title at 20 sp bold, the beats chip and a bare 36 dp settings button.
     Row(
         Modifier
@@ -492,7 +504,7 @@ private fun Header(title: String, rewards: @Composable () -> Unit, onSettings: (
                 .clickable(onClick = onSettings),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(painterResource(R.drawable.ic_settings), contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            Icon(painterResource(R.drawable.ic_settings), contentDescription = str(R.string.app_settings), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -501,10 +513,10 @@ private fun Header(title: String, rewards: @Composable () -> Unit, onSettings: (
 @Composable
 private fun TabBar(selected: Int, onSelect: (Int) -> Unit) {
     val tabs = listOf(
-        "Listen" to R.drawable.ic_graphic_eq,
-        "Log" to R.drawable.ic_history,
-        "Library" to R.drawable.ic_library_music,
-        "Sets" to R.drawable.ic_queue,
+        R.string.app_tab_listen to R.drawable.ic_graphic_eq,
+        R.string.app_tab_log to R.drawable.ic_history,
+        R.string.app_tab_library to R.drawable.ic_library_music,
+        R.string.app_tab_sets to R.drawable.ic_queue,
     )
     Row(
         Modifier
@@ -532,7 +544,7 @@ private fun TabBar(selected: Int, onSelect: (Int) -> Unit) {
             ) {
                 val tint = if (active) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                 Icon(painterResource(icon), contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
-                Text(label, color = tint, fontSize = 11.sp, lineHeight = 13.sp, fontWeight = if (active) FontWeight.Medium else FontWeight.Normal)
+                Text(str(label), color = tint, fontSize = 11.sp, lineHeight = 13.sp, fontWeight = if (active) FontWeight.Medium else FontWeight.Normal)
             }
         }
     }

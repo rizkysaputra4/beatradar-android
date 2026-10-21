@@ -16,6 +16,7 @@ import com.boimin.beatradar.capture.CaptureService
 import com.boimin.beatradar.capture.Monitor
 import com.boimin.beatradar.capture.MonitorState
 import com.boimin.beatradar.capture.MonitorStatus
+import com.boimin.beatradar.i18n.str
 import kotlin.math.roundToInt
 
 /**
@@ -38,17 +39,18 @@ class BeatWidget : AppWidgetProvider() {
         private fun views(context: Context, state: MonitorState): RemoteViews {
             val v = RemoteViews(context.packageName, R.layout.widget_beat)
             val listening = state.status == MonitorStatus.LISTENING
-            v.setTextViewText(R.id.widget_bpm, state.bpm?.takeIf { listening }?.let { "${it.roundToInt()} BPM" } ?: "—")
+            v.setTextViewText(R.id.widget_bpm, state.bpm?.takeIf { listening }?.let { context.str(R.string.widget_bpm, it.roundToInt()) } ?: "—")
             v.setTextViewText(
                 R.id.widget_status,
                 when {
-                    state.matched -> "In your range"
+                    state.matched -> context.str(R.string.widget_in_range)
                     listening && state.title != null -> listOfNotNull(state.title, state.artist).joinToString(" · ")
-                    listening -> "Listening…"
-                    state.status == MonitorStatus.PAUSED -> "Paused"
-                    else -> "Tap ▶ to listen"
+                    listening -> context.str(R.string.widget_listening)
+                    state.status == MonitorStatus.PAUSED -> context.str(R.string.widget_paused)
+                    else -> context.str(R.string.widget_tap_to_listen)
                 },
             )
+            v.setContentDescription(R.id.widget_toggle, context.str(R.string.widget_toggle_description))
             v.setImageViewResource(R.id.widget_toggle, if (state.active) R.drawable.ic_stop else R.drawable.ic_play)
             v.setOnClickPendingIntent(R.id.widget_toggle, toggleIntent(context, state.active))
             v.setOnClickPendingIntent(

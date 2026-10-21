@@ -32,6 +32,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import com.boimin.beatradar.R
+import com.boimin.beatradar.i18n.str
 import com.boimin.beatradar.library.LibraryViewModel
 import com.boimin.beatradar.net.ApiException
 import com.boimin.beatradar.net.SharedSummary
@@ -40,17 +42,17 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
-/** Titles and what each kind of shared data is, in plain words. */
+/** Titles and what each kind of shared data is, in plain words (string resources). */
 internal val SHARED_LABELS = mapOf(
-    "measurements" to ("Tempo measurements" to "Song name, BPM and time of each song this phone measured. Never audio."),
-    "fingerprints" to ("Audio fingerprints" to "Number patterns that recognise a song. They can't be played back."),
-    "clips" to ("Clips of unknown songs" to "12-second audio clips, only with Help name unknown songs on."),
-    "log" to ("Log backup" to "Your log, so it's on all your phones."),
-    "loves" to ("Loves" to "Songs you loved."),
-    "tempo_votes" to ("Tempo votes" to "Your answers to \"Which tempo feels right?\"."),
-    "name_proposals" to ("Names you suggested" to "Names you typed for unknown songs, for an admin to check."),
-    "shared_sets" to ("Shared set links" to "Sets you shared as a link."),
-    "synced_sets" to ("Sets backup" to "Your sets, so they're on all your phones."),
+    "measurements" to (R.string.shared_kind_measurements to R.string.shared_kind_measurements_desc),
+    "fingerprints" to (R.string.shared_kind_fingerprints to R.string.shared_kind_fingerprints_desc),
+    "clips" to (R.string.shared_kind_clips to R.string.shared_kind_clips_desc),
+    "log" to (R.string.shared_kind_log to R.string.shared_kind_log_desc),
+    "loves" to (R.string.shared_kind_loves to R.string.shared_kind_loves_desc),
+    "tempo_votes" to (R.string.shared_kind_tempo_votes to R.string.shared_kind_tempo_votes_desc),
+    "name_proposals" to (R.string.shared_kind_name_proposals to R.string.shared_kind_name_proposals_desc),
+    "shared_sets" to (R.string.shared_kind_shared_sets to R.string.shared_kind_shared_sets_desc),
+    "synced_sets" to (R.string.shared_kind_synced_sets to R.string.shared_kind_synced_sets_desc),
 )
 
 /**
@@ -67,18 +69,18 @@ fun SharedSheet(load: suspend () -> SharedSummary, email: String?, onDismiss: ()
         try {
             summary = load()
         } catch (e: ApiException) {
-            error = LibraryViewModel.describe(e)
+            error = LibraryViewModel.describe(context, e)
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetGesturesEnabled = false, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(
             Modifier.verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("What I've shared", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(str(R.string.shared_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(
-                "Everything this phone${if (summary?.items?.any { it.kind == "log" } == true) " and your account" else ""} sent to BeatRadar, and how long it's kept.",
+                str(if (summary?.items?.any { it.kind == "log" } == true) R.string.shared_intro_with_account else R.string.shared_intro),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -86,7 +88,9 @@ fun SharedSheet(load: suspend () -> SharedSummary, email: String?, onDismiss: ()
             val s = summary
             if (s == null && error == null) CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally).padding(16.dp))
             s?.items?.forEach { k ->
-                val (title, what) = SHARED_LABELS[k.kind] ?: (k.kind to "")
+                val labels = SHARED_LABELS[k.kind]
+                val title = labels?.let { str(it.first) } ?: k.kind
+                val what = labels?.let { str(it.second) }.orEmpty()
                 Column(
                     Modifier
                         .fillMaxWidth()
@@ -98,32 +102,32 @@ fun SharedSheet(load: suspend () -> SharedSummary, email: String?, onDismiss: ()
                     Text("$title · ${k.count}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                     Text(what, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
-                        listOfNotNull(k.lastAt?.let { "Last ${date(it)}" }, k.kept).joinToString(" · "),
+                        listOfNotNull(k.lastAt?.let { str(R.string.shared_last_at, date(it)) }, k.kept).joinToString(" · "),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
             if (s != null) {
-                Text("Want something deleted?", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
+                Text(str(R.string.shared_delete_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
                 val to = s.deletionEmail
                 if (to != null) {
                     Text(
-                        "Email $to and say what to delete. Keep the reference below in the email so we can find your data:",
+                        str(R.string.shared_delete_email, to),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(s.reference, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                    Button(onClick = { emailRequest(context, to, s.reference, email) }) { Text("Email a deletion request") }
+                    Button(onClick = { emailRequest(context, to, s.reference, email) }) { Text(str(R.string.shared_delete_button)) }
                 } else {
                     Text(
-                        "Deletion requests aren't set up on this server yet. Your reference: ${s.reference}",
+                        str(R.string.shared_delete_not_set_up, s.reference),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Text(
-                    "To stop sharing from now on, turn off Contribute to the Library and Help name unknown songs in Settings.",
+                    str(R.string.shared_stop_sharing),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -135,21 +139,21 @@ fun SharedSheet(load: suspend () -> SharedSummary, email: String?, onDismiss: ()
 /** Opens the email app with the request filled in: the reference, and the account email when signed in. */
 private fun emailRequest(context: Context, to: String, reference: String, accountEmail: String?) {
     val body = buildString {
-        appendLine("Please delete the following data I shared with BeatRadar:")
+        appendLine(context.str(R.string.shared_email_intro))
         appendLine()
-        appendLine("(for example: all of it, or only tempo measurements, clips, loves…)")
+        appendLine(context.str(R.string.shared_email_example))
         appendLine()
-        appendLine("Reference: $reference")
-        accountEmail?.let { appendLine("Account: $it") }
+        appendLine(context.str(R.string.shared_email_reference, reference))
+        accountEmail?.let { appendLine(context.str(R.string.shared_email_account, it)) }
     }
     val intent = Intent(Intent.ACTION_SENDTO, "mailto:".toUri())
         .putExtra(Intent.EXTRA_EMAIL, arrayOf(to))
-        .putExtra(Intent.EXTRA_SUBJECT, "BeatRadar deletion request")
+        .putExtra(Intent.EXTRA_SUBJECT, context.str(R.string.shared_email_subject))
         .putExtra(Intent.EXTRA_TEXT, body)
     try {
         context.startActivity(intent)
     } catch (_: ActivityNotFoundException) {
-        Toast.makeText(context, "No email app. Write to $to with reference $reference", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, context.str(R.string.shared_no_email_app, to, reference), Toast.LENGTH_LONG).show()
     }
 }
 

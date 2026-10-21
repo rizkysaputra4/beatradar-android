@@ -1,5 +1,6 @@
 package com.boimin.beatradar.library
 
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,6 +18,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.boimin.beatradar.R
+import com.boimin.beatradar.i18n.str
+import com.boimin.beatradar.i18n.strPlural
 import com.boimin.beatradar.ui.theme.Brand
 import java.util.Locale
 
@@ -29,9 +32,10 @@ fun SongCounters(listeners: Int, confirmations: Int, loves: Int?, labelled: Bool
     val iconSize = if (labelled) 18.dp else 13.dp
     val style = if (labelled) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.labelSmall
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    val description = buildString {
-        append("$listeners ${if (listeners == 1) "person" else "people"} measured it, $confirmations confirmed")
-        if (loves != null) append(", $loves loves")
+    val description = if (loves != null) {
+        strPlural(R.plurals.song_counters_description_loves, listeners, listeners, confirmations, loves)
+    } else {
+        strPlural(R.plurals.song_counters_description, listeners, listeners, confirmations)
     }
     Row(
         modifier.semantics(mergeDescendants = true) { contentDescription = description },
@@ -39,12 +43,11 @@ fun SongCounters(listeners: Int, confirmations: Int, loves: Int?, labelled: Bool
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (labelled) {
-            Counter(R.drawable.ic_groups, compactCount(listeners), "submitted", muted, iconSize, style)
+            Counter(R.drawable.ic_groups, str(R.string.song_counter_submitted, compactCount(listeners)), muted, iconSize, style)
         }
         Counter(
             if (confirmations > 0) R.drawable.ic_verified else R.drawable.ic_verified_outline,
-            compactCount(confirmations),
-            if (labelled) "confirmed" else null,
+            if (labelled) str(R.string.song_counter_confirmed, compactCount(confirmations)) else compactCount(confirmations),
             if (confirmations > 0) Brand.Success else muted,
             iconSize,
             style,
@@ -53,7 +56,6 @@ fun SongCounters(listeners: Int, confirmations: Int, loves: Int?, labelled: Bool
             Counter(
                 R.drawable.ic_favorite,
                 compactCount(loves),
-                null,
                 if (loves > 0) Brand.Coral else muted,
                 iconSize,
                 style,
@@ -63,11 +65,11 @@ fun SongCounters(listeners: Int, confirmations: Int, loves: Int?, labelled: Bool
 }
 
 @Composable
-private fun Counter(icon: Int, value: String, label: String?, tint: Color, size: androidx.compose.ui.unit.Dp, style: androidx.compose.ui.text.TextStyle) {
+private fun Counter(icon: Int, text: String, tint: Color, size: androidx.compose.ui.unit.Dp, style: androidx.compose.ui.text.TextStyle) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(painterResource(icon), contentDescription = null, tint = tint, modifier = Modifier.size(size))
         Spacer(Modifier.width(3.dp))
-        Text(if (label != null) "$value $label" else value, style = style, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text, style = style, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -81,8 +83,3 @@ fun compactCount(n: Int): String = when {
 
 private fun trim(s: String) = s.removeSuffix(".0")
 
-/** "15 of 18 people measured within 2 BPM of this tempo", or a nudge when nobody has confirmed it yet. */
-fun confirmationExplainer(listeners: Int, confirmations: Int): String = when {
-    listeners <= 1 -> "Only one person has measured this song. Be the first to confirm it."
-    else -> "$confirmations of $listeners people measured within 2 BPM of this tempo."
-}

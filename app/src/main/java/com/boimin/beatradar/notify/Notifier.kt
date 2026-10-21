@@ -20,6 +20,8 @@ import com.boimin.beatradar.capture.MonitorState
 import com.boimin.beatradar.capture.MonitorStatus
 import com.boimin.beatradar.meta.ShazamBridge
 import com.boimin.beatradar.data.Recap
+import com.boimin.beatradar.i18n.str
+import com.boimin.beatradar.i18n.strPlural
 import com.boimin.beatradar.net.Milestone
 import java.text.NumberFormat
 import kotlin.math.roundToInt
@@ -32,14 +34,14 @@ class Notifier(private val context: Context) {
     fun ongoing(state: MonitorState): Notification {
         val bpm = state.bpm?.roundToInt()
         val title = when {
-            state.status == MonitorStatus.PAUSED -> "Paused"
-            bpm == null -> "Listening for a beat…"
-            state.matched -> "$bpm BPM · match!"
-            state.matchProgress > 0f -> "$bpm BPM · in range ${(state.matchProgress * 10).toInt()}/10 s"
-            else -> "$bpm BPM"
+            state.status == MonitorStatus.PAUSED -> context.str(R.string.notif_listening_paused)
+            bpm == null -> context.str(R.string.notif_listening_waiting)
+            state.matched -> context.str(R.string.notif_listening_bpm_match, bpm)
+            state.matchProgress > 0f -> context.str(R.string.notif_listening_bpm_progress, bpm, (state.matchProgress * 10).toInt())
+            else -> context.str(R.string.notif_listening_bpm, bpm)
         }
         val song = listOfNotNull(state.title, state.artist).joinToString(" · ")
-        val text = song.ifEmpty { "Listening through the microphone" }
+        val text = song.ifEmpty { context.str(R.string.notif_listening_mic) }
         val paused = state.status == MonitorStatus.PAUSED
         return NotificationCompat.Builder(context, CHANNEL_LISTENING)
             .setSmallIcon(R.drawable.ic_stat_beat)
@@ -53,10 +55,10 @@ class Notifier(private val context: Context) {
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .addAction(
                 if (paused) R.drawable.ic_play else R.drawable.ic_pause,
-                if (paused) "Resume" else "Pause",
+                context.str(if (paused) R.string.notif_action_resume else R.string.notif_action_pause),
                 serviceAction(if (paused) CaptureService.ACTION_RESUME else CaptureService.ACTION_PAUSE),
             )
-            .addAction(R.drawable.ic_stop, "Stop", serviceAction(CaptureService.ACTION_STOP))
+            .addAction(R.drawable.ic_stop, context.str(R.string.notif_action_stop), serviceAction(CaptureService.ACTION_STOP))
             .setStyle(MediaStyle().setShowActionsInCompactView(0, 1))
             .build()
     }
@@ -67,8 +69,8 @@ class Notifier(private val context: Context) {
         val builder = NotificationCompat.Builder(context, CHANNEL_MATCH)
             .setSmallIcon(R.drawable.ic_stat_beat)
             .setColor(ContextCompat.getColor(context, R.color.brand_coral))
-            .setContentTitle("${bpm.roundToInt()} BPM — in your range")
-            .setContentText(listOfNotNull(title, artist).joinToString(" · ").ifEmpty { "Tap Identify to name this song" })
+            .setContentTitle(context.str(R.string.notif_match_title, bpm.roundToInt()))
+            .setContentText(listOfNotNull(title, artist).joinToString(" · ").ifEmpty { context.str(R.string.notif_match_text_unnamed) })
             .setContentIntent(openApp())
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -78,7 +80,7 @@ class Notifier(private val context: Context) {
                 context, REQUEST_SHAZAM, ShazamBridge.launchIntent(context),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
-            builder.addAction(R.drawable.ic_search, "Identify with Shazam", shazam)
+            builder.addAction(R.drawable.ic_search, context.str(R.string.notif_match_action_shazam), shazam)
         }
         notify(ID_MATCH, builder.build())
     }
@@ -96,8 +98,8 @@ class Notifier(private val context: Context) {
             NotificationCompat.Builder(context, CHANNEL_SONGS)
                 .setSmallIcon(R.drawable.ic_stat_beat)
                 .setColor(ContextCompat.getColor(context, R.color.brand_coral))
-                .setContentTitle("${m.title} reached ${NumberFormat.getIntegerInstance().format(m.milestone)} listeners")
-                .setContentText("You brought this song in. ${m.artist} · now ${NumberFormat.getIntegerInstance().format(m.listeners)} listeners")
+                .setContentTitle(context.strPlural(R.plurals.notif_milestone_title, m.milestone, m.title, NumberFormat.getIntegerInstance().format(m.milestone)))
+                .setContentText(context.strPlural(R.plurals.notif_milestone_text, m.listeners, m.artist, NumberFormat.getIntegerInstance().format(m.listeners)))
                 .setContentIntent(open)
                 .setAutoCancel(true)
                 .setCategory(NotificationCompat.CATEGORY_SOCIAL)
@@ -117,9 +119,10 @@ class Notifier(private val context: Context) {
             NotificationCompat.Builder(context, CHANNEL_SONGS)
                 .setSmallIcon(R.drawable.ic_stat_beat)
                 .setColor(ContextCompat.getColor(context, R.color.brand_coral))
-                .setContentTitle("Your week in tempo")
+                .setContentTitle(context.str(R.string.notif_recap_title))
                 .setContentText(
-                    "${r.songs} songs" + (r.topBand?.let { ", mostly at $it–${it + 9} BPM" } ?: "") + ". See your recap and share it.",
+                    r.topBand?.let { context.strPlural(R.plurals.notif_recap_text_band, r.songs, r.songs, it, it + 9) }
+                        ?: context.strPlural(R.plurals.notif_recap_text, r.songs, r.songs),
                 )
                 .setContentIntent(open)
                 .setAutoCancel(true)
@@ -132,8 +135,8 @@ class Notifier(private val context: Context) {
             ID_SYSTEM,
             NotificationCompat.Builder(context, CHANNEL_LISTENING)
                 .setSmallIcon(R.drawable.ic_stat_beat)
-                .setContentTitle("Listening stopped")
-                .setContentText("Android ended audio capture. Tap to start again.")
+                .setContentTitle(context.str(R.string.notif_stopped_title))
+                .setContentText(context.str(R.string.notif_stopped_text))
                 .setContentIntent(openApp())
                 .setAutoCancel(true)
                 .build(),
@@ -176,22 +179,22 @@ class Notifier(private val context: Context) {
         fun createChannels(context: Context) {
             val nm = context.getSystemService(NotificationManager::class.java)
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_LISTENING, "Listening", NotificationManager.IMPORTANCE_LOW).apply {
-                    description = "Shows the current BPM while BeatRadar listens"
+                NotificationChannel(CHANNEL_LISTENING, context.str(R.string.notif_channel_listening_name), NotificationManager.IMPORTANCE_LOW).apply {
+                    description = context.str(R.string.notif_channel_listening_description)
                     setShowBadge(false)
                 },
             )
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_MATCH, "BPM matches", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "When a song's tempo is inside your range"
+                NotificationChannel(CHANNEL_MATCH, context.str(R.string.notif_channel_matches_name), NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = context.str(R.string.notif_channel_matches_description)
                     // BeatRadar vibrates itself (works on silent); keep the channel quiet.
                     setSound(null, null)
                     enableVibration(false)
                 },
             )
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_SONGS, "Songs you brought in", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                    description = "When a song you first added reaches 10, 100 or 1,000 listeners"
+                NotificationChannel(CHANNEL_SONGS, context.str(R.string.notif_channel_songs_name), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                    description = context.str(R.string.notif_channel_songs_description)
                 },
             )
         }

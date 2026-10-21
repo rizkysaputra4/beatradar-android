@@ -1,0 +1,11 @@
+<resources>
+    <!-- API 31+: the icon animates (drawable-v31/ic_splash_logo.xml) and the wordmark sits in the branding slot at the
+         bottom. The splash compat library cannot show a branding image below API 31, so values/themes.xml has none. -->
+    <style name="Theme.BeatRadar.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <item name="windowSplashScreenAnimationDuration">700</item>
+        <item name="android:windowSplashScreenBrandingImage">@drawable/splash_branding</item>
+        <item name="postSplashScreenTheme">@style/Theme.BeatRadar</item>
+    </style>
+</resources>

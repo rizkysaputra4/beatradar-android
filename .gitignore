@@ -9,3 +9,11 @@
 /captures/
 .externalNativeBuild/
 .cxx/
+
+# Python caches of tools/
+__pycache__/
+*.pyc
+# Translation scratch: one-off generators duplicating tools/packs/*.json, and outputs of tools/export_strings.py
+/tools/build_*.py
+/tools/translate-prompt-full.txt
+/tools/packs/en.json

@@ -26,6 +26,7 @@ object ClickPlayer {
     private const val CLICK_MS = 25
 
     private var track: AudioTrack? = null
+    private var beatFrames = 0
     private val _playingBpm = MutableStateFlow<Int?>(null)
     /** The tempo clicking now, or null when quiet. */
     val playingBpm: StateFlow<Int?> = _playingBpm
@@ -44,7 +45,19 @@ object ClickPlayer {
         t.setLoopPoints(0, bar.size, -1)
         t.play()
         track = t
+        beatFrames = bar.size / BEATS_PER_BAR
         _playingBpm.value = bpm.coerceIn(MIN_BPM, MAX_BPM)
+    }
+
+    /**
+     * The beat of the bar sounding now (0 is the accent), or null when quiet. Read from the track's play head, so a
+     * beat light follows what is heard rather than a clock of its own.
+     */
+    @Synchronized
+    fun beatInBar(): Int? {
+        val t = track ?: return null
+        if (beatFrames == 0) return null
+        return (t.playbackHeadPosition % (beatFrames * BEATS_PER_BAR)) / beatFrames
     }
 
     @Synchronized

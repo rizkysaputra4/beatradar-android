@@ -55,6 +55,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.boimin.beatradar.R
 import com.boimin.beatradar.account.AccountViewModel
+import com.boimin.beatradar.i18n.str
+import com.boimin.beatradar.i18n.strPlural
 import com.boimin.beatradar.library.Pill
 import com.boimin.beatradar.net.BadgeView
 import com.boimin.beatradar.net.BoardEntry
@@ -109,14 +111,14 @@ fun BeatsChip(rewards: Rewards?, onClick: () -> Unit) {
     ) {
         Icon(
             painterResource(R.drawable.ic_fire),
-            contentDescription = "Your beats",
+            contentDescription = str(R.string.rewards_chip_streak_description),
             tint = if (beats > 0) Brand.Flame else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             modifier = Modifier.size(18.dp).scale(pop.value),
         )
         Spacer(Modifier.width(3.dp))
         Text("${rewards?.streak ?: 0}", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.width(10.dp))
-        Icon(painterResource(R.drawable.ic_note), contentDescription = "Beats", tint = Tone.primarySoft, modifier = Modifier.size(16.dp))
+        Icon(painterResource(R.drawable.ic_note), contentDescription = str(R.string.rewards_chip_beats_description), tint = Tone.primarySoft, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(2.dp))
         Text(number(beats), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
     }
@@ -130,11 +132,14 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String
     val discoveries by vm.discoveries.collectAsStateWithLifecycle()
     val board by vm.board.collectAsStateWithLifecycle()
     var allTime by rememberSaveable { mutableStateOf(false) }
+    // The badge whose detail is open, by code so it follows fresh progress.
+    var opened by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { vm.loadRewards() }
     LaunchedEffect(allTime) { vm.loadBoard(allTime) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetGesturesEnabled = false,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
@@ -153,17 +158,12 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "Your Beats",
+                    str(R.string.rewards_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
                 )
-                // Bought a coffee: a small thank-you, unlocks nothing.
-                if (r?.supporter == true) {
-                    Pill("☕ Supporter")
-                    Spacer(Modifier.width(6.dp))
-                }
                 Row(
                     Modifier
                         .clip(RoundedCornerShape(50))
@@ -179,7 +179,7 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        "$streakDays Day Streak",
+                        strPlural(R.plurals.rewards_streak_days, streakDays.toInt(), streakDays),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = Brand.Coral,
@@ -195,15 +195,15 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 BentoStatCard(
-                    label = "THIS WEEK",
+                    label = str(R.string.rewards_this_week),
                     value = number(r?.beatsWeek ?: 0),
-                    sub = r?.rankWeek?.let { "Rank #$it" },
+                    sub = r?.rankWeek?.let { str(R.string.rewards_rank, it) },
                     modifier = Modifier.weight(1f),
                 )
                 BentoStatCard(
-                    label = "ALL TIME",
+                    label = str(R.string.rewards_all_time),
                     value = number(r?.beatsAll ?: 0),
-                    sub = r?.rankAll?.let { "Rank #$it" },
+                    sub = r?.rankAll?.let { str(R.string.rewards_rank, it) },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -219,7 +219,7 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     Text(
-                        "Sign in to keep your beats and join the leaderboard →",
+                        str(R.string.rewards_sign_in_prompt),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary,
@@ -228,20 +228,32 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String
             }
 
             Spacer(Modifier.height(18.dp))
-            Text(
-                "BADGES",
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.8.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            val badges = r?.badges.orEmpty()
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    str(R.string.rewards_badges_header),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                if (badges.isNotEmpty()) {
+                    Text(
+                        str(R.string.badge_count, badges.count { it.earned || it.count > 0 }, badges.size),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Tone.primarySoft,
+                    )
+                }
+            }
             Spacer(Modifier.height(8.dp))
-            BadgeGrid(r?.badges.orEmpty())
+            BadgeGrid(badges, onOpen = { opened = it.code })
 
             discoveries?.takeIf { it.total > 0 }?.let { d ->
                 Spacer(Modifier.height(18.dp))
                 Text(
-                    "SONGS YOU BROUGHT IN · ${number(d.total)}",
+                    str(R.string.rewards_brought_in_header, number(d.total)),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.8.sp,
@@ -261,7 +273,7 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "LEADERBOARD",
+                    str(R.string.rewards_leaderboard_header),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.8.sp,
@@ -274,7 +286,7 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         .padding(2.dp),
                 ) {
-                    listOf(false to "Week", true to "All Time").forEach { (all, label) ->
+                    listOf(false to str(R.string.rewards_toggle_week), true to str(R.string.rewards_toggle_all_time)).forEach { (all, label) ->
                         val active = allTime == all
                         Box(
                             Modifier
@@ -299,7 +311,7 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String
             if (b != null) {
                 if (!allTime) b.lastGrooveMaster?.let {
                     Text(
-                        "Last week's Groove Master: $it",
+                        str(R.string.rewards_last_groove_master, it),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -307,7 +319,7 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String
                 }
                 if (b.entries.isEmpty()) {
                     Text(
-                        "Nobody on the board yet. Measure a song to be first.",
+                        str(R.string.rewards_board_empty),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -326,6 +338,7 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String
             }
         }
     }
+    rewards?.badges?.firstOrNull { it.code == opened }?.let { BadgeDetailSheet(it, onDismiss = { opened = null }) }
 }
 
 @Composable
@@ -365,113 +378,6 @@ private fun BentoStatCard(label: String, value: String, sub: String?, modifier: 
     }
 }
 
-@Composable
-private fun BadgeGrid(badges: List<BadgeView>) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        badges.chunked(3).forEach { row ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Max),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                row.forEach { BadgeTile(it, Modifier.weight(1f).fillMaxHeight()) }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun BadgeTile(badge: BadgeView, modifier: Modifier) {
-    val isGrooveMaster = badge.earned && badge.code == "groove_master"
-    val borderColor = if (isGrooveMaster) Brand.Coral.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outline
-    Column(
-        modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
-            .alpha(if (badge.earned) 1f else 0.55f)
-            .padding(horizontal = 6.dp, vertical = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
-        BadgeIcon(badge.code, badge.tier, badge.earned, 34)
-        Spacer(Modifier.height(5.dp))
-        Text(
-            badge.name + if (badge.count > 1) " ×${badge.count}" else "",
-            fontSize = 10.sp,
-            lineHeight = 12.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(5.dp))
-        val next = badge.nextAt
-        if (next != null && next > 0) {
-            val ratio = (badge.progress.toFloat() / next).coerceIn(0f, 1f)
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                Box(
-                    Modifier
-                        .fillMaxWidth(0.85f)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(MaterialTheme.colorScheme.outline),
-                ) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth(ratio)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(MaterialTheme.colorScheme.primary),
-                    )
-                }
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    "${number(badge.progress)} / ${number(next)}",
-                    fontSize = 8.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        } else {
-            Text(
-                if (badge.earned) "Earned" else "Locked",
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isGrooveMaster) Brand.Coral else if (badge.earned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-/** Badge art: a medal in the tier's metal (crown for Groove Master), grey while locked. */
-@Composable
-fun BadgeIcon(code: String, tier: Int, earned: Boolean, sizeDp: Int) {
-    val tint = when {
-        !earned -> MaterialTheme.colorScheme.onSurfaceVariant
-        code == "groove_master" -> Brand.Coral
-        tier >= 3 -> Color(0xFFD4AF37)
-        tier == 2 -> Color(0xFF9EA3AD)
-        else -> Color(0xFFC07A3C)
-    }
-    Box(
-        Modifier
-            .size(sizeDp.dp)
-            .clip(CircleShape)
-            .background(tint.copy(alpha = 0.16f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            painterResource(if (code == "groove_master") R.drawable.ic_crown else if (code == "top_10") R.drawable.ic_trophy else R.drawable.ic_badge),
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size((sizeDp * 0.56f).dp),
-        )
-    }
-}
-
 private const val DISCOVERIES_SHOWN = 5
 
 @Composable
@@ -488,7 +394,7 @@ private fun DiscoveryRow(d: Discovery, onClick: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(d.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                "${d.artist} · ${d.bpm.roundToInt()} BPM",
+                str(R.string.rewards_discovery_artist_bpm, d.artist, d.bpm.roundToInt()),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -498,12 +404,12 @@ private fun DiscoveryRow(d: Discovery, onClick: () -> Unit) {
         Spacer(Modifier.width(8.dp))
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                "${number(d.listeners.toLong())} listener${if (d.listeners == 1) "" else "s"}",
+                strPlural(R.plurals.rewards_discovery_listeners, d.listeners, number(d.listeners.toLong())),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (d.milestone != null) Brand.Coral else MaterialTheme.colorScheme.onSurface,
             )
-            d.milestone?.let { Text("${number(it.toLong())}+ reached", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            d.milestone?.let { Text(str(R.string.rewards_discovery_milestone, number(it.toLong())), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
 }
@@ -522,7 +428,7 @@ private fun BoardRow(e: BoardEntry, highlight: Boolean) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            "#${e.rank}",
+            str(R.string.rewards_board_rank, e.rank),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.ExtraBold,
             color = if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -531,14 +437,14 @@ private fun BoardRow(e: BoardEntry, highlight: Boolean) {
         if (e.grooveMaster > 0) {
             Icon(
                 painterResource(R.drawable.ic_crown),
-                contentDescription = "Groove Master",
+                contentDescription = str(R.string.rewards_groove_master),
                 tint = Brand.Coral,
                 modifier = Modifier.size(14.dp),
             )
             Spacer(Modifier.width(5.dp))
         }
         Text(
-            (if (highlight) "${e.nickname} (You)" else e.nickname) + if (e.supporter) " ☕" else "",
+            (if (highlight) str(R.string.rewards_board_you, e.nickname) else e.nickname) + if (e.supporter) " ☕" else "",
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -557,13 +463,17 @@ private fun BoardRow(e: BoardEntry, highlight: Boolean) {
 
 /** Shown once on app open for badges earned since the last look. */
 @Composable
-fun BadgeCelebration(names: List<String>, onDone: () -> Unit) {
+fun BadgeCelebration(badges: List<BadgeView>, onDone: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDone,
-        icon = { BadgeIcon("new", 1, true, 56) },
-        title = { Text(if (names.size == 1) "New badge!" else "${names.size} new badges!") },
-        text = { Text(names.joinToString(" · "), textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) },
-        confirmButton = { TextButton(onClick = onDone) { Text("Nice") } },
+        icon = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { badges.take(3).forEach { BadgeArt(it, 64) } }
+        },
+        title = { Text(strPlural(R.plurals.badge_celebration_title, badges.size, badges.size)) },
+        text = {
+            Text(badges.map { badgeName(it.code, it.name) }.joinToString(" · "), textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        },
+        confirmButton = { TextButton(onClick = onDone) { Text(str(R.string.badge_celebration_ok)) } },
     )
 }
 
@@ -573,6 +483,7 @@ fun BadgeCelebration(names: List<String>, onDone: () -> Unit) {
 fun ProfileSheet(profile: PublicProfile, onReport: () -> Unit, onDismiss: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetGesturesEnabled = false,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
     ) {
@@ -582,13 +493,12 @@ fun ProfileSheet(profile: PublicProfile, onReport: () -> Unit, onDismiss: () -> 
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(profile.nickname, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-                    Text("${number(profile.beatsAll)} beats", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(strPlural(R.plurals.rewards_profile_beats, profile.beatsAll.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), number(profile.beatsAll)), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (profile.supporter) Pill("☕ Supporter")
-                if (profile.grooveMaster > 0) Pill("Groove Master ×${profile.grooveMaster}")
+                if (profile.grooveMaster > 0) Pill(str(R.string.rewards_groove_master_count, profile.grooveMaster))
             }
             Spacer(Modifier.height(16.dp))
-            if (profile.badges.isEmpty()) Text("No badges yet", style = MaterialTheme.typography.bodyMedium)
+            if (profile.badges.isEmpty()) Text(str(R.string.rewards_profile_no_badges), style = MaterialTheme.typography.bodyMedium)
             profile.badges.chunked(3).forEach { row ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     row.forEach { b ->
@@ -601,10 +511,10 @@ fun ProfileSheet(profile: PublicProfile, onReport: () -> Unit, onDismiss: () -> 
                                 .padding(vertical = 10.dp, horizontal = 6.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            BadgeIcon(b.code, b.tier, true, 36)
+                            BadgeArt(b.code, b.tier.coerceAtLeast(1), 44, count = b.count)
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                b.name + if (b.count > 1) " ×${b.count}" else "",
+                                badgeName(b.code, b.name).let { if (b.count > 1) str(R.string.badge_name_count, it, b.count) else it },
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.Center,
@@ -615,7 +525,7 @@ fun ProfileSheet(profile: PublicProfile, onReport: () -> Unit, onDismiss: () -> 
                 }
             }
             Spacer(Modifier.height(8.dp))
-            TextButton(onClick = onReport) { Text("Report this nickname") }
+            TextButton(onClick = onReport) { Text(str(R.string.rewards_profile_report)) }
         }
     }
 }

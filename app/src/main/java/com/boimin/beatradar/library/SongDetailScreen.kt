@@ -53,6 +53,8 @@ import com.boimin.beatradar.R
 import com.boimin.beatradar.capture.CaptureService
 import com.boimin.beatradar.capture.Monitor
 import com.boimin.beatradar.data.Settings
+import com.boimin.beatradar.i18n.str
+import com.boimin.beatradar.i18n.strPlural
 import com.boimin.beatradar.net.SongDetail
 import com.boimin.beatradar.net.SongSummary
 import com.boimin.beatradar.net.TempoVotes
@@ -76,15 +78,15 @@ internal fun SongDetailScreen(state: DetailState, vm: LibraryViewModel, actions:
     val song = state.song
     Column(modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(52.dp), verticalAlignment = Alignment.CenterVertically) {
-            BarIcon(R.drawable.ic_arrow_back, "Back", 24, MaterialTheme.colorScheme.onSurface, vm::close)
+            BarIcon(R.drawable.ic_arrow_back, str(R.string.library_back), 24, MaterialTheme.colorScheme.onSurface, vm::close)
             Spacer(Modifier.weight(1f))
             if (song != null) {
-                BarIcon(R.drawable.ic_share, "Share", 22, Tone.text2) { actions.share(song.summary()) }
+                BarIcon(R.drawable.ic_share, str(R.string.library_share), 22, Tone.text2) { actions.share(song.summary()) }
                 Spacer(Modifier.width(4.dp))
                 Box {
-                    BarIcon(R.drawable.ic_more, "More", 22, Tone.text2) { menu = true }
+                    BarIcon(R.drawable.ic_more, str(R.string.library_more), 22, Tone.text2) { menu = true }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(text = { Text("Report this song") }, onClick = { menu = false; reporting = "wrong_bpm" })
+                        DropdownMenuItem(text = { Text(str(R.string.song_report)) }, onClick = { menu = false; reporting = "wrong_bpm" })
                     }
                 }
             }
@@ -103,7 +105,7 @@ internal fun SongDetailScreen(state: DetailState, vm: LibraryViewModel, actions:
                 onFeelsDifferent = { if (song.bpmAlt != null && song.tempoVotes != null) voting = true else reporting = "wrong_bpm" },
             )
             state.loading -> Centered { CircularProgressIndicator() }
-            else -> Message("Couldn't load this song", state.error ?: "", retry = vm::refreshDetail)
+            else -> Message(str(R.string.song_load_failed), state.error ?: "", retry = vm::refreshDetail)
         }
     }
     if (addingToSet && song != null) {
@@ -114,6 +116,7 @@ internal fun SongDetailScreen(state: DetailState, vm: LibraryViewModel, actions:
         val monitor by Monitor.state.collectAsStateWithLifecycle()
         val context = LocalContext.current
         PracticeSheet(
+            songTitle = listOf(song.title, song.artist).filter { it.isNotBlank() }.joinToString(" · "),
             startBpm = song.bpm.roundToInt(),
             listening = monitor.active,
             onStopListening = { CaptureService.send(context, CaptureService.ACTION_STOP) },
@@ -176,12 +179,12 @@ private fun SongPage(
                 when {
                     song.discoveredByMe -> {
                         Spacer(Modifier.height(6.dp))
-                        Text("You added this song to the Library", fontSize = 13.sp, lineHeight = 15.sp, color = Tone.primarySoft)
+                        Text(str(R.string.song_added_by_you), fontSize = 13.sp, lineHeight = 15.sp, color = Tone.primarySoft)
                     }
                     song.broughtInBy != null -> {
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            "Brought in by @${song.broughtInBy}",
+                            str(R.string.song_brought_in_by, song.broughtInBy),
                             fontSize = 13.sp,
                             lineHeight = 15.sp,
                             color = Tone.primarySoft,
@@ -211,18 +214,18 @@ private fun SongPage(
                     color = if (inTarget) inTargetColor() else MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("BPM", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
+                Text(str(R.string.library_bpm), fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
             }
             Spacer(Modifier.height(12.dp))
             Text(confidenceText(song.listeners, song.confirmations), fontSize = 14.sp, lineHeight = 17.sp, color = Tone.text2)
             song.bpmAlt?.let {
                 Spacer(Modifier.height(4.dp))
-                Text("Also heard at ${it.roundToInt()} BPM", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(str(R.string.song_also_heard_at, it.roundToInt()), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (settings.rangeEnabled) {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    if (inTarget) "In your ${settings.minBpm}–${settings.maxBpm} target" else "Outside your ${settings.minBpm}–${settings.maxBpm} target",
+                    if (inTarget) str(R.string.song_in_target, settings.minBpm, settings.maxBpm) else str(R.string.song_outside_target, settings.minBpm, settings.maxBpm),
                     fontSize = 13.sp,
                     lineHeight = 15.sp,
                     color = if (inTarget) inTargetColor() else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -230,8 +233,8 @@ private fun SongPage(
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PillButton(R.drawable.ic_note, "Play a click", Modifier.weight(1f), onClick = onPractise)
-                PillButton(R.drawable.ic_vote, "Feels different?", Modifier.weight(1f), onClick = onFeelsDifferent)
+                PillButton(R.drawable.ic_note, str(R.string.song_play_click), Modifier.weight(1f), onClick = onPractise)
+                PillButton(R.drawable.ic_vote, str(R.string.song_feels_different), Modifier.weight(1f), onClick = onFeelsDifferent)
             }
         }
 
@@ -252,7 +255,7 @@ private fun SongPage(
                 Icon(painterResource(R.drawable.ic_playlist_add), contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    if (inSets.isNotEmpty()) "In ${inSets.size} set${if (inSets.size == 1) "" else "s"}" else "Add to set",
+                    if (inSets.isNotEmpty()) strPlural(R.plurals.song_in_sets, inSets.size, inSets.size) else str(R.string.sets_add_to_set),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
                     color = Color.White,
@@ -277,7 +280,7 @@ private fun SongPage(
                     modifier = Modifier.size(22.dp),
                 )
                 Spacer(Modifier.width(8.dp))
-                Text(if (song.loveCount > 0) "Love · ${compactCount(song.loveCount)}" else "Love", fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                Text(if (song.loveCount > 0) str(R.string.song_love_count, compactCount(song.loveCount)) else str(R.string.song_love), fontSize = 15.sp, fontWeight = FontWeight.Medium)
             }
         }
 
@@ -304,7 +307,7 @@ private fun SongPage(
             val bpm = song.bpm.roundToInt()
             Spacer(Modifier.height(22.dp))
             Text(
-                "More at ${bpm - 2}–${bpm + 2} BPM",
+                str(R.string.song_more_at, bpm - 2, bpm + 2),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -323,9 +326,9 @@ private fun SongPage(
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(s.title, fontSize = 15.sp, lineHeight = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("${s.artist} · ${s.bpm.roundToInt()} BPM", fontSize = 13.sp, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("${s.artist} · ${str(R.string.library_bpm_value, s.bpm.roundToInt())}", fontSize = 13.sp, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    BarIcon(R.drawable.ic_playlist_add, "Add ${s.title} to a set", 22, Tone.primarySoft) { onAddSimilar(s) }
+                    BarIcon(R.drawable.ic_playlist_add, str(R.string.song_add_to_set_description, s.title), 22, Tone.primarySoft) { onAddSimilar(s) }
                 }
             }
         }
@@ -334,10 +337,11 @@ private fun SongPage(
 }
 
 /** "Measured once · needs 2 more to confirm" rather than "100%" from one phone. */
+@Composable
 internal fun confidenceText(listeners: Int, confirmations: Int): String = when {
-    listeners <= 1 -> "Measured once · needs 2 more to confirm"
-    listeners == 2 -> "Measured by 2 people · needs 1 more to confirm"
-    else -> "Confirmed by $confirmations of $listeners listeners"
+    listeners <= 1 -> str(R.string.song_confidence_once)
+    listeners == 2 -> str(R.string.song_confidence_two)
+    else -> strPlural(R.plurals.song_confidence_confirmed, listeners, confirmations, listeners)
 }
 
 private val SERVICES = linkedMapOf("spotify" to "Spotify", "apple_music" to "Apple Music", "youtube" to "YouTube")
@@ -365,10 +369,10 @@ private fun PillButton(icon: Int, label: String, modifier: Modifier, onClick: ()
 private fun TempoVoteDialog(bpm: Float, alt: Float, votes: TempoVotes, onVote: (Float) -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Which tempo feels right?") },
+        title = { Text(str(R.string.song_vote_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Some hear ${bpm.roundToInt()}, some ${alt.roundToInt()}. Which one do you move to?", style = MaterialTheme.typography.bodyMedium)
+                Text(str(R.string.song_vote_body, bpm.roundToInt(), alt.roundToInt()), style = MaterialTheme.typography.bodyMedium)
                 for ((tempo, count) in listOf(bpm to votes.forBpm, alt to votes.forAlt).sortedBy { it.first }) {
                     val mine = votes.myVote != null && abs(votes.myVote - tempo) < 0.5f
                     Row(
@@ -380,24 +384,28 @@ private fun TempoVoteDialog(bpm: Float, alt: Float, votes: TempoVotes, onVote: (
                             .padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("${tempo.roundToInt()} BPM", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        Text(if (mine) "Your vote · $count" else "$count vote${if (count == 1) "" else "s"}", style = MaterialTheme.typography.bodySmall)
+                        Text(str(R.string.library_bpm_value, tempo.roundToInt()), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text(if (mine) str(R.string.song_your_vote, count) else strPlural(R.plurals.song_votes, count, count), style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(str(R.string.song_done)) } },
     )
 }
 
 @Composable
 private fun ReportDialog(initialReason: String, onDismiss: () -> Unit, onSend: (String, String?) -> Unit) {
-    val reasons = listOf("wrong_bpm" to "Wrong BPM", "wrong_title" to "Wrong title or artist", "other" to "Something else")
+    val reasons = listOf(
+        "wrong_bpm" to str(R.string.song_reason_wrong_bpm),
+        "wrong_title" to str(R.string.song_reason_wrong_title),
+        "other" to str(R.string.song_reason_other),
+    )
     var reason by remember { mutableStateOf(initialReason) }
     var note by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Report this song") },
+        title = { Text(str(R.string.song_report)) },
         text = {
             Column {
                 reasons.forEach { (code, label) ->
@@ -414,12 +422,12 @@ private fun ReportDialog(initialReason: String, onDismiss: () -> Unit, onSend: (
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it.take(500) },
-                    label = { Text(if (reason == "wrong_bpm") "The tempo you hear (optional)" else "Details (optional)") },
+                    label = { Text(if (reason == "wrong_bpm") str(R.string.song_note_tempo) else str(R.string.song_note_details)) },
                 )
             }
         },
-        confirmButton = { TextButton(onClick = { onSend(reason, note.trim().ifEmpty { null }) }) { Text("Send") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = { onSend(reason, note.trim().ifEmpty { null }) }) { Text(str(R.string.song_send)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.library_cancel)) } },
     )
 }
 

@@ -64,6 +64,8 @@ import com.boimin.beatradar.data.SetRules
 import com.boimin.beatradar.data.SetSong
 import com.boimin.beatradar.data.SetSummary
 import com.boimin.beatradar.data.Settings
+import com.boimin.beatradar.i18n.str
+import com.boimin.beatradar.i18n.strPlural
 import com.boimin.beatradar.net.SongSummary
 import com.boimin.beatradar.ui.BpmBadge
 import com.boimin.beatradar.ui.theme.Brand
@@ -118,15 +120,15 @@ fun SetsScreen(vm: LibraryViewModel, settings: Settings, actions: LibraryActions
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Group songs by tempo for a run, a workout or a DJ set. Add songs from their page, or start from a playlist.",
+                    str(R.string.sets_intro),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { creating = true }, contentPadding = PaddingValues(horizontal = 14.dp)) { Text("New set") }
-                    OutlinedButton(onClick = { vm.openBuild() }, contentPadding = PaddingValues(horizontal = 14.dp)) { Text("Build me a set") }
+                    Button(onClick = { creating = true }, contentPadding = PaddingValues(horizontal = 14.dp)) { Text(str(R.string.sets_new_set)) }
+                    OutlinedButton(onClick = { vm.openBuild() }, contentPadding = PaddingValues(horizontal = 14.dp)) { Text(str(R.string.sets_build_me_a_set)) }
                 }
-                OutlinedButton(onClick = { vm.openPlaylist() }, contentPadding = PaddingValues(horizontal = 14.dp)) { Text("BPM of a playlist") }
+                OutlinedButton(onClick = { vm.openPlaylist() }, contentPadding = PaddingValues(horizontal = 14.dp)) { Text(str(R.string.playlist_title)) }
             }
         }
         if (sets.isEmpty()) {
@@ -137,9 +139,9 @@ fun SetsScreen(vm: LibraryViewModel, settings: Settings, actions: LibraryActions
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Icon(painterResource(R.drawable.ic_set_add), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
-                    Text("No sets yet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(str(R.string.sets_empty_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text(
-                        "Create one, then open any song in Discover and tap Add to set.",
+                        str(R.string.sets_empty_body),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -151,9 +153,9 @@ fun SetsScreen(vm: LibraryViewModel, settings: Settings, actions: LibraryActions
 
     if (creating) {
         NameDialog(
-            title = "New set",
+            title = str(R.string.sets_new_set),
             initial = "",
-            confirm = "Create",
+            confirm = str(R.string.sets_create),
             onDismiss = { creating = false },
             onSave = { name ->
                 creating = false
@@ -185,7 +187,7 @@ private fun SetCard(set: SetSummary, onClick: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(set.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                "${set.songs} song${if (set.songs == 1) "" else "s"} · ${SetRules.span(set.minBpm, set.maxBpm)}",
+                "${strPlural(R.plurals.sets_song_count, set.songs, set.songs)} · ${bpmSpan(set.minBpm, set.maxBpm)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -220,7 +222,7 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
                     val q = vm.youtubeQueue(songs.drop(from).map { it.slug })
                     actions.openUrl(
                         q?.url ?: ("https://www.youtube.com/results?search_query=" +
-                            java.net.URLEncoder.encode("${song.artist} ${song.title}", Charsets.UTF_8)),
+                            java.net.URLEncoder.encode("${song.artist} ${song.title}", "UTF-8")),
                     )
                 }
             }
@@ -240,7 +242,7 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
                 // Same 52 dp as the top bar it replaces, so the page does not move.
                 Box(Modifier.fillMaxWidth().padding(horizontal = 14.dp).height(52.dp).padding(vertical = 5.dp)) {
                     SelectionBar(selected.size, onCancel = { selected = emptySet() }, modifier = Modifier.fillMaxSize()) {
-                        BarIcon(R.drawable.ic_delete, "Remove selected songs", 22, MaterialTheme.colorScheme.error) {
+                        BarIcon(R.drawable.ic_delete, str(R.string.sets_remove_selected), 22, MaterialTheme.colorScheme.error) {
                             vm.removeSongs(set.id, songs.filter { it.slug in selected })
                             selected = emptySet()
                         }
@@ -249,15 +251,15 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
             } else {
                 // Design: 44 dp touch targets, back at 24 dp, share and ⋮ at 22 dp in the softer text colour.
                 Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(52.dp), verticalAlignment = Alignment.CenterVertically) {
-                    BarIcon(R.drawable.ic_arrow_back, "My sets", 24, MaterialTheme.colorScheme.onSurface, onBack)
+                    BarIcon(R.drawable.ic_arrow_back, str(R.string.sets_my_sets), 24, MaterialTheme.colorScheme.onSurface, onBack)
                     Spacer(Modifier.weight(1f))
-                    BarIcon(R.drawable.ic_share, "Share", 22, Tone.text2) { scope.launch { vm.shareSet(set.id)?.let(actions.shareText) } }
+                    BarIcon(R.drawable.ic_share, str(R.string.library_share), 22, Tone.text2) { scope.launch { vm.shareSet(set.id)?.let(actions.shareText) } }
                     Spacer(Modifier.width(4.dp))
                     Box {
-                        BarIcon(R.drawable.ic_more, "More", 22, Tone.text2) { menu = true }
+                        BarIcon(R.drawable.ic_more, str(R.string.library_more), 22, Tone.text2) { menu = true }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; renaming = true })
-                            DropdownMenuItem(text = { Text("Delete set", color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; deleting = true })
+                            DropdownMenuItem(text = { Text(str(R.string.sets_rename)) }, onClick = { menu = false; renaming = true })
+                            DropdownMenuItem(text = { Text(str(R.string.sets_delete_set), color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; deleting = true })
                         }
                     }
                 }
@@ -269,9 +271,9 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
                 Spacer(Modifier.height(8.dp))
                 Text(
                     listOfNotNull(
-                        "${songs.size} song${if (songs.size == 1) "" else "s"}",
-                        (totalMs / 60_000).takeIf { it > 0 }?.let { (if (allTimed) "" else "about ") + "$it min" },
-                        SetRules.span(set.minBpm, set.maxBpm).takeIf { songs.isNotEmpty() },
+                        strPlural(R.plurals.sets_song_count, songs.size, songs.size),
+                        (totalMs / 60_000).takeIf { it > 0 }?.let { str(if (allTimed) R.string.sets_minutes else R.string.sets_about_minutes, it.toInt()) },
+                        bpmSpan(set.minBpm, set.maxBpm).takeIf { songs.isNotEmpty() },
                     ).joinToString(" · "),
                     fontSize = 15.sp,
                     color = Tone.text2,
@@ -284,8 +286,8 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
                             Spacer(Modifier.width(6.dp))
                         }
                         Text(
-                            if (inTarget == songs.size) "All in your ${settings.minBpm}–${settings.maxBpm} target"
-                            else "$inTarget of ${songs.size} in your ${settings.minBpm}–${settings.maxBpm} target",
+                            if (inTarget == songs.size) str(R.string.sets_all_in_target, settings.minBpm, settings.maxBpm)
+                            else str(R.string.sets_some_in_target, inTarget, songs.size, settings.minBpm, settings.maxBpm),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
                             color = if (inTarget > 0) inTargetColor() else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -306,8 +308,7 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
                         ) {
                             Icon(painterResource(R.drawable.ic_play), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Play set in ", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White)
-                            Text(appName, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White)
+                            Text(str(R.string.sets_play_in, appName), fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White)
                         }
                         Box {
                             Row(
@@ -319,7 +320,7 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
                                     .padding(horizontal = 16.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text("Change", fontSize = 14.sp, color = Tone.text2)
+                                Text(str(R.string.sets_change), fontSize = 14.sp, color = Tone.text2)
                                 Spacer(Modifier.width(4.dp))
                                 Icon(painterResource(R.drawable.ic_expand_more), contentDescription = null, tint = Tone.text2, modifier = Modifier.size(18.dp))
                             }
@@ -340,7 +341,7 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
         if (songs.isEmpty()) {
             item {
                 Text(
-                    "Open any song in Library and tap Add to set to put it here. Songs are sorted by tempo.",
+                    str(R.string.sets_empty_set),
                     fontSize = 13.sp,
                     color = Tone.text3,
                     modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 16.dp),
@@ -364,7 +365,7 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
         if (songs.isNotEmpty()) {
             item {
                 Text(
-                    "Swipe a song left to remove it. Long-press to select several.",
+                    str(R.string.sets_swipe_hint),
                     fontSize = 13.sp,
                     color = Tone.text3,
                     modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 14.dp),
@@ -374,15 +375,15 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
     }
 
     if (renaming) {
-        NameDialog("Rename set", set.name, "Save", onDismiss = { renaming = false }, onSave = { renaming = false; vm.renameSet(set.id, it) })
+        NameDialog(str(R.string.sets_rename_title), set.name, str(R.string.sets_save), onDismiss = { renaming = false }, onSave = { renaming = false; vm.renameSet(set.id, it) })
     }
     if (deleting) {
         AlertDialog(
             onDismissRequest = { deleting = false },
-            title = { Text("Delete “${set.name}”?") },
-            text = { Text("The songs stay in the Library; only this list goes.") },
-            confirmButton = { TextButton(onClick = { deleting = false; vm.deleteSet(set.id); onBack() }) { Text("Delete", color = MaterialTheme.colorScheme.error) } },
-            dismissButton = { TextButton(onClick = { deleting = false }) { Text("Cancel") } },
+            title = { Text(str(R.string.sets_delete_title, set.name)) },
+            text = { Text(str(R.string.sets_delete_body)) },
+            confirmButton = { TextButton(onClick = { deleting = false; vm.deleteSet(set.id); onBack() }) { Text(str(R.string.sets_delete), color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = { deleting = false }) { Text(str(R.string.library_cancel)) } },
         )
     }
 }
@@ -410,7 +411,7 @@ private fun SetSongRow(song: SetSong, inTarget: Boolean, selected: Boolean?, onC
         trailing = if (selected == null) {
             {
                 Spacer(Modifier.width(10.dp))
-                PlayButton("Play ${song.title}", onPlay)
+                PlayButton(str(R.string.sets_play_song, song.title), onPlay)
             }
         } else {
             null
@@ -442,11 +443,11 @@ internal fun AddToSetSheet(song: SongSummary, vm: LibraryViewModel, onDismiss: (
     var newName by rememberSaveable { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetGesturesEnabled = false) {
         Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Add to set", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(str(R.string.sets_add_to_set), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(
-                "${song.title} · ${Math.round(song.bpm)} BPM",
+                "${song.title} · ${str(R.string.library_bpm_value, Math.round(song.bpm))}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -461,7 +462,7 @@ internal fun AddToSetSheet(song: SongSummary, vm: LibraryViewModel, onDismiss: (
                     Column(Modifier.weight(1f)) {
                         Text(set.name, style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            "${set.songs} song${if (set.songs == 1) "" else "s"} · ${SetRules.span(set.minBpm, set.maxBpm)}",
+                            "${strPlural(R.plurals.sets_song_count, set.songs, set.songs)} · ${bpmSpan(set.minBpm, set.maxBpm)}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -472,15 +473,15 @@ internal fun AddToSetSheet(song: SongSummary, vm: LibraryViewModel, onDismiss: (
                 OutlinedTextField(
                     value = newName,
                     onValueChange = { newName = it.take(SetRules.MAX_NAME) },
-                    label = { Text(if (sets.isEmpty()) "Name your first set" else "New set") },
-                    placeholder = { Text("e.g. Morning run") },
+                    label = { Text(if (sets.isEmpty()) str(R.string.sets_name_first_set) else str(R.string.sets_new_set)) },
+                    placeholder = { Text(str(R.string.sets_name_example)) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
                 Button(
                     onClick = { scope.launch { vm.createSet(newName, song) }; newName = "" },
                     enabled = SetRules.cleanName(newName) != null,
-                ) { Text("Create") }
+                ) { Text(str(R.string.sets_create)) }
             }
         }
     }
@@ -496,12 +497,12 @@ private fun NameDialog(title: String, initial: String, confirm: String, onDismis
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it.take(SetRules.MAX_NAME) },
-                placeholder = { Text("e.g. Morning run 160–170") },
+                placeholder = { Text(str(R.string.sets_name_example_range)) },
                 singleLine = true,
             )
         },
         confirmButton = { TextButton(onClick = { onSave(name) }, enabled = SetRules.cleanName(name) != null) { Text(confirm) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.library_cancel)) } },
     )
 }
 

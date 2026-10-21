@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Badge glyph, drawn white and tinted by BadgeArt. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <group android:translateX="1" android:translateY="3" android:scaleX="0.23" android:scaleY="0.23">
+        <path android:pathData="M13,60 C10,52 11,44 15,38 C17,36 20,36 21,38 C24,43 30,45 36,42 L42,35 C44,33 47,33 48,35 C51,42 57,47 66,50 C73,52 79,55 81,59 C82,61 81,62 79,62 L13,61 Z" android:fillColor="#FFFFFFFF" />
+        <path android:pathData="M9,59 L80,61.5 C83,61.5 85,60 86,58.5 C87,63 84,69 77,70 L18,70 C12,70 8,66 9,59 Z" android:fillColor="#FFFFFFFF" />
+    </group>
+    <path android:pathData="M15.53,11.53a3.5,3.5 0 0,1 4.95,0" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8"
+        android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" />
+    <path android:pathData="M13.76,9.76a6,6 0 0,1 8.49,0" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" android:strokeAlpha="0.6"
+        android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" />
+</vector>

@@ -14,6 +14,8 @@ import com.boimin.beatradar.data.PrintUpload
 import com.boimin.beatradar.data.Recap
 import com.boimin.beatradar.data.RecapCalc
 import com.boimin.beatradar.data.Settings
+import com.boimin.beatradar.R
+import com.boimin.beatradar.i18n.str
 import com.boimin.beatradar.data.SyncState
 import com.boimin.beatradar.meta.NowPlayingListener
 import com.boimin.beatradar.meta.SongNamer
@@ -99,10 +101,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     getApplication<Application>().app.requestSync()
                 } else {
-                    _message.value = "That suggestion is no longer available"
+                    _message.value = getApplication<Application>().str(R.string.main_suggestion_gone)
                 }
             } catch (e: ApiException) {
-                _message.value = LibraryViewModel.describe(e)
+                _message.value = LibraryViewModel.describe(getApplication(), e)
             }
         }
     }
@@ -113,7 +115,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 getApplication<Application>().app.sync.rejectSuggestion(entry.id)
             } catch (e: ApiException) {
-                _message.value = LibraryViewModel.describe(e)
+                _message.value = LibraryViewModel.describe(getApplication(), e)
             }
         }
     }

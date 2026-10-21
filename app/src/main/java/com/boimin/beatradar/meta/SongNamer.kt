@@ -47,7 +47,8 @@ object SongNamer {
             }
             val same = dao.findByKey(key, excludeId = entryId) ?: return@withTransaction entryId
             // Keep the older entry and add this one's plays to it.
-            val (keep, drop) = if (same.id < entryId) same to dao.byId(entryId)!! else dao.byId(entryId)!! to same
+            val self = dao.byId(entryId) ?: return@withTransaction null
+            val (keep, drop) = if (same.id < entryId) same to self else self to same
             dao.absorb(keep.id, drop.timestamp, drop.playCount, drop.inRange)
             dao.movePrints(drop.id, keep.id)
             if (NameSource.shouldReplace(keep.nameSource, source) || (manual && keep.id != entryId)) {

@@ -18,6 +18,7 @@ import com.boimin.beatradar.R
 import com.boimin.beatradar.capture.CaptureService
 import com.boimin.beatradar.capture.Monitor
 import com.boimin.beatradar.capture.MonitorStatus
+import com.boimin.beatradar.i18n.str
 import kotlin.math.roundToInt
 
 /** Quick Settings tile: start or stop listening from the notification shade, with the live BPM as its subtitle. */
@@ -58,13 +59,13 @@ class ListenTile : TileService() {
         val tile = qsTile ?: return
         val s = Monitor.state.value
         tile.state = if (s.active) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-        tile.label = getString(R.string.tile_label)
+        tile.label = str(R.string.tile_label)
         tile.icon = Icon.createWithResource(this, R.drawable.ic_stat_beat)
         tile.subtitle = when {
-            s.status == MonitorStatus.LISTENING && s.bpm != null -> "${s.bpm.roundToInt()} BPM"
-            s.status == MonitorStatus.LISTENING -> "Listening"
-            s.status == MonitorStatus.PAUSED -> "Paused"
-            else -> "Off"
+            s.status == MonitorStatus.LISTENING && s.bpm != null -> str(R.string.tile_bpm, s.bpm.roundToInt())
+            s.status == MonitorStatus.LISTENING -> str(R.string.tile_listening)
+            s.status == MonitorStatus.PAUSED -> str(R.string.tile_paused)
+            else -> str(R.string.tile_off)
         }
         tile.updateTile()
     }

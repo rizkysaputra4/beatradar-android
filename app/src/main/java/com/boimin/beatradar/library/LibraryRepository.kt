@@ -1,5 +1,7 @@
 package com.boimin.beatradar.library
 
+import androidx.annotation.StringRes
+import com.boimin.beatradar.R
 import com.boimin.beatradar.account.AccountRepository
 import com.boimin.beatradar.dsp.Landmark
 import com.boimin.beatradar.net.BoardView
@@ -36,12 +38,12 @@ import com.boimin.beatradar.net.SongDetail
 import com.boimin.beatradar.net.SongPage
 
 /** How the Library list is ordered (`sort` on `GET /v1/songs`). */
-enum class SongSort(val api: String, val label: String) {
-    POPULAR("popular", "Popular"),
-    CONFIRMED("confirmed", "Confirmed"),
-    LOVED("loved", "Most loved"),
-    RECENT("recent", "New"),
-    BPM("bpm", "BPM"),
+enum class SongSort(val api: String, @StringRes val label: Int) {
+    POPULAR("popular", R.string.library_sort_popular),
+    CONFIRMED("confirmed", R.string.library_sort_confirmed),
+    LOVED("loved", R.string.library_sort_most_loved),
+    RECENT("recent", R.string.library_sort_new),
+    BPM("bpm", R.string.library_sort_bpm),
 }
 
 data class SongQuery(

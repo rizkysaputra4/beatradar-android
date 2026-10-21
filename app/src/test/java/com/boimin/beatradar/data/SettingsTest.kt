@@ -62,8 +62,8 @@ class SettingsTest {
         assertEquals("Morning run", SetRules.cleanName("  Morning   run "))
         assertEquals(null, SetRules.cleanName("   "))
         assertEquals(SetRules.MAX_NAME, SetRules.cleanName("x".repeat(100))!!.length)
-        assertEquals("No songs yet", SetRules.span(null, null))
-        assertEquals("124 BPM", SetRules.span(124.2f, 123.8f))
-        assertEquals("118–128 BPM", SetRules.span(118f, 128.4f))
+        assertEquals(null, SetRules.spanBpm(null, null))
+        assertEquals(124..124, SetRules.spanBpm(124.2f, 123.8f))
+        assertEquals(118..128, SetRules.spanBpm(118f, 128.4f))
     }
 }

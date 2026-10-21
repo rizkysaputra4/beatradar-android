@@ -96,7 +96,7 @@
         <service
             android:name=".capture.CaptureService"
             android:exported="false"
-            android:foregroundServiceType="microphone" />
+            android:foregroundServiceType="microphone|shortService" />
 
         <service
             android:name=".meta.NowPlayingListener"

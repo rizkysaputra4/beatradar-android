@@ -41,7 +41,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.boimin.beatradar.R
 import com.boimin.beatradar.data.Settings
+import com.boimin.beatradar.i18n.str
+import com.boimin.beatradar.i18n.strPlural
 import com.boimin.beatradar.net.PlaylistTrack
 import com.boimin.beatradar.ui.BpmBadge
 import kotlinx.coroutines.launch
@@ -65,7 +68,7 @@ internal fun PlaylistScreen(state: PlaylistState, vm: LibraryViewModel, settings
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item {
-            TextButton(onClick = vm::closePlaylist) { Text("‹ My sets") }
+            TextButton(onClick = vm::closePlaylist) { Text(str(R.string.sets_back)) }
         }
         item {
             Column(
@@ -77,9 +80,9 @@ internal fun PlaylistScreen(state: PlaylistState, vm: LibraryViewModel, settings
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("BPM of a playlist", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(str(R.string.playlist_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(
-                    "Paste a public Spotify, YouTube or YouTube Music playlist link, or share one to BeatRadar from that app.",
+                    str(R.string.playlist_body),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -93,7 +96,7 @@ internal fun PlaylistScreen(state: PlaylistState, vm: LibraryViewModel, settings
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Button(onClick = { vm.lookupPlaylist(link) }, enabled = link.isNotBlank() && !state.loading) {
-                    Text(if (state.loading) "Reading the playlist…" else "Get the BPMs")
+                    Text(if (state.loading) str(R.string.playlist_reading) else str(R.string.playlist_get))
                 }
                 state.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
             }
@@ -104,10 +107,13 @@ internal fun PlaylistScreen(state: PlaylistState, vm: LibraryViewModel, settings
         if (result != null) {
             item {
                 Column(Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(result.name ?: "Playlist", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    val name = result.name ?: str(R.string.playlist_default_name)
+                    Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        "${result.matched} of ${result.total} songs have a BPM" +
-                            (if (measured.isNotEmpty()) " · ${measured.count { settings.inTarget(it.song!!.bpm) }} in your target" else ""),
+                        listOfNotNull(
+                            strPlural(R.plurals.playlist_matched, result.total, result.matched, result.total),
+                            if (measured.isNotEmpty()) str(R.string.playlist_in_target, measured.count { settings.inTarget(it.song!!.bpm) }) else null,
+                        ).joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -115,11 +121,11 @@ internal fun PlaylistScreen(state: PlaylistState, vm: LibraryViewModel, settings
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = {
                                 scope.launch {
-                                    vm.createSetWith(result.name ?: "Playlist", measured.mapNotNull { it.song })?.let(onSaved)
+                                    vm.createSetWith(name, measured.mapNotNull { it.song })?.let(onSaved)
                                 }
-                            }) { Text("Save as set") }
+                            }) { Text(str(R.string.sets_save_as_set)) }
                             Spacer(Modifier.weight(1f))
-                            TextButton(onClick = { byBpm = !byBpm }) { Text(if (byBpm) "Sorted by BPM" else "Playlist order") }
+                            TextButton(onClick = { byBpm = !byBpm }) { Text(if (byBpm) str(R.string.playlist_sorted_bpm) else str(R.string.playlist_order)) }
                         }
                     }
                 }
@@ -130,9 +136,9 @@ internal fun PlaylistScreen(state: PlaylistState, vm: LibraryViewModel, settings
             if (unmeasured.isNotEmpty()) {
                 item {
                     Column(Modifier.padding(top = 10.dp)) {
-                        Text("NOT MEASURED YET", fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(str(R.string.playlist_not_measured), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            "Play these near BeatRadar to add their tempo to the Library, for you and everyone else.",
+                            str(R.string.playlist_not_measured_body),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -170,7 +176,7 @@ private fun TrackRow(track: PlaylistTrack, inTarget: Boolean, onClick: (() -> Un
         if (song != null) {
             BpmBadge(song.bpm, inTarget)
         } else {
-            Text("? BPM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(str(R.string.playlist_unknown_bpm), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

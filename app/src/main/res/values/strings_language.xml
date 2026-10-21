@@ -1,0 +1,18 @@
+<resources>
+    <!-- Settings → Language (i18n/LanguageSheet.kt) -->
+    <string name="language_title">Language</string>
+    <string name="language_subtitle">Pick the language BeatRadar shows. Only the one you use is kept on your phone.</string>
+    <string name="language_follow_phone">Follow phone language</string>
+    <string name="language_phone_unavailable">%1$s isn\'t available yet, so BeatRadar shows English.</string>
+    <string name="language_all">All languages</string>
+    <string name="language_built_in">Built in</string>
+    <string name="language_downloading_rest">Downloading the rest · %1$d of %2$d parts</string>
+    <string name="language_search">Search languages</string>
+    <string name="language_no_match">No language matches that.</string>
+    <string name="language_done">Done</string>
+    <string name="language_retry">Try again</string>
+    <string name="language_offline">No connection. Connect to download this language.</string>
+    <string name="language_unavailable">This language isn\'t available yet.</string>
+    <string name="language_list_failed">More languages show here when you\'re online.</string>
+    <string name="language_list_error">Couldn\'t load other languages. Try again later.</string>
+</resources>

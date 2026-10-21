@@ -15,10 +15,10 @@ android {
         targetSdk = 37
         versionCode = 2
         versionName = "0.2.0"
-        // TODO: the Web OAuth client id from the Google Cloud project (the server checks tokens against it).
-        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"REPLACE_ME.apps.googleusercontent.com\"")
-        // TODO: the share-link domain is not decided yet (PLAN section 11.2). Also used for App Links.
-        val shareHost = "beatradar.example"
+        // The Web OAuth client id (Google Cloud): sign-in asks for tokens for it, and the server checks them against it.
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"1073093330874-h92fun5sei8rcitlf67jv2s5s9ip7if8.apps.googleusercontent.com\"")
+        // The public site: share links (/s/…, /set/…), also used for App Links.
+        val shareHost = "findbeatradar.com"
         buildConfigField("String", "SHARE_HOST", "\"$shareHost\"")
         manifestPlaceholders["shareHost"] = shareHost
         // TODO: the Google Cloud project number linked in Play Console (Play Integrity). 0 = skip the check.
@@ -33,8 +33,8 @@ android {
             buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
         }
         release {
-            // TODO: the production domain is not decided yet (PLAN section 11.2).
-            buildConfigField("String", "API_BASE_URL", "\"https://api.beatradar.example/\"")
+            // The API on its own name, so the website can move elsewhere later without an app update.
+            buildConfigField("String", "API_BASE_URL", "\"https://api.findbeatradar.com/\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

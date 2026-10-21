@@ -37,7 +37,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.boimin.beatradar.R
 import com.boimin.beatradar.data.Settings
+import com.boimin.beatradar.i18n.str
+import com.boimin.beatradar.i18n.strPlural
 import com.boimin.beatradar.net.SongSummary
 import com.boimin.beatradar.ui.BpmBadge
 import com.boimin.beatradar.ui.theme.brandSwitchColors
@@ -53,7 +56,7 @@ internal fun SharedSetScreen(state: SharedSetState, vm: LibraryViewModel, settin
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item { TextButton(onClick = vm::closeSharedSet) { Text("‹ My sets") } }
+        item { TextButton(onClick = vm::closeSharedSet) { Text(str(R.string.sets_back)) } }
         when {
             set != null -> {
                 item {
@@ -61,12 +64,15 @@ internal fun SharedSetScreen(state: SharedSetState, vm: LibraryViewModel, settin
                         Text(set.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         val sorted = set.songs.sortedBy { it.bpm }
                         Text(
-                            "${set.songs.size} songs · ${com.boimin.beatradar.data.SetRules.span(sorted.firstOrNull()?.bpm, sorted.lastOrNull()?.bpm)}" +
-                                (set.sharedBy?.let { " · shared by $it" } ?: ""),
+                            listOfNotNull(
+                                strPlural(R.plurals.sets_song_count, set.songs.size, set.songs.size),
+                                bpmSpan(sorted.firstOrNull()?.bpm, sorted.lastOrNull()?.bpm),
+                                set.sharedBy?.let { str(R.string.sets_shared_by, it) },
+                            ).joinToString(" · "),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Button(onClick = { scope.launch { vm.createSetWith(set.name, set.songs)?.let(onSaved) } }) { Text("Copy this set") }
+                        Button(onClick = { scope.launch { vm.createSetWith(set.name, set.songs)?.let(onSaved) } }) { Text(str(R.string.sets_copy)) }
                     }
                 }
                 items(set.songs.sortedBy { it.bpm }, key = { it.slug }) { s ->
@@ -92,33 +98,33 @@ internal fun BuildSetScreen(state: BuildState, vm: LibraryViewModel, settings: S
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item { TextButton(onClick = vm::closeBuild) { Text("‹ My sets") } }
+        item { TextButton(onClick = vm::closeBuild) { Text(str(R.string.sets_back)) } }
         item {
             Card {
-                Text("Build me a set", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(str(R.string.sets_build_me_a_set), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(
-                    "Well-confirmed songs at your target ${range.first}–${range.last} BPM. Change the target on the Listen tab.",
+                    str(R.string.sets_build_body, range.first, range.last),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (m in listOf(15, 30, 45, 60)) {
-                        Chip("$m min", selected = minutes == m, modifier = Modifier.weight(1f)) { minutes = m }
+                        Chip(str(R.string.sets_minutes, m), selected = minutes == m, modifier = Modifier.weight(1f)) { minutes = m }
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Only songs I've heard", style = MaterialTheme.typography.bodyMedium)
-                        Text("Songs this phone measured", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(str(R.string.sets_only_heard), style = MaterialTheme.typography.bodyMedium)
+                        Text(str(R.string.sets_only_heard_body), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = onlyMine, onCheckedChange = { onlyMine = it }, colors = brandSwitchColors())
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { vm.runBuild(range, settings.halfDoubleMatch, minutes, onlyMine) }, enabled = !state.loading) {
-                        Text(if (state.loading) "Building…" else "Build")
+                        Text(if (state.loading) str(R.string.sets_building) else str(R.string.sets_build))
                     }
                     if (result != null && result.songs.isNotEmpty()) {
-                        TextButton(onClick = { vm.runBuild(range, settings.halfDoubleMatch, minutes, onlyMine, again = true) }) { Text("Try another mix") }
+                        TextButton(onClick = { vm.runBuild(range, settings.halfDoubleMatch, minutes, onlyMine, again = true) }) { Text(str(R.string.sets_try_another)) }
                     }
                 }
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
@@ -131,20 +137,21 @@ internal fun BuildSetScreen(state: BuildState, vm: LibraryViewModel, settings: S
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         when {
-                            result.songs.isEmpty() -> "No songs in the Library at this tempo yet. Measure some to grow it."
-                            result.totalMs < result.targetMs -> "Found $got of $want minutes: the Library has no more at this tempo yet."
-                            else -> "${result.songs.size} songs · about $got minutes"
+                            result.songs.isEmpty() -> str(R.string.sets_build_empty)
+                            result.totalMs < result.targetMs -> strPlural(R.plurals.sets_build_short, want.toInt(), got, want)
+                            else -> strPlural(R.plurals.sets_build_result, result.songs.size, result.songs.size, got)
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
                     if (result.songs.any { it.estimated }) {
-                        Text("Some lengths are guesses (3:30).", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(str(R.string.sets_estimated), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     if (result.songs.isNotEmpty()) {
+                        val setName = str(R.string.sets_build_name, minutes, range.first, range.last)
                         Button(onClick = {
-                            scope.launch { vm.createSetWith("$minutes min at ${range.first}–${range.last}", result.songs.map { it.summary() })?.let(onSaved) }
-                        }) { Text("Save as set") }
+                            scope.launch { vm.createSetWith(setName, result.songs.map { it.summary() })?.let(onSaved) }
+                        }) { Text(str(R.string.sets_save_as_set)) }
                     }
                 }
             }

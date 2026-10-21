@@ -50,6 +50,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.boimin.beatradar.R
 import com.boimin.beatradar.data.SetRules
+import com.boimin.beatradar.i18n.str
+import com.boimin.beatradar.i18n.strPlural
 import com.boimin.beatradar.net.SongSummary
 import com.boimin.beatradar.ui.BpmBadge
 import kotlinx.coroutines.launch
@@ -116,7 +118,7 @@ internal fun SelectTile(sizeDp: Int, cornerDp: Int) {
             .background(MaterialTheme.colorScheme.primary),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(painterResource(R.drawable.ic_check), contentDescription = "Selected", tint = Color.White, modifier = Modifier.size(24.dp))
+        Icon(painterResource(R.drawable.ic_check), contentDescription = str(R.string.library_selected), tint = Color.White, modifier = Modifier.size(24.dp))
     }
 }
 
@@ -149,7 +151,7 @@ internal fun SwipeToDelete(onDelete: () -> Unit, enabled: Boolean = true, conten
                     .padding(horizontal = 20.dp),
                 contentAlignment = Alignment.CenterEnd,
             ) {
-                Icon(painterResource(R.drawable.ic_delete), contentDescription = "Remove", tint = MaterialTheme.colorScheme.onError)
+                Icon(painterResource(R.drawable.ic_delete), contentDescription = str(R.string.library_remove), tint = MaterialTheme.colorScheme.onError)
             }
         },
     ) { content() }
@@ -178,9 +180,9 @@ internal fun SelectionBar(count: Int, onCancel: () -> Unit, modifier: Modifier =
                 .padding(horizontal = 12.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text("Cancel", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
+            Text(str(R.string.library_cancel), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
         }
-        Text("$count selected", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        Text(strPlural(R.plurals.library_selected_count, count, count), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
         action()
     }
 }
@@ -209,9 +211,9 @@ internal fun AddManyToSetSheet(songs: List<SongSummary>, vm: LibraryViewModel, o
     val sets by vm.sets.collectAsStateWithLifecycle()
     var newName by rememberSaveable { mutableStateOf("") }
     val scope = rememberCoroutineScope()
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetGesturesEnabled = false) {
         Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Add ${songs.size} song${if (songs.size == 1) "" else "s"} to a set", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(strPlural(R.plurals.sets_add_songs_title, songs.size, songs.size), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             sets.forEach { set ->
                 Row(
                     Modifier
@@ -229,7 +231,7 @@ internal fun AddManyToSetSheet(songs: List<SongSummary>, vm: LibraryViewModel, o
                     Column(Modifier.weight(1f)) {
                         Text(set.name, style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            "${set.songs} song${if (set.songs == 1) "" else "s"} · ${SetRules.span(set.minBpm, set.maxBpm)}",
+                            "${strPlural(R.plurals.sets_song_count, set.songs, set.songs)} · ${bpmSpan(set.minBpm, set.maxBpm)}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -240,7 +242,7 @@ internal fun AddManyToSetSheet(songs: List<SongSummary>, vm: LibraryViewModel, o
                 OutlinedTextField(
                     value = newName,
                     onValueChange = { newName = it.take(SetRules.MAX_NAME) },
-                    label = { Text(if (sets.isEmpty()) "Name your first set" else "New set") },
+                    label = { Text(if (sets.isEmpty()) str(R.string.sets_name_first_set) else str(R.string.sets_new_set)) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
@@ -250,8 +252,15 @@ internal fun AddManyToSetSheet(songs: List<SongSummary>, vm: LibraryViewModel, o
                         scope.launch { if (vm.createSetWith(name, songs) != null) onDone(SetRules.cleanName(name) ?: name) }
                     },
                     enabled = SetRules.cleanName(newName) != null,
-                ) { Text("Create") }
+                ) { Text(str(R.string.sets_create)) }
             }
         }
     }
+}
+
+/** A set's tempo span ("118–128 BPM", "124 BPM", or "No songs yet"), as [SetRules.span] in the app's language. */
+@Composable
+internal fun bpmSpan(min: Float?, max: Float?): String {
+    val span = SetRules.spanBpm(min, max) ?: return str(R.string.library_no_songs_yet)
+    return if (span.first == span.last) str(R.string.library_bpm_value, span.first) else str(R.string.library_bpm_range, span.first, span.last)
 }

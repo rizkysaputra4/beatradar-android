@@ -16,6 +16,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.boimin.beatradar.R
+import com.boimin.beatradar.i18n.str
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "beat_log", indices = [Index("timestamp"), Index("matchKey")])
@@ -56,6 +58,10 @@ data class BeatLogEntry(
     @Embedded(prefix = "sug") val suggestion: NameSuggestion? = null,
 ) {
     val label: String get() = title ?: placeholderNo?.let { "Song #$it" } ?: "Unknown song"
+
+    /** [label] in the app's language, for anything the user sees. */
+    fun label(context: Context): String =
+        title ?: placeholderNo?.let { context.str(R.string.data_song_placeholder, it) } ?: context.str(R.string.data_unknown_song)
 }
 
 /** "Is this <title> – <artist>?" from the server (PLAN §5c). [state]: `candidate` or `trusted`. */

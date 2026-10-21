@@ -1,9 +1,13 @@
 package com.boimin.beatradar.library
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.boimin.beatradar.R
 import com.boimin.beatradar.app
+import com.boimin.beatradar.i18n.str
+import com.boimin.beatradar.i18n.strPlural
 import com.boimin.beatradar.net.ApiException
 import com.boimin.beatradar.net.BuildIn
 import com.boimin.beatradar.net.BuiltSet
@@ -83,6 +87,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     private val repo = application.app.library
     private val setDao = application.app.database.sets()
     private val signedIn: Boolean get() = getApplication<Application>().app.account.user.value != null
+    private val context: Context get() = getApplication()
+
+    private fun describe(e: ApiException): String = describe(context, e)
 
     /** A set changed: signed in, it goes to the account backup soon. */
     private fun setsChanged() {
@@ -149,7 +156,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             songs.forEach { setDao.remove(setId, it.slug, now) }
             setsChanged()
             _undo.value = Undoable(
-                if (songs.size == 1) "Removed “${songs[0].title}”" else "Removed ${songs.size} songs",
+                if (songs.size == 1) context.str(R.string.sets_removed_one, songs[0].title) else context.strPlural(R.plurals.sets_removed, songs.size, songs.size),
             ) {
                 viewModelScope.launch {
                     setDao.insertSongs(songs)
@@ -194,13 +201,13 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         val set = setDao.byId(setId) ?: return null
         val songs = setDao.songs(setId)
         if (songs.isEmpty()) {
-            _message.value = "Add songs before sharing the set"
+            _message.value = context.str(R.string.sets_add_before_share)
             return null
         }
         return try {
             val out = repo.shareSet(set.syncId, set.name, songs.map { it.slug })
             setDao.setShareSlug(setId, out.slug)
-            "${set.name} · ${SetRules.span(songs.minOf { it.bpm }, songs.maxOf { it.bpm })} on BeatRadar ${out.url}"
+            context.str(R.string.sets_share_text, set.name, SetRules.span(context, songs.minOf { it.bpm }, songs.maxOf { it.bpm }), out.url)
         } catch (e: ApiException) {
             _message.value = describe(e)
             null
@@ -221,7 +228,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             _sharedSet.value = try {
                 SharedSetState(slug, set = repo.sharedSet(slug))
             } catch (e: ApiException) {
-                SharedSetState(slug, error = if (e.http == 404) "This shared set doesn't exist anymore" else describe(e))
+                SharedSetState(slug, error = if (e.http == 404) context.str(R.string.sets_shared_missing) else describe(e))
             }
         }
     }
@@ -483,7 +490,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             _message.value = try {
                 repo.report(slug, reason, note)
-                "Thanks, the report was sent"
+                context.str(R.string.library_report_sent)
             } catch (e: ApiException) {
                 describe(e)
             }
@@ -495,7 +502,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             try {
                 _profile.value = repo.profile(nickname)
             } catch (e: ApiException) {
-                _message.value = if (e.http == 404) "This profile is hidden" else describe(e)
+                _message.value = if (e.http == 404) context.str(R.string.library_profile_hidden) else describe(e)
             }
         }
     }
@@ -508,7 +515,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             _message.value = try {
                 repo.reportNickname(nickname, null)
-                "Thanks, the nickname was reported"
+                context.str(R.string.library_nickname_reported)
             } catch (e: ApiException) {
                 describe(e)
             }
@@ -525,13 +532,15 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     companion object {
-        fun describe(e: ApiException): String = when {
-            e.offline -> "You're offline"
-            e.code == "sign_in_required" -> "Sign in first"
-            e.http == 404 -> "Not found"
-            e.http == 429 -> "Too many requests. Try again in a minute."
-            e.http >= 500 -> "The Library is having trouble. Try again later."
+        /** The user's words for a failed call: the app's own for common cases, else the server's message. */
+        fun describe(context: Context, e: ApiException): String = when {
+            e.offline -> context.str(R.string.library_offline)
+            e.code == "sign_in_required" -> context.str(R.string.library_error_sign_in)
+            e.http == 404 -> context.str(R.string.library_error_not_found)
+            e.http == 429 -> context.str(R.string.library_error_too_many)
+            e.http >= 500 -> context.str(R.string.library_error_server)
             else -> e.message
         }
+
     }
 }

@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Library: shared words (bars, units, buttons) -->
+    <string name="library_back">Back</string>
+    <string name="library_share">Share</string>
+    <string name="library_more">More</string>
+    <string name="library_cancel">Cancel</string>
+    <string name="library_remove">Remove</string>
+    <string name="library_selected">Selected</string>
+    <string name="library_try_again">Try again</string>
+    <string name="library_bpm">BPM</string>
+    <string name="library_bpm_value">%1$d BPM</string>
+    <string name="library_bpm_range">%1$d–%2$d BPM</string>
+    <string name="library_no_songs_yet">No songs yet</string>
+    <plurals name="library_selected_count">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
+
+    <!-- Library: errors and snackbar messages (LibraryViewModel) -->
+    <string name="library_offline">You\'re offline</string>
+    <string name="library_error_sign_in">Sign in first</string>
+    <string name="library_error_not_found">Not found</string>
+    <string name="library_error_too_many">Too many requests. Try again in a minute.</string>
+    <string name="library_error_server">The Library is having trouble. Try again later.</string>
+    <string name="library_report_sent">Thanks, the report was sent</string>
+    <string name="library_profile_hidden">This profile is hidden</string>
+    <string name="library_nickname_reported">Thanks, the nickname was reported</string>
+
+    <!-- Library: Discover list (LibraryScreen) -->
+    <string name="library_search_hint">Search public tempo library…</string>
+    <string name="library_sign_in_prompt">Sign in to love songs and back up your log →</string>
+    <string name="library_load_failed">Couldn\'t load the Library</string>
+    <string name="library_offline_body">BeatRadar keeps counting offline. The Library needs a connection.</string>
+    <string name="library_empty_title">No songs here yet</string>
+    <string name="library_empty_filtered">Try another search or tempo.</string>
+    <string name="library_empty_body">Songs appear as people measure them.</string>
+    <string name="library_most_confirmed_here">MOST CONFIRMED AT THIS TEMPO</string>
+    <string name="library_trending_here">TRENDING AT THIS TEMPO</string>
+    <string name="library_error_retry">%1$s · Retry</string>
+    <string name="library_bpm_artist">%1$d BPM · %2$s</string>
+    <string name="library_any_tempo">Any tempo</string>
+    <string name="library_genre">Genre</string>
+    <string name="library_any_genre">Any genre</string>
+    <string name="library_decade">Decade</string>
+    <string name="library_decade_value">%1$ds</string>
+    <string name="library_any_decade">Any decade</string>
+    <string name="library_loved">♥ Loved</string>
+    <string name="library_filter_tempo">Filter Tempo: %1$d–%2$d BPM</string>
+    <string name="library_sort_popular">Popular</string>
+    <string name="library_sort_confirmed">Confirmed</string>
+    <string name="library_sort_most_loved">Most loved</string>
+    <string name="library_sort_new">New</string>
+    <string name="library_sort_bpm">BPM</string>
+    <plurals name="library_added_to_set">
+        <item quantity="one">Added %1$d song to “%2$s”</item>
+        <item quantity="other">Added %1$d songs to “%2$s”</item>
+    </plurals>
+
+    <!-- Song page (SongDetailScreen) -->
+    <string name="song_report">Report this song</string>
+    <string name="song_load_failed">Couldn\'t load this song</string>
+    <string name="song_added_by_you">You added this song to the Library</string>
+    <string name="song_brought_in_by">Brought in by @%1$s</string>
+    <string name="song_also_heard_at">Also heard at %1$d BPM</string>
+    <string name="song_in_target">In your %1$d–%2$d target</string>
+    <string name="song_outside_target">Outside your %1$d–%2$d target</string>
+    <string name="song_play_click">Play a click</string>
+    <string name="song_feels_different">Feels different?</string>
+    <plurals name="song_in_sets">
+        <item quantity="one">In %1$d set</item>
+        <item quantity="other">In %1$d sets</item>
+    </plurals>
+    <string name="song_love">Love</string>
+    <string name="song_love_count">Love · %1$s</string>
+    <string name="song_more_at">More at %1$d–%2$d BPM</string>
+    <string name="song_add_to_set_description">Add %1$s to a set</string>
+    <string name="song_confidence_once">Measured once · needs 2 more to confirm</string>
+    <string name="song_confidence_two">Measured by 2 people · needs 1 more to confirm</string>
+    <plurals name="song_confidence_confirmed">
+        <item quantity="one">Confirmed by %1$d of %2$d listener</item>
+        <item quantity="other">Confirmed by %1$d of %2$d listeners</item>
+    </plurals>
+    <string name="song_vote_title">Which tempo feels right?</string>
+    <string name="song_vote_body">Some hear %1$d, some %2$d. Which one do you move to?</string>
+    <string name="song_your_vote">Your vote · %1$d</string>
+    <plurals name="song_votes">
+        <item quantity="one">%1$d vote</item>
+        <item quantity="other">%1$d votes</item>
+    </plurals>
+    <string name="song_done">Done</string>
+    <string name="song_reason_wrong_bpm">Wrong BPM</string>
+    <string name="song_reason_wrong_title">Wrong title or artist</string>
+    <string name="song_reason_other">Something else</string>
+    <string name="song_note_tempo">The tempo you hear (optional)</string>
+    <string name="song_note_details">Details (optional)</string>
+    <string name="song_send">Send</string>
+
+    <!-- Song counters (SongCounters) -->
+    <plurals name="song_counters_description">
+        <item quantity="one">%1$d person measured it, %2$d confirmed</item>
+        <item quantity="other">%1$d people measured it, %2$d confirmed</item>
+    </plurals>
+    <plurals name="song_counters_description_loves">
+        <item quantity="one">%1$d person measured it, %2$d confirmed, %3$d loves</item>
+        <item quantity="other">%1$d people measured it, %2$d confirmed, %3$d loves</item>
+    </plurals>
+    <string name="song_counter_submitted">%1$s submitted</string>
+    <string name="song_counter_confirmed">%1$s confirmed</string>
+
+    <!-- My sets (SetsScreen, SongRows) -->
+    <string name="sets_intro">Group songs by tempo for a run, a workout or a DJ set. Add songs from their page, or start from a playlist.</string>
+    <string name="sets_new_set">New set</string>
+    <string name="sets_build_me_a_set">Build me a set</string>
+    <string name="sets_empty_title">No sets yet</string>
+    <string name="sets_empty_body">Create one, then open any song in Discover and tap Add to set.</string>
+    <string name="sets_create">Create</string>
+    <string name="sets_add_to_set">Add to set</string>
+    <string name="sets_remove_selected">Remove selected songs</string>
+    <string name="sets_my_sets">My sets</string>
+    <string name="sets_rename">Rename</string>
+    <string name="sets_delete_set">Delete set</string>
+    <string name="sets_minutes">%1$d min</string>
+    <string name="sets_about_minutes">about %1$d min</string>
+    <string name="sets_all_in_target">All in your %1$d–%2$d target</string>
+    <string name="sets_some_in_target">%1$d of %2$d in your %3$d–%4$d target</string>
+    <string name="sets_play_in">Play set in %1$s</string>
+    <string name="sets_change">Change</string>
+    <string name="sets_empty_set">Open any song in Library and tap Add to set to put it here. Songs are sorted by tempo.</string>
+    <string name="sets_swipe_hint">Swipe a song left to remove it. Long-press to select several.</string>
+    <string name="sets_rename_title">Rename set</string>
+    <string name="sets_save">Save</string>
+    <string name="sets_delete_title">Delete “%1$s”?</string>
+    <string name="sets_delete_body">The songs stay in the Library; only this list goes.</string>
+    <string name="sets_delete">Delete</string>
+    <string name="sets_play_song">Play %1$s</string>
+    <string name="sets_name_first_set">Name your first set</string>
+    <string name="sets_name_example">e.g. Morning run</string>
+    <string name="sets_name_example_range">e.g. Morning run 160–170</string>
+    <plurals name="sets_song_count">
+        <item quantity="one">%1$d song</item>
+        <item quantity="other">%1$d songs</item>
+    </plurals>
+    <plurals name="sets_add_songs_title">
+        <item quantity="one">Add %1$d song to a set</item>
+        <item quantity="other">Add %1$d songs to a set</item>
+    </plurals>
+    <string name="sets_removed_one">Removed “%1$s”</string>
+    <plurals name="sets_removed">
+        <item quantity="one">Removed %1$d song</item>
+        <item quantity="other">Removed %1$d songs</item>
+    </plurals>
+    <string name="sets_add_before_share">Add songs before sharing the set</string>
+    <string name="sets_share_text">%1$s · %2$s on BeatRadar %3$s</string>
+
+    <!-- Shared set and Build me a set (SetExtrasScreens) -->
+    <string name="sets_back">‹ My sets</string>
+    <string name="sets_shared_missing">This shared set doesn\'t exist anymore</string>
+    <string name="sets_shared_by">shared by %1$s</string>
+    <string name="sets_copy">Copy this set</string>
+    <string name="sets_build_body">Well-confirmed songs at your target %1$d–%2$d BPM. Change the target on the Listen tab.</string>
+    <string name="sets_only_heard">Only songs I\'ve heard</string>
+    <string name="sets_only_heard_body">Songs this phone measured</string>
+    <string name="sets_building">Building…</string>
+    <string name="sets_build">Build</string>
+    <string name="sets_try_another">Try another mix</string>
+    <string name="sets_build_empty">No songs in the Library at this tempo yet. Measure some to grow it.</string>
+    <plurals name="sets_build_short">
+        <item quantity="one">Found %1$d of %2$d minute: the Library has no more at this tempo yet.</item>
+        <item quantity="other">Found %1$d of %2$d minutes: the Library has no more at this tempo yet.</item>
+    </plurals>
+    <plurals name="sets_build_result">
+        <item quantity="one">%1$d song · about %2$d minutes</item>
+        <item quantity="other">%1$d songs · about %2$d minutes</item>
+    </plurals>
+    <string name="sets_estimated">Some lengths are guesses (3:30).</string>
+    <string name="sets_save_as_set">Save as set</string>
+    <string name="sets_build_name">%1$d min at %2$d–%3$d</string>
+
+    <!-- BPM of a playlist (PlaylistScreen) -->
+    <string name="playlist_title">BPM of a playlist</string>
+    <string name="playlist_body">Paste a public Spotify, YouTube or YouTube Music playlist link, or share one to BeatRadar from that app.</string>
+    <string name="playlist_reading">Reading the playlist…</string>
+    <string name="playlist_get">Get the BPMs</string>
+    <string name="playlist_default_name">Playlist</string>
+    <plurals name="playlist_matched">
+        <item quantity="one">%1$d of %2$d song has a BPM</item>
+        <item quantity="other">%1$d of %2$d songs have a BPM</item>
+    </plurals>
+    <string name="playlist_in_target">%1$d in your target</string>
+    <string name="playlist_sorted_bpm">Sorted by BPM</string>
+    <string name="playlist_order">Playlist order</string>
+    <string name="playlist_not_measured">NOT MEASURED YET</string>
+    <string name="playlist_not_measured_body">Play these near BeatRadar to add their tempo to the Library, for you and everyone else.</string>
+    <string name="playlist_unknown_bpm">\? BPM</string>
+
+    <!-- Practice click sheet (PracticeSheet) -->
+    <string name="practice_title">Practice click</string>
+    <string name="practice_accent">Accent every 4 beats</string>
+    <string name="practice_slower">Slower</string>
+    <string name="practice_faster">Faster</string>
+    <string name="practice_half_time">Half time</string>
+    <string name="practice_song">Song</string>
+    <string name="practice_double_time">Double time</string>
+    <string name="practice_listening_note">Listening stops when the click starts: the microphone would measure the click.</string>
+    <string name="practice_start">Start click</string>
+    <string name="practice_stop">Stop click</string>
+</resources>

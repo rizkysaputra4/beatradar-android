@@ -164,7 +164,8 @@ class AccountRepository(context: Context) : TokenSource {
 
     /** Signs out this phone. Works offline too: the local session is dropped either way. */
     suspend fun logout() {
-        runCatching { api.postEmpty<Unit>("v1/auth/logout") }
+        // The server revokes the session by its refresh token; without it the call is refused and stays valid there.
+        loadSession()?.let { s -> runCatching { api.post<RefreshRequest, Unit>("v1/auth/logout", RefreshRequest(s.refreshToken)) } }
         lock.withLock { clearSession() }
         _signedOut.tryEmit(SignOutReason.USER)
     }

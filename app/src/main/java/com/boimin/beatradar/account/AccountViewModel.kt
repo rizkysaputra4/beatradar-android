@@ -1,10 +1,15 @@
 package com.boimin.beatradar.account
 
 import android.app.Application
+import android.content.Context
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.boimin.beatradar.R
 import com.boimin.beatradar.app
 import com.boimin.beatradar.data.ClipStore
+import com.boimin.beatradar.i18n.str
+import com.boimin.beatradar.net.BadgeView
 import com.boimin.beatradar.net.ApiException
 import com.boimin.beatradar.net.BoardView
 import com.boimin.beatradar.net.Me
@@ -46,9 +51,9 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
     private val _board = MutableStateFlow<BoardView?>(null)
     val board: StateFlow<BoardView?> = _board
 
-    private val _celebrate = MutableStateFlow<List<String>>(emptyList())
-    /** Names of badges earned since the last look, to celebrate once. */
-    val celebrate: StateFlow<List<String>> = _celebrate
+    private val _celebrate = MutableStateFlow<List<BadgeView>>(emptyList())
+    /** Badges earned or upgraded since the last look, to celebrate once. */
+    val celebrate: StateFlow<List<BadgeView>> = _celebrate
 
     private val _toast = MutableStateFlow<String?>(null)
     val toast: StateFlow<String?> = _toast
@@ -63,7 +68,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
                 // this phone's own (guest) beats.
                 clearAccountData()
                 loadRewards()
-                if (reason == SignOutReason.SESSION_LOST) _toast.value = "You were signed out. Sign in again to keep backing up your log."
+                if (reason == SignOutReason.SESSION_LOST) _toast.value = text(R.string.account_session_lost)
             }
         }
         viewModelScope.launch { account.refreshMe() }
@@ -125,7 +130,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
     fun resendVerification(email: String) {
         viewModelScope.launch {
             runCatching { account.resendVerification(email) }
-            _signIn.value = SignInState(info = "Sent again. Check your inbox (and spam).")
+            _signIn.value = SignInState(info = text(R.string.account_verification_resent))
         }
     }
 
@@ -133,7 +138,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             _signIn.value = try {
                 account.forgotPassword(email)
-                SignInState(info = "If that address has an account, a reset link is on its way.")
+                SignInState(info = text(R.string.account_reset_sent))
             } catch (e: ApiException) {
                 SignInState(error = describe(e))
             }
@@ -152,7 +157,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             try {
                 account.deleteAccount()
-                _toast.value = "Your account was deleted"
+                _toast.value = text(R.string.account_deleted)
             } catch (e: ApiException) {
                 _toast.value = describe(e)
             }
@@ -199,7 +204,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
             val r = runCatching { library.rewards() }.getOrNull() ?: return@launch
             _rewards.value = r
             if (r.newBadges.isNotEmpty()) {
-                _celebrate.value = r.newBadges.map { code -> r.badges.firstOrNull { it.code == code }?.name ?: code }
+                _celebrate.value = r.newBadges.mapNotNull { code -> r.badges.firstOrNull { it.code == code } }
             }
         }
     }
@@ -223,24 +228,28 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         _toast.value = null
     }
 
+    private fun text(@StringRes id: Int): String = getApplication<Application>().str(id)
+
+    private fun describe(e: ApiException): String = describe(getApplication(), e)
+
     companion object {
         /** Friendly text for the server's error codes. */
-        fun describe(e: ApiException): String = when (e.code) {
-            "offline" -> "You're offline"
-            "invalid_credentials" -> "Wrong email or password"
-            "email_not_verified" -> "Verify your email first: open the link we sent you."
-            "locked" -> "Too many attempts. Try again in a few minutes."
-            "empty_password" -> "Enter a password."
-            "weak_password" -> "That password is too long."
-            "email_taken" -> "There's already an account with this email. Sign in instead."
-            "use_google" -> "This email signs in with Google."
-            "nickname_taken" -> "That nickname is taken"
-            "nickname_not_allowed" -> "That nickname isn't allowed"
-            "token_reused", "invalid_refresh" -> "You were signed out. Please sign in again."
-            "sign_in_required" -> "Sign in first"
+        fun describe(context: Context, e: ApiException): String = when (e.code) {
+            "offline" -> context.str(R.string.account_error_offline)
+            "invalid_credentials" -> context.str(R.string.account_error_invalid_credentials)
+            "email_not_verified" -> context.str(R.string.account_error_email_not_verified)
+            "locked" -> context.str(R.string.account_error_locked)
+            "empty_password" -> context.str(R.string.account_error_empty_password)
+            "weak_password" -> context.str(R.string.account_error_weak_password)
+            "email_taken" -> context.str(R.string.account_error_email_taken)
+            "use_google" -> context.str(R.string.account_error_use_google)
+            "nickname_taken" -> context.str(R.string.account_error_nickname_taken)
+            "nickname_not_allowed" -> context.str(R.string.account_error_nickname_not_allowed)
+            "token_reused", "invalid_refresh" -> context.str(R.string.account_error_signed_out)
+            "sign_in_required" -> context.str(R.string.account_error_sign_in_required)
             else -> when {
-                e.http == 429 -> "Too many tries. Wait a minute and try again."
-                e.http >= 500 -> "The server is having trouble. Try again later."
+                e.http == 429 -> context.str(R.string.account_error_rate_limited)
+                e.http >= 500 -> context.str(R.string.account_error_server)
                 else -> e.message
             }
         }

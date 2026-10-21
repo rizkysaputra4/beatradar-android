@@ -15,6 +15,8 @@ import com.android.billingclient.api.QueryPurchasesParams
 import com.android.billingclient.api.consumePurchase
 import com.android.billingclient.api.queryProductDetails
 import com.android.billingclient.api.queryPurchasesAsync
+import com.boimin.beatradar.R
+import com.boimin.beatradar.i18n.str
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -38,6 +40,7 @@ sealed interface CoffeeState {
  * consumed (which also acknowledges it) as soon as Play confirms payment.
  */
 class CoffeeBilling(context: Context, private val onPurchased: suspend (productId: String, purchaseToken: String) -> Unit = { _, _ -> }) {
+    private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val _state = MutableStateFlow<CoffeeState>(CoffeeState.Loading)
     val state: StateFlow<CoffeeState> = _state
@@ -71,7 +74,7 @@ class CoffeeBilling(context: Context, private val onPurchased: suspend (productI
         ).build()
         val result = client.queryProductDetails(params)
         val coffees = result.productDetailsList.orEmpty()
-            .mapNotNull { d -> d.oneTimePurchaseOfferDetails?.let { Coffee(d.productId, PRODUCTS[d.productId] ?: d.name, it.formattedPrice, d) } }
+            .mapNotNull { d -> d.oneTimePurchaseOfferDetails?.let { Coffee(d.productId, PRODUCTS[d.productId]?.let { id -> appContext.str(id) } ?: d.name, it.formattedPrice, d) } }
             .sortedBy { PRODUCTS.keys.indexOf(it.productId) }
         _state.value = if (coffees.isEmpty()) CoffeeState.Unavailable else CoffeeState.Ready(coffees)
         // A tip paid while the app was closed (e.g. a pending cash payment) is consumed now.
@@ -108,7 +111,11 @@ class CoffeeBilling(context: Context, private val onPurchased: suspend (productI
     }
 
     companion object {
-        /** Play Console product ids → labels. Prices come from Play, per country. */
-        val PRODUCTS = linkedMapOf("coffee_small" to "Small coffee", "coffee_medium" to "Medium coffee", "coffee_large" to "Large coffee")
+        /** Play Console product ids → label string resources. Prices come from Play, per country. */
+        val PRODUCTS = linkedMapOf(
+            "coffee_small" to R.string.billing_coffee_small,
+            "coffee_medium" to R.string.billing_coffee_medium,
+            "coffee_large" to R.string.billing_coffee_large,
+        )
     }
 }

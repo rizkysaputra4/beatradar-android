@@ -3,7 +3,6 @@ package com.boimin.beatradar.net
 import com.boimin.beatradar.library.SongQuery
 import com.boimin.beatradar.library.SongSort
 import com.boimin.beatradar.library.compactCount
-import com.boimin.beatradar.library.confirmationExplainer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -119,7 +118,5 @@ class ApiModelsTest {
         assertEquals("1.2k", compactCount(1_234))
         assertEquals("25k", compactCount(25_300))
         assertEquals("1.5M", compactCount(1_500_000))
-        assertTrue(confirmationExplainer(1, 0).contains("first to confirm"))
-        assertEquals("15 of 18 people measured within 2 BPM of this tempo.", confirmationExplainer(18, 15))
     }
 }

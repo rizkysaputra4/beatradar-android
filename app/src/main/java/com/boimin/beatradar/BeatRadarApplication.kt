@@ -2,10 +2,13 @@ package com.boimin.beatradar
 
 import android.app.Application
 import android.content.Context
+import android.content.res.Configuration
 import com.boimin.beatradar.account.AccountRepository
 import com.boimin.beatradar.data.AppDatabase
 import com.boimin.beatradar.data.NameSource
 import com.boimin.beatradar.data.SettingsRepository
+import com.boimin.beatradar.i18n.LanguageSync
+import com.boimin.beatradar.i18n.Strings
 import com.boimin.beatradar.library.LibraryRepository
 import com.boimin.beatradar.meta.NowPlayingHub
 import com.boimin.beatradar.meta.SongNamer
@@ -30,6 +33,9 @@ class BeatRadarApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // The kept language first, so the first screen is drawn in it; then check for a newer or different pack.
+        Strings.load(this)
+        scope.launch { LanguageSync.refresh(this@BeatRadarApplication) }
         Notifier.createChannels(this)
         // A Shazam result after "Identify" on a logged clip names that entry (and deletes its clip).
         scope.launch {
@@ -49,6 +55,12 @@ class BeatRadarApplication : Application() {
         }
         requestSync()
         RecapWorker.schedule(this)
+    }
+
+    /** The phone's language changed: follow it, unless a language was picked in Settings. */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (LanguageSync.choice(this) == null) scope.launch { LanguageSync.refresh(this@BeatRadarApplication) }
     }
 
     /** Uploads new measurements (and syncs the log backup when signed in) as soon as there is a network. */

@@ -50,6 +50,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -60,6 +61,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.boimin.beatradar.R
 import com.boimin.beatradar.data.Settings
+import com.boimin.beatradar.i18n.str
+import com.boimin.beatradar.i18n.strPlural
 import com.boimin.beatradar.net.Facets
 import com.boimin.beatradar.net.SongSummary
 import com.boimin.beatradar.ui.BpmBadge
@@ -106,6 +109,7 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
     val query by vm.query.collectAsStateWithLifecycle()
     val extras by vm.extras.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    val context = LocalContext.current
     // Long-press starts selecting songs to add to a set together.
     var selected by remember { mutableStateOf(mapOf<String, SongSummary>()) }
     var adding by remember { mutableStateOf(false) }
@@ -143,7 +147,7 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                 if (query.text.isEmpty()) {
                     Text(
-                        "Search public tempo library…",
+                        str(R.string.library_search_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -170,7 +174,7 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
                     onCancel = { selected = emptyMap() },
                     modifier = Modifier.matchParentSize().padding(start = 18.dp, end = 18.dp, bottom = 6.dp),
                 ) {
-                    SelectionAction("Add to set") { adding = true }
+                    SelectionAction(str(R.string.sets_add_to_set)) { adding = true }
                 }
             }
         }
@@ -179,7 +183,7 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
                 songs = selected.values.toList(),
                 vm = vm,
                 onDone = { name ->
-                    vm.say("Added ${selected.size} song${if (selected.size == 1) "" else "s"} to “$name”")
+                    vm.say(context.strPlural(R.plurals.library_added_to_set, selected.size, selected.size, name))
                     adding = false
                     selected = emptyMap()
                 },
@@ -197,7 +201,7 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "Sign in to love songs and back up your log →",
+                    str(R.string.library_sign_in_prompt),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
@@ -208,13 +212,13 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
         when {
             list.items.isEmpty() && list.loading -> Centered { CircularProgressIndicator() }
             list.items.isEmpty() && list.error != null -> Message(
-                if (list.error == "You're offline") "You're offline" else "Couldn't load the Library",
-                list.error.takeIf { it != "You're offline" } ?: "BeatRadar keeps counting offline. The Library needs a connection.",
+                if (list.error == str(R.string.library_offline)) str(R.string.library_offline) else str(R.string.library_load_failed),
+                list.error.takeIf { it != str(R.string.library_offline) } ?: str(R.string.library_offline_body),
                 retry = vm::reload,
             )
             list.items.isEmpty() && list.loadedOnce -> Message(
-                "No songs here yet",
-                if (query.text.isNotBlank() || query.bpmMin != null || query.lovedOnly) "Try another search or tempo." else "Songs appear as people measure them.",
+                str(R.string.library_empty_title),
+                if (query.text.isNotBlank() || query.bpmMin != null || query.lovedOnly) str(R.string.library_empty_filtered) else str(R.string.library_empty_body),
             )
             else -> LazyColumn(
                 state = listState,
@@ -225,7 +229,7 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
                 if (trending != null) {
                     item(key = "trending") {
                         TrendingRow(
-                            title = if (trending.fallback) "MOST CONFIRMED AT THIS TEMPO" else "TRENDING AT THIS TEMPO",
+                            title = if (trending.fallback) str(R.string.library_most_confirmed_here) else str(R.string.library_trending_here),
                             songs = trending.items,
                             onOpen = { vm.open(it) },
                         )
@@ -245,7 +249,7 @@ private fun SongList(vm: LibraryViewModel, actions: LibraryActions, modifier: Mo
                     )
                 }
                 if (list.loading) item { Box(Modifier.fillMaxWidth().padding(12.dp), Alignment.Center) { CircularProgressIndicator(Modifier.size(24.dp)) } }
-                if (list.error != null) item { TextButton(onClick = vm::loadMore, modifier = Modifier.fillMaxWidth()) { Text("${list.error} · Retry") } }
+                if (list.error != null) item { TextButton(onClick = vm::loadMore, modifier = Modifier.fillMaxWidth()) { Text(str(R.string.library_error_retry, list.error)) } }
             }
         }
     }
@@ -270,7 +274,7 @@ private fun TrendingRow(title: String, songs: List<SongSummary>, onOpen: (String
                 ) {
                     SongArtwork(s.artworkUrl, sizeDp = 104, cornerDp = 10)
                     Text(s.title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("${s.bpm.roundToInt()} BPM · ${s.artist}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(str(R.string.library_bpm_artist, s.bpm.roundToInt(), s.artist), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -294,7 +298,7 @@ private fun Filters(query: SongQuery, signedIn: Boolean, facets: Facets, onChang
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         LogFilterPill(
-            label = if (ranged) "${query.bpmMin}–${query.bpmMax} BPM ▾" else "Any tempo ▾",
+            label = if (ranged) "${str(R.string.library_bpm_range, query.bpmMin, query.bpmMax)} ▾" else "${str(R.string.library_any_tempo)} ▾",
             selected = ranged,
             activeColor = MaterialTheme.colorScheme.primary,
             onClick = {
@@ -316,27 +320,27 @@ private fun Filters(query: SongQuery, signedIn: Boolean, facets: Facets, onChang
         }
         Box {
             LogFilterPill(
-                label = "${query.sort.label} ▾",
+                label = "${str(query.sort.label)} ▾",
                 selected = false,
                 activeColor = MaterialTheme.colorScheme.primary,
                 onClick = { sortOpen = true },
             )
             DropdownMenu(expanded = sortOpen, onDismissRequest = { sortOpen = false }) {
                 SongSort.entries.forEach { s ->
-                    DropdownMenuItem(text = { Text(s.label) }, onClick = { sortOpen = false; onChange(query.copy(sort = s)) })
+                    DropdownMenuItem(text = { Text(str(s.label)) }, onClick = { sortOpen = false; onChange(query.copy(sort = s)) })
                 }
             }
         }
         if (facets.genres.isNotEmpty() || query.genre != null) {
             Box {
                 LogFilterPill(
-                    label = "${query.genre ?: "Genre"} ▾",
+                    label = "${query.genre ?: str(R.string.library_genre)} ▾",
                     selected = query.genre != null,
                     activeColor = MaterialTheme.colorScheme.primary,
                     onClick = { genreOpen = true },
                 )
                 DropdownMenu(expanded = genreOpen, onDismissRequest = { genreOpen = false }) {
-                    DropdownMenuItem(text = { Text("Any genre") }, onClick = { genreOpen = false; onChange(query.copy(genre = null)) })
+                    DropdownMenuItem(text = { Text(str(R.string.library_any_genre)) }, onClick = { genreOpen = false; onChange(query.copy(genre = null)) })
                     facets.genres.forEach { g ->
                         DropdownMenuItem(text = { Text("${g.genre} · ${g.songs}") }, onClick = { genreOpen = false; onChange(query.copy(genre = g.genre)) })
                     }
@@ -346,22 +350,22 @@ private fun Filters(query: SongQuery, signedIn: Boolean, facets: Facets, onChang
         if (facets.decades.isNotEmpty() || query.decade != null) {
             Box {
                 LogFilterPill(
-                    label = "${query.decade?.let { "${it}s" } ?: "Decade"} ▾",
+                    label = "${query.decade?.let { str(R.string.library_decade_value, it) } ?: str(R.string.library_decade)} ▾",
                     selected = query.decade != null,
                     activeColor = MaterialTheme.colorScheme.primary,
                     onClick = { decadeOpen = true },
                 )
                 DropdownMenu(expanded = decadeOpen, onDismissRequest = { decadeOpen = false }) {
-                    DropdownMenuItem(text = { Text("Any decade") }, onClick = { decadeOpen = false; onChange(query.copy(decade = null)) })
+                    DropdownMenuItem(text = { Text(str(R.string.library_any_decade)) }, onClick = { decadeOpen = false; onChange(query.copy(decade = null)) })
                     facets.decades.forEach { d ->
-                        DropdownMenuItem(text = { Text("${d.decade}s · ${d.songs}") }, onClick = { decadeOpen = false; onChange(query.copy(decade = d.decade)) })
+                        DropdownMenuItem(text = { Text("${str(R.string.library_decade_value, d.decade)} · ${d.songs}") }, onClick = { decadeOpen = false; onChange(query.copy(decade = d.decade)) })
                     }
                 }
             }
         }
         if (signedIn) {
             LogFilterPill(
-                label = "♥ Loved",
+                label = str(R.string.library_loved),
                 selected = query.lovedOnly,
                 activeColor = Brand.Coral,
                 onClick = { onChange(query.copy(lovedOnly = !query.lovedOnly)) },
@@ -383,7 +387,7 @@ private fun Filters(query: SongQuery, signedIn: Boolean, facets: Facets, onChang
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Filter Tempo: ${query.bpmMin}–${query.bpmMax} BPM",
+                    str(R.string.library_filter_tempo, query.bpmMin, query.bpmMax),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -399,7 +403,7 @@ private fun Filters(query: SongQuery, signedIn: Boolean, facets: Facets, onChang
                         }
                         .padding(horizontal = 8.dp, vertical = 3.dp),
                 ) {
-                    Text("Any tempo", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(str(R.string.library_any_tempo), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             RangeSlider(
@@ -478,7 +482,7 @@ internal fun Message(title: String, body: String, retry: (() -> Unit)? = null) {
         Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         if (retry != null) {
             Spacer(Modifier.height(12.dp))
-            TextButton(onClick = retry) { Text("Try again") }
+            TextButton(onClick = retry) { Text(str(R.string.library_try_again)) }
         }
     }
 }

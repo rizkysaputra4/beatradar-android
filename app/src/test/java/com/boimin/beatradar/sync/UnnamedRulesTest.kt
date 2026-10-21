@@ -10,7 +10,6 @@ import com.boimin.beatradar.net.SuggestionList
 import com.boimin.beatradar.net.UnnamedIn
 import com.boimin.beatradar.net.UnnamedItemResult
 import com.boimin.beatradar.net.UnnamedResult
-import com.boimin.beatradar.ui.unnamedLineText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -94,11 +93,5 @@ class UnnamedRulesTest {
         assertNull(ApiJson.decodeFromString(RejectResult.serializer(), """{"next":null}""").next)
         assertNull(ApiJson.decodeFromString(RejectResult.serializer(), "{}").next)
         assertEquals("b", ApiJson.decodeFromString(RejectResult.serializer(), """{"next":{"clientRef":"7","slug":"b","title":"T2","artist":"A","score":17,"state":"trusted"}}""").next!!.slug)
-    }
-
-    @Test fun unnamedLine() {
-        assertEquals("1 song without a name · Identify", unnamedLineText(1, 0))
-        assertEquals("3 songs without a name · 1 suggested name · Identify", unnamedLineText(3, 1))
-        assertEquals("3 songs without a name · 2 suggested names · Identify", unnamedLineText(3, 2))
     }
 }

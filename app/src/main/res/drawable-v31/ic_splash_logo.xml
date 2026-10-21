@@ -1,0 +1,113 @@
+<!-- Animated splash icon (API 31+): the beat pulse draws in, then the three radar arcs ripple out from their midpoints,
+     inner to outer. 700 ms in all, matching windowSplashScreenAnimationDuration in values-v31/themes.xml.
+     Same drawing as drawable/ic_splash_logo.xml; every path starts hidden and ends at the static values there. -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt">
+    <aapt:attr name="android:drawable">
+        <vector
+            android:width="108dp"
+            android:height="108dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+            <group
+                android:pivotX="49"
+                android:pivotY="54"
+                android:scaleX="0.66"
+                android:scaleY="0.66"
+                android:translateX="5">
+                <path
+                    android:name="pulse"
+                    android:strokeColor="#FF5A5F"
+                    android:strokeWidth="6.5"
+                    android:strokeLineCap="round"
+                    android:strokeLineJoin="round"
+                    android:trimPathEnd="0"
+                    android:pathData="M 18,54 H 24 L 28,61 L 34,26 L 40,78 L 45,54 H 49" />
+                <path
+                    android:name="arc1"
+                    android:strokeColor="#7C6CF6"
+                    android:strokeAlpha="0"
+                    android:strokeWidth="6.5"
+                    android:strokeLineCap="round"
+                    android:trimPathStart="0.5"
+                    android:trimPathEnd="0.5"
+                    android:pathData="M 49,43 A 11,11 0 0,1 49,65" />
+                <path
+                    android:name="arc2"
+                    android:strokeColor="#7C6CF6"
+                    android:strokeAlpha="0"
+                    android:strokeWidth="6.5"
+                    android:strokeLineCap="round"
+                    android:trimPathStart="0.5"
+                    android:trimPathEnd="0.5"
+                    android:pathData="M 49,33 A 21,21 0 0,1 49,75" />
+                <path
+                    android:name="arc3"
+                    android:strokeColor="#7C6CF6"
+                    android:strokeAlpha="0"
+                    android:strokeWidth="6.5"
+                    android:strokeLineCap="round"
+                    android:trimPathStart="0.5"
+                    android:trimPathEnd="0.5"
+                    android:pathData="M 49,23 A 31,31 0 0,1 49,85" />
+            </group>
+        </vector>
+    </aapt:attr>
+
+    <target android:name="pulse">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:propertyName="trimPathEnd"
+                android:valueFrom="0"
+                android:valueTo="1"
+                android:valueType="floatType"
+                android:duration="380"
+                android:interpolator="@android:interpolator/fast_out_slow_in" />
+        </aapt:attr>
+    </target>
+
+    <target android:name="arc1">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator android:propertyName="strokeAlpha" android:valueFrom="0" android:valueTo="1"
+                    android:valueType="floatType" android:startOffset="300" android:duration="120" />
+                <objectAnimator android:propertyName="trimPathStart" android:valueFrom="0.5" android:valueTo="0"
+                    android:valueType="floatType" android:startOffset="300" android:duration="220"
+                    android:interpolator="@android:interpolator/fast_out_slow_in" />
+                <objectAnimator android:propertyName="trimPathEnd" android:valueFrom="0.5" android:valueTo="1"
+                    android:valueType="floatType" android:startOffset="300" android:duration="220"
+                    android:interpolator="@android:interpolator/fast_out_slow_in" />
+            </set>
+        </aapt:attr>
+    </target>
+
+    <target android:name="arc2">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator android:propertyName="strokeAlpha" android:valueFrom="0" android:valueTo="0.8"
+                    android:valueType="floatType" android:startOffset="390" android:duration="120" />
+                <objectAnimator android:propertyName="trimPathStart" android:valueFrom="0.5" android:valueTo="0"
+                    android:valueType="floatType" android:startOffset="390" android:duration="220"
+                    android:interpolator="@android:interpolator/fast_out_slow_in" />
+                <objectAnimator android:propertyName="trimPathEnd" android:valueFrom="0.5" android:valueTo="1"
+                    android:valueType="floatType" android:startOffset="390" android:duration="220"
+                    android:interpolator="@android:interpolator/fast_out_slow_in" />
+            </set>
+        </aapt:attr>
+    </target>
+
+    <target android:name="arc3">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator android:propertyName="strokeAlpha" android:valueFrom="0" android:valueTo="0.5"
+                    android:valueType="floatType" android:startOffset="480" android:duration="120" />
+                <objectAnimator android:propertyName="trimPathStart" android:valueFrom="0.5" android:valueTo="0"
+                    android:valueType="floatType" android:startOffset="480" android:duration="220"
+                    android:interpolator="@android:interpolator/fast_out_slow_in" />
+                <objectAnimator android:propertyName="trimPathEnd" android:valueFrom="0.5" android:valueTo="1"
+                    android:valueType="floatType" android:startOffset="480" android:duration="220"
+                    android:interpolator="@android:interpolator/fast_out_slow_in" />
+            </set>
+        </aapt:attr>
+    </target>
+</animated-vector>

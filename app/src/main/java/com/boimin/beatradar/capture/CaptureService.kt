@@ -7,6 +7,8 @@ import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.Manifest
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.media.AudioFormat
 import android.media.AudioRecord
@@ -202,8 +204,7 @@ class CaptureService : Service() {
         ClickPlayer.stop()
         captureJob?.cancel()
         Monitor.update { MonitorState(status = MonitorStatus.LISTENING, phoneApp = it.phoneApp) }
-        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
-        ServiceCompat.startForeground(this, Notifier.ID_LISTENING, notifier.ongoing(Monitor.state.value), type)
+        if (!enterForeground()) return
         foreground = true
         scope.launch(serial) { resetSong() }
         synchronized(clipRing) { clipFilled = 0 }
@@ -222,6 +223,28 @@ class CaptureService : Service() {
         if (Monitor.state.value.status != MonitorStatus.PAUSED) return
         Monitor.update { it.copy(status = MonitorStatus.LISTENING) }
         startCapture()
+    }
+
+    /**
+     * Becomes the microphone foreground service. A widget drawn before the microphone permission was taken away still
+     * starts this service; Android 14+ then refuses the microphone type, and a service started in the foreground that
+     * never gets there crashes the app. So the promise is kept with a short service that ends at once, and the widget
+     * is redrawn to open the app (which asks for the permission) next time. False when listening can't start.
+     */
+    private fun enterForeground(): Boolean {
+        val note = notifier.ongoing(Monitor.state.value)
+        val canListen = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (canListen) {
+            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
+            val started = runCatching { ServiceCompat.startForeground(this, Notifier.ID_LISTENING, note, type) }
+            if (started.isSuccess) return true
+            Log.w(TAG, "could not start listening in the foreground", started.exceptionOrNull())
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            runCatching { ServiceCompat.startForeground(this, Notifier.ID_LISTENING, note, ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE) }
+        }
+        stopEverything()
+        return false
     }
 
     private fun stopEverything() {

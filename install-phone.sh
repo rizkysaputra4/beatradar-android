@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-API=${API:-http://168.144.129.5/}
+API=${API:-https://api.findbeatradar.com/}
 run_tests=1
 for arg in "$@"; do
   case $arg in

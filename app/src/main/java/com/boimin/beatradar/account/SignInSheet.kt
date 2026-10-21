@@ -40,6 +40,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.boimin.beatradar.R
+import com.boimin.beatradar.i18n.str
 import kotlinx.coroutines.launch
 
 private enum class Mode { CHOOSE, SIGN_IN, REGISTER, FORGOT }
@@ -67,20 +69,20 @@ fun SignInSheet(vm: AccountViewModel, onDismiss: () -> Unit) {
         onDismiss()
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetGesturesEnabled = false, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
                 when (mode) {
-                    Mode.CHOOSE, Mode.SIGN_IN -> "Sign in"
-                    Mode.REGISTER -> "Create an account"
-                    Mode.FORGOT -> "Reset your password"
+                    Mode.CHOOSE, Mode.SIGN_IN -> str(R.string.account_sign_in)
+                    Mode.REGISTER -> str(R.string.account_create_title)
+                    Mode.FORGOT -> str(R.string.account_reset_title)
                 },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
             if (mode == Mode.CHOOSE) {
                 Text(
-                    "Love songs, back up your log to every phone, and join the leaderboards. Counting BPM works without an account.",
+                    str(R.string.account_pitch),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -96,13 +98,13 @@ fun SignInSheet(vm: AccountViewModel, onDismiss: () -> Unit) {
                     },
                     enabled = !state.busy,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Continue with Google") }
-                OutlinedButton(onClick = { mode = Mode.SIGN_IN }, modifier = Modifier.fillMaxWidth()) { Text("Use email") }
+                ) { Text(str(R.string.account_continue_google)) }
+                OutlinedButton(onClick = { mode = Mode.SIGN_IN }, modifier = Modifier.fillMaxWidth()) { Text(str(R.string.account_use_email)) }
             } else {
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
-                    label = { Text("Email") },
+                    label = { Text(str(R.string.account_email)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     // Lets the password manager fill a saved login.
@@ -112,7 +114,7 @@ fun SignInSheet(vm: AccountViewModel, onDismiss: () -> Unit) {
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
-                        label = { Text("Password") },
+                        label = { Text(str(R.string.account_password)) },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -136,27 +138,27 @@ fun SignInSheet(vm: AccountViewModel, onDismiss: () -> Unit) {
                 ) {
                     Text(
                         when (mode) {
-                            Mode.REGISTER -> "Create account"
-                            Mode.FORGOT -> "Send reset link"
-                            else -> "Sign in"
+                            Mode.REGISTER -> str(R.string.account_create)
+                            Mode.FORGOT -> str(R.string.account_send_reset)
+                            else -> str(R.string.account_sign_in)
                         },
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     when (mode) {
                         Mode.SIGN_IN -> {
-                            TextButton(onClick = { mode = Mode.REGISTER }) { Text("Create account") }
+                            TextButton(onClick = { mode = Mode.REGISTER }) { Text(str(R.string.account_create)) }
                             Spacer(Modifier.weight(1f))
-                            TextButton(onClick = { mode = Mode.FORGOT }) { Text("Forgot password?") }
+                            TextButton(onClick = { mode = Mode.FORGOT }) { Text(str(R.string.account_forgot)) }
                         }
-                        else -> TextButton(onClick = { mode = Mode.SIGN_IN }) { Text("Back to sign in") }
+                        else -> TextButton(onClick = { mode = Mode.SIGN_IN }) { Text(str(R.string.account_back_to_sign_in)) }
                     }
                 }
             }
             if (state.busy) CircularProgressIndicator(Modifier.size(24.dp).align(Alignment.CenterHorizontally))
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
             state.info?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium) }
-            if (state.canResend) TextButton(onClick = { vm.resendVerification(email) }) { Text("Resend verification email") }
+            if (state.canResend) TextButton(onClick = { vm.resendVerification(email) }) { Text(str(R.string.account_resend_verification)) }
             Spacer(Modifier.height(4.dp))
         }
     }

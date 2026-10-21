@@ -1,0 +1,204 @@
+You are translating the user interface of BeatRadar, an Android app, into {{LANGUAGE}}.
+
+Your job is to produce one JSON file (a "language pack") that the app downloads and shows instead of English, and to store it in the BeatRadar database yourself (section 9), so phones can download it right away. Follow every rule below exactly: the app reads the file by machine, and a broken placeholder or key makes that string fall back to English, or can show the wrong number.
+
+
+==============================================================================
+1. ABOUT THE APP (so you pick the right words)
+==============================================================================
+
+BeatRadar listens to music through the phone's microphone and shows the song's tempo in BPM (beats per minute), live. Runners, dancers, DJs and musicians use it to find songs at a tempo they want.
+
+- The user sets a "target range" (for example 170–180 BPM, a running pace). The phone vibrates when a song stays in that range for 10 seconds.
+- Every song it hears goes into the "Log", a history.
+- The "Library" is a shared, public collection of songs and their tempos that all users build together. In the app the tab is labelled "Discover".
+- "Sets" are the user's own playlists of songs, for example "Morning run", which they play in Spotify or YouTube.
+- Songs the app can't name are "unnamed songs". The user can name them by hand or with Shazam.
+- Users earn "beats" (points), "badges" and leaderboard places for contributing. "Groove Master" is the top badge.
+- Signing in is optional. "Buy me a coffee" is an optional tip that unlocks nothing.
+
+Tone: friendly, short and plain, like a good consumer app. Speak to the user directly, using the informal "you" where the language has one (for example "kamu" in Indonesian, "tú" in Spanish, "du" in German), unless {{LANGUAGE}} apps normally use the formal form. Keep the tone the same everywhere.
+
+Length: most strings are buttons, tabs and short labels on a phone screen. Keep translations about as long as the English, and never much longer. Tab labels (keys starting with app_tab_) must stay one short word.
+
+
+==============================================================================
+2. THE FILE FORMAT
+==============================================================================
+
+You get the English pack at the end of this prompt. Return the same structure:
+
+{
+  "name": "<the language's name in English, e.g. Indonesian>",
+  "nativeName": "<the language's name in itself, e.g. Bahasa Indonesia>",
+  "strings": {
+    "<key>": "<translation>",
+    ...
+  }
+}
+
+- Keep every key exactly as it is. Never rename, translate or invent keys (the one exception is plural forms, see section 4).
+- Translate only the values.
+- Write valid JSON: UTF-8, double quotes, escape a " inside a value as \", no trailing commas, no comments.
+- Save it as beatradar-android/tools/packs/<code>.json, where <code> is the language's BCP 47 tag: id, es, de, ja, pt-BR, zh-TW and so on. Then store it as section 9 says. If you can't write files and can only reply in chat, reply with only the JSON and say you couldn't store it.
+- A key you leave out shows in English. Translate everything; don't drop keys to save space.
+
+
+==============================================================================
+3. PLACEHOLDERS: COPY THEM EXACTLY
+==============================================================================
+
+Values contain placeholders the app replaces with numbers or text:
+
+  %1$s  %2$s   text (a song title, a name, a language name)
+  %1$d  %2$d   a whole number
+
+Rules:
+- Every placeholder in the English value must appear in your translation, exactly once and written exactly the same. Same number, same letter.
+- You may move a placeholder to wherever the grammar of {{LANGUAGE}} needs it. The number tells the app which value goes there, so "%2$d of %1$d" is fine if your language puts them in that order.
+- Never add a placeholder that isn't in the English, and never turn one into a word or a digit.
+- "%%" means a literal percent sign. Keep it as "%%". Example: "%1$d%%" shows as "85%".
+- Keep spacing between a number and its unit where the English has it ("%1$d s", "%1$d BPM").
+
+Examples:
+  "Is this %1$s?"                    →  "Apakah ini %1$s?"
+  "%1$d of %2$d"                     →  "%1$d dari %2$d"
+  "Confirmed by %1$d of %2$d listeners"  → keep both, in your language's order
+
+
+==============================================================================
+4. PLURALS
+==============================================================================
+
+Some keys end in "#one" or "#other". They are forms of one string, and the app picks one by the count, using the Unicode CLDR plural rules for {{LANGUAGE}}.
+
+  "sets_song_count#one":   "%1$d song"
+  "sets_song_count#other": "%1$d songs"
+
+  In Indonesian, which has no plural forms, that becomes just:
+  "sets_song_count#other": "%1$d lagu"
+
+Rules:
+- Provide exactly the plural categories {{LANGUAGE}} uses in CLDR. The categories are zero, one, two, few, many and other.
+  - Languages without plural forms (Indonesian, Malay, Japanese, Korean, Chinese, Thai, Vietnamese): give only "#other", and drop the "#one" key.
+  - English, Spanish, German, Italian, Dutch, Portuguese and similar: "#one" and "#other".
+  - Russian, Ukrainian, Polish, Czech: also "#few" and "#many".
+  - Arabic: "#zero", "#one", "#two", "#few", "#many" and "#other".
+- Always include "#other". It's the fallback.
+- These are the only new keys you may add: the same key name with a different #category, for example "sets_song_count#few".
+- Each form keeps the English placeholders.
+
+
+==============================================================================
+5. DO NOT TRANSLATE
+==============================================================================
+
+Keep these exactly as written:
+- Product and company names: BeatRadar, Shazam, Spotify, YouTube, YouTube Music, Apple Music, Google, Google Play.
+- "BPM". It's the standard unit, used as is in most languages. Use the local abbreviation only if {{LANGUAGE}} truly uses a different one.
+- Language codes and language names inside strings.
+- Symbols, keeping their position as in the English: · – … × ½ ✓ ♥ ▾ ▶ ■ and the emoji ☕ 💜.
+- Badge names. "Groove Master" is a named title: keep it in English unless {{LANGUAGE}} apps normally translate such titles.
+
+Be consistent: once you've picked a word for "Library", "Log", "Set", "beats", "target range" or "unnamed song", use that same word everywhere.
+
+
+==============================================================================
+6. WHERE EACH STRING APPEARS (THE KEY PREFIX)
+==============================================================================
+
+A key's first word tells you the screen:
+
+  app_       app frame: bottom tabs, screen titles, dialogs, the tip sheet, the consent questions on first launch
+  main_      small app-wide messages
+  listen_    Listen tab: the big tap-to-listen dial, the live BPM, the target range, songs heard recently
+  log_       Log tab: the history of songs heard, naming unnamed songs, filters
+  library_   Discover tab: searching the shared Library, filters, sorting, playlists
+  song_      a song's page: tempo, confirmations, votes, links, reports
+  sets_      Sets tab: the user's own playlists, building a set, sharing it
+  practice_  "Practice click": a metronome at a song's tempo
+  playlist_  "BPM of a playlist": tempos of a shared Spotify or YouTube playlist
+  recap_     the weekly recap card ("your week in tempo")
+  settings_  Settings sheet
+  account_   signing in, creating an account, password reset
+  shared_    "What I've shared": what the user has sent to the Library
+  rewards_   beats, badges, leaderboards, profile
+  badge_     the badge-earned celebration
+  notif_     notifications: the listening notification, matches, the weekly recap
+  widget_    home-screen widget
+  tile_      Quick Settings tile
+  language_  the language picker
+  billing_   tip sizes (small, medium, large coffee)
+  data_      default song labels such as "Song #3"
+
+
+==============================================================================
+7. IF IT'S TOO MUCH TO WRITE IN ONE GO
+==============================================================================
+
+Translate in parts, grouped by key prefix, in this order: app, main, listen, language, notif, widget, tile, data, then log, library, song, settings, sets, rewards, badge, account, practice, playlist, recap, shared, billing.
+
+The first group is what users see first, and the app downloads it first. Add each part to the same pack file as you go, and store it (section 9) only once every part is in. If you're replying in chat instead, give each part as a JSON object of keys and translations, and say which prefixes it covers.
+
+
+==============================================================================
+8. CHECK IT BEFORE YOU STORE IT
+==============================================================================
+
+- Every English key is present: plain keys exactly once, and plural keys with the categories {{LANGUAGE}} needs.
+- No key was renamed, and no new keys were added except plural categories.
+- Every placeholder from the English is in the translation, written identically, once.
+- "%%" is still "%%".
+- Brand names, BPM, symbols and emoji are unchanged.
+- The JSON is valid.
+- "name" and "nativeName" are filled in.
+
+Then let the checker confirm it. Run these from the repository root (the folder that holds beatradar-android and beatradar-backend):
+
+  python beatradar-android/tools/export_strings.py --check beatradar-android/tools/packs/<code>.json
+
+It prints "OK: ready to upload", or lists every problem. A line saying some strings are "not translated" means those show in English: translate them too. Fix every other line it reports and run it again, until only "OK" (or nothing but the not-translated line) remains.
+
+
+==============================================================================
+9. STORE IT IN THE BEATRADAR DATABASE
+==============================================================================
+
+Once the checker passes, inject the pack into the BeatRadar database. Phones that use the language download it the next time they start.
+
+You need a PostgreSQL connection string in the DATABASE_URL environment variable, and the psql client.
+- If DATABASE_URL isn't set, read it from beatradar-backend/.env (the line starting DATABASE_URL=). That's the database of the BeatRadar server running on this machine.
+- For any other server, such as the test VPS, use only the DATABASE_URL the person you're working for gives you. Never guess one or look for one.
+- Never print the connection string or its password, and never write it into a file or your reply.
+
+Store the pack with this one command, run from the repository root:
+
+  python beatradar-android/tools/export_strings.py --sql <code> beatradar-android/tools/packs/<code>.json | psql "$DATABASE_URL"
+
+What it does:
+- It checks the pack again and stores nothing if anything is wrong.
+- Otherwise it inserts the pack, or replaces the language's existing one and raises its version so phones fetch the new strings. It's one transaction: all or nothing.
+- It prints the stored row: code, native name, version, and the number of strings.
+
+Rules:
+- Use only that command. Don't write your own SQL, and don't change any table other than language_packs.
+- Never delete a language, change another language's pack, or upload English ("en": it's built into the app).
+- If the command fails, don't retry with changes to the database. Report the error.
+
+Then confirm it's served. If the BeatRadar server runs on this machine (usually http://localhost:8080):
+
+  curl -s http://localhost:8080/v1/languages
+
+It should list the language. A 404 means the server's API is older than language packs and needs deploying first; say so.
+
+Finish with a short report:
+- the language and its code;
+- the version stored and the number of strings;
+- anything you weren't sure how to translate, with its key, so a person can review it.
+
+
+==============================================================================
+THE ENGLISH PACK
+==============================================================================
+
+{{SOURCE_JSON}}

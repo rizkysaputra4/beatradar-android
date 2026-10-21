@@ -1,13 +1,15 @@
 package com.boimin.beatradar
 
 import android.Manifest
+import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.Settings as AndroidSettings
 import android.view.View
-import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.AccelerateInterpolator
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,6 +19,7 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
 import androidx.core.animation.doOnEnd
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.splashscreen.SplashScreenViewProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.core.net.toUri
@@ -30,6 +33,7 @@ import com.boimin.beatradar.notify.Haptics
 import kotlin.math.roundToInt
 import com.boimin.beatradar.data.BeatLogEntry
 import com.boimin.beatradar.data.ClipStore
+import com.boimin.beatradar.i18n.str
 import com.boimin.beatradar.meta.SongNamer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -51,7 +55,7 @@ class MainActivity : ComponentActivity() {
         if (grants[Manifest.permission.RECORD_AUDIO] == true) {
             startListening()
         } else {
-            Toast.makeText(this, "BeatRadar needs audio permission to hear the beat", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, str(R.string.main_activity_mic_permission_needed), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -59,19 +63,7 @@ class MainActivity : ComponentActivity() {
         val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
         splash.setKeepOnScreenCondition { vm.settings.value == null }
-        splash.setOnExitAnimationListener { splashScreenViewProvider ->
-            val fadeOut = ObjectAnimator.ofFloat(
-                splashScreenViewProvider.view,
-                View.ALPHA,
-                1f,
-                0f
-            ).apply {
-                duration = 200L
-                interpolator = AccelerateDecelerateInterpolator()
-                doOnEnd { splashScreenViewProvider.remove() }
-            }
-            fadeOut.start()
-        }
+        splash.setOnExitAnimationListener(::animateSplashExit)
         enableEdgeToEdge()
         coffee = CoffeeBilling(this, onPurchased = { product, token ->
             app.library.claimSupporter(product, token)
@@ -122,6 +114,31 @@ class MainActivity : ComponentActivity() {
      * `https://<share host>/s/<slug>` (App Links) opens that song in the Library; a playlist link shared from Spotify or
      * YouTube Music opens "BPM of a playlist".
      */
+    /**
+     * Lets the icon animation (API 31+) finish so the logo is never cut off half drawn, then the icon swells and fades as
+     * the splash fades into the app. Below API 31 the icon is static and the start and duration are 0, so there is no wait.
+     */
+    private fun animateSplashExit(provider: SplashScreenViewProvider) {
+        val iconLeft = provider.iconAnimationStartMillis + provider.iconAnimationDurationMillis - SystemClock.uptimeMillis()
+        // The system may hand over a splash without an icon (e.g. opened from a link), and then iconView throws.
+        val icon = runCatching { provider.iconView }.getOrNull()
+        val animators = buildList {
+            add(ObjectAnimator.ofFloat(provider.view, View.ALPHA, 1f, 0f))
+            if (icon != null) {
+                add(ObjectAnimator.ofFloat(icon, View.SCALE_X, 1f, 1.25f))
+                add(ObjectAnimator.ofFloat(icon, View.SCALE_Y, 1f, 1.25f))
+            }
+        }
+        AnimatorSet().apply {
+            playTogether(animators)
+            startDelay = iconLeft.coerceIn(0L, SPLASH_MAX_WAIT_MS)
+            duration = 260L
+            interpolator = AccelerateInterpolator()
+            doOnEnd { provider.remove() }
+            start()
+        }
+    }
+
     private fun handleLink(intent: Intent?) {
         if (intent?.getBooleanExtra(EXTRA_OPEN_RECAP, false) == true) {
             vm.showRecap.value = true
@@ -132,7 +149,7 @@ class MainActivity : ComponentActivity() {
             if (PlayLinks.looksLikePlaylist(text)) {
                 libraryVm.sharedPlaylistLink.value = text
             } else {
-                Toast.makeText(this, "Share a Spotify or YouTube playlist to see its BPMs", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, str(R.string.main_activity_share_playlist_hint), Toast.LENGTH_LONG).show()
             }
             return
         }
@@ -145,7 +162,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun shareSong(song: SongSummary) {
-        val text = "${song.title} – ${song.artist} · ${song.bpm.roundToInt()} BPM on BeatRadar https://${BuildConfig.SHARE_HOST}/s/${song.slug}"
+        val text = str(R.string.main_activity_share_song, song.title, song.artist, song.bpm.roundToInt(), "https://${BuildConfig.SHARE_HOST}/s/${song.slug}")
         val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
         startActivity(Intent.createChooser(send, null))
     }
@@ -158,7 +175,7 @@ class MainActivity : ComponentActivity() {
     /** Spotify / YouTube / Apple Music links open their app when installed (they claim these URLs), else the browser. */
     private fun openUrl(url: String) {
         runCatching { startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
-            .onFailure { Toast.makeText(this, "No app can open this link", Toast.LENGTH_SHORT).show() }
+            .onFailure { Toast.makeText(this, str(R.string.main_activity_no_app_for_link), Toast.LENGTH_SHORT).show() }
     }
 
     private fun requestStart() {
@@ -175,7 +192,7 @@ class MainActivity : ComponentActivity() {
     private fun identifyClip(entry: BeatLogEntry) {
         val path = entry.clipPath ?: return
         SongNamer.startIdentify(entry.id)
-        Toast.makeText(this, "Playing the clip for Shazam. Keep the volume up.", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, str(R.string.main_activity_playing_clip_for_shazam), Toast.LENGTH_LONG).show()
         startActivity(ShazamBridge.launchIntent(this))
         lifecycleScope.launch {
             delay(1_800)
@@ -186,5 +203,8 @@ class MainActivity : ComponentActivity() {
     companion object {
         /** From the Sunday notification: open the weekly recap. */
         const val EXTRA_OPEN_RECAP = "open_recap"
+
+        /** Longest the splash waits for its icon animation (700 ms, values-v31/themes.xml) before handing over. */
+        private const val SPLASH_MAX_WAIT_MS = 700L
     }
 }

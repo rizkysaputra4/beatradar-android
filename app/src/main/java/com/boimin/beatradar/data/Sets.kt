@@ -1,5 +1,6 @@
 package com.boimin.beatradar.data
 
+import android.content.Context
 import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
@@ -10,6 +11,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Transaction
+import com.boimin.beatradar.R
+import com.boimin.beatradar.i18n.str
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
@@ -178,10 +181,12 @@ object SetRules {
     /** A trimmed name, or null when there's nothing left. */
     fun cleanName(raw: String): String? = raw.trim().replace(Regex("\\s+"), " ").take(MAX_NAME).ifEmpty { null }
 
+    /** The rounded tempo span of a set's songs, or null with none (one value when they round the same). */
+    fun spanBpm(min: Float?, max: Float?): IntRange? = if (min == null || max == null) null else Math.round(min)..Math.round(max)
+
     /** "118–128 BPM", "124 BPM", or "No songs yet". */
-    fun span(min: Float?, max: Float?): String = when {
-        min == null || max == null -> "No songs yet"
-        Math.round(min) == Math.round(max) -> "${Math.round(min)} BPM"
-        else -> "${Math.round(min)}–${Math.round(max)} BPM"
+    fun span(context: Context, min: Float?, max: Float?): String {
+        val span = spanBpm(min, max) ?: return context.str(R.string.library_no_songs_yet)
+        return if (span.first == span.last) context.str(R.string.library_bpm_value, span.first) else context.str(R.string.library_bpm_range, span.first, span.last)
     }
 }
