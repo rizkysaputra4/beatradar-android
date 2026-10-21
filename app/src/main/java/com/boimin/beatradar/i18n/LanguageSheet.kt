@@ -23,9 +23,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -48,6 +46,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.boimin.beatradar.R
 import com.boimin.beatradar.net.ApiException
+import com.boimin.beatradar.ui.CalmBottomSheet
+import com.boimin.beatradar.ui.rememberCalmSheetState
 import com.boimin.beatradar.ui.theme.Tone
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -132,11 +132,9 @@ fun LanguageSheet(onDismiss: () -> Unit) {
     }
     val phoneIsEnglish = phone.language == LanguageSync.ENGLISH
 
-    ModalBottomSheet(
+    CalmBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        // A short drag on the list used to close the sheet; it closes with Done, Back or a tap outside.
-        sheetGesturesEnabled = false,
+        sheetState = rememberCalmSheetState(skipPartiallyExpanded = true),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = Tone.sheet,
         // Tone.sheet isn't a theme colour, so the sheet can't work out its text colour: without this, untinted text

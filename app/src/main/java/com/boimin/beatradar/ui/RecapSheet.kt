@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -47,7 +46,7 @@ import java.util.Date
 @Composable
 fun RecapSheet(recap: Recap, streak: Long?, beatsWeek: Long?, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetGesturesEnabled = false) {
+    CalmBottomSheet(onDismissRequest = onDismiss, sheetState = rememberCalmSheetState()) {
         Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(str(R.string.recap_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
             Text(period(recap), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

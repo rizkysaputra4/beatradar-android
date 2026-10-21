@@ -24,12 +24,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -83,10 +81,9 @@ fun SettingsSheet(
     // Re-check when returning from the system settings screen.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { access = hasNotificationAccess() }
 
-    ModalBottomSheet(
+    CalmBottomSheet(
         onDismissRequest = onDismiss,
-        sheetGesturesEnabled = false,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = rememberCalmSheetState(skipPartiallyExpanded = true),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = Tone.sheet,
         // Tone.sheet isn't a theme colour, so untinted text would otherwise take the caller's (black) colour.

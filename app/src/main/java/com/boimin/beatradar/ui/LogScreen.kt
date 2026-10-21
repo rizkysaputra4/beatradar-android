@@ -37,8 +37,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -578,10 +576,9 @@ private fun RenameSheet(
     // An unnamed song opens ready to type; a rename leaves the keyboard down until a field is tapped.
     LaunchedEffect(Unit) { if (unnamed) titleFocus.requestFocus() }
 
-    ModalBottomSheet(
+    CalmBottomSheet(
         onDismissRequest = onDismiss,
-        sheetGesturesEnabled = false,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = rememberCalmSheetState(skipPartiallyExpanded = true),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = Tone.sheet,
         // Tone.sheet isn't a theme colour, so the sheet can't work out its text colour: without this, untinted text

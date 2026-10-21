@@ -21,9 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -50,6 +48,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.boimin.beatradar.R
 import com.boimin.beatradar.i18n.str
 import com.boimin.beatradar.notify.ClickPlayer
+import com.boimin.beatradar.ui.CalmBottomSheet
+import com.boimin.beatradar.ui.rememberCalmSheetState
 import com.boimin.beatradar.ui.theme.Brand
 import com.boimin.beatradar.ui.theme.Tone
 
@@ -78,10 +78,9 @@ internal fun PracticeSheet(songTitle: String, startBpm: Int, listening: Boolean,
         while (true) withFrameMillis { beat = ClickPlayer.beatInBar() }
     }
 
-    ModalBottomSheet(
+    CalmBottomSheet(
         onDismissRequest = onDismiss,
-        sheetGesturesEnabled = false,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = rememberCalmSheetState(skipPartiallyExpanded = true),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = Tone.sheet,
         // Tone.sheet isn't a theme colour, so the sheet can't work out its text colour: without this, untinted text

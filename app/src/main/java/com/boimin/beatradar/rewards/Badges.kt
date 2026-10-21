@@ -22,9 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +44,8 @@ import com.boimin.beatradar.i18n.appLocale
 import com.boimin.beatradar.i18n.str
 import com.boimin.beatradar.i18n.strPlural
 import com.boimin.beatradar.net.BadgeView
+import com.boimin.beatradar.ui.CalmBottomSheet
+import com.boimin.beatradar.ui.rememberCalmSheetState
 import com.boimin.beatradar.ui.theme.Brand
 import com.boimin.beatradar.ui.theme.Tone
 import java.text.NumberFormat
@@ -252,10 +252,9 @@ private fun BadgeTile(badge: BadgeView, modifier: Modifier, onClick: () -> Unit)
 fun BadgeDetailSheet(badge: BadgeView, onDismiss: () -> Unit) {
     val earned = badge.earned || badge.count > 0
     val col = color(badge.code, badge.tier, earned, badge.tiered, badge.repeatable)
-    ModalBottomSheet(
+    CalmBottomSheet(
         onDismissRequest = onDismiss,
-        sheetGesturesEnabled = false,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = rememberCalmSheetState(skipPartiallyExpanded = true),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = Tone.sheet,
         contentColor = MaterialTheme.colorScheme.onSurface,
