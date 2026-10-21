@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -25,6 +27,21 @@ android {
         buildConfigField("long", "CLOUD_PROJECT_NUMBER", "0L")
     }
 
+    // The Play upload key lives outside the repo (the workspace's secrets/ folder); override the properties file with
+    // -PsigningProps=path or BEATRADAR_SIGNING_PROPS. Without it, release builds come out unsigned.
+    val signingProps = ((project.findProperty("signingProps") as String?) ?: System.getenv("BEATRADAR_SIGNING_PROPS"))
+        ?.let(::file) ?: rootProject.file("../secrets/beatradar-upload.properties")
+    val uploadKey = signingProps.takeIf { it.isFile }?.let { f ->
+        Properties().apply { f.inputStream().use(::load) }.let { p ->
+            signingConfigs.create("upload") {
+                storeFile = f.resolveSibling(p.getProperty("storeFile"))
+                storePassword = p.getProperty("storePassword")
+                keyAlias = p.getProperty("keyAlias")
+                keyPassword = p.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             // The emulator reaches the PC's localhost at 10.0.2.2. Override with -PapiBaseUrl=... (e.g. the PC's LAN IP
@@ -38,11 +55,16 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = uploadKey
         }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+    packaging {
+        // Library licence texts, version markers and the coroutines debug agent: nothing reads them at run time.
+        resources.excludes += listOf("META-INF/**/LICENSE*", "META-INF/*.version", "DebugProbesKt.bin")
     }
     buildFeatures {
         compose = true
