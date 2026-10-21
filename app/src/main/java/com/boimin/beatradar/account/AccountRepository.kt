@@ -159,8 +159,10 @@ class AccountRepository(context: Context) : TokenSource {
         return runCatching { api.get<Me>("v1/me") }.getOrNull()?.also(::updateUser)
     }
 
+    suspend fun updateProfile(update: ProfileUpdate): Me = api.patch<ProfileUpdate, Me>("v1/me/profile", update).also(::updateUser)
+
     suspend fun updateProfile(nickname: String? = null, onLeaderboard: Boolean? = null): Me =
-        api.patch<ProfileUpdate, Me>("v1/me/profile", ProfileUpdate(nickname, onLeaderboard)).also(::updateUser)
+        updateProfile(ProfileUpdate(nickname, onLeaderboard))
 
     /** Signs out this phone. Works offline too: the local session is dropped either way. */
     suspend fun logout() {

@@ -135,6 +135,7 @@
     <string name="sets_add_to_set">Add to set</string>
     <string name="sets_remove_selected">Remove selected songs</string>
     <string name="sets_my_sets">My sets</string>
+    <string name="sets_show_on_profile">Show on my profile</string>
     <string name="sets_rename">Rename</string>
     <string name="sets_delete_set">Delete set</string>
     <string name="sets_minutes">%1$d min</string>

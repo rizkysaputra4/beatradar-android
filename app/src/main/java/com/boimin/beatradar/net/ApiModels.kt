@@ -62,7 +62,16 @@ val ApiJson = Json {
     val googleLinked: Boolean = false,
 )
 @Serializable data class Session(val accessToken: String, val refreshToken: String, val expiresIn: Long, val user: Me)
-@Serializable data class ProfileUpdate(val nickname: String? = null, val onLeaderboard: Boolean? = null)
+@Serializable data class ProfileUpdate(
+    val nickname: String? = null,
+    val onLeaderboard: Boolean? = null,
+    val showStreak: Boolean? = null,
+    val showTempoZone: Boolean? = null,
+    val showLoves: Boolean? = null,
+    /** Stock picture ids from `/v1/profile-art`. */
+    val avatar: String? = null,
+    val banner: String? = null,
+)
 
 // Library
 
@@ -262,8 +271,17 @@ val ApiJson = Json {
     val signedIn: Boolean = false,
     /** Bought a coffee: a small badge next to the nickname. */
     val supporter: Boolean = false,
+    /** My stock avatar, a path on the API host (`/media/avatars/…`). */
+    val avatarUrl: String? = null,
 )
-@Serializable data class BoardEntry(val rank: Long, val nickname: String, val beats: Long, val grooveMaster: Long = 0, val supporter: Boolean = false)
+@Serializable data class BoardEntry(
+    val rank: Long,
+    val nickname: String,
+    val beats: Long,
+    val grooveMaster: Long = 0,
+    val supporter: Boolean = false,
+    val avatarUrl: String? = null,
+)
 @Serializable data class BoardView(
     val period: String = "week",
     val entries: List<BoardEntry> = emptyList(),
@@ -287,11 +305,47 @@ val ApiJson = Json {
 @Serializable data class PublicBadge(val code: String, val name: String, val tier: Int = 0, val count: Int = 0)
 @Serializable data class PublicProfile(
     val nickname: String,
+    /** Stock pictures, paths on the API host (`/media/avatars/…`, `/media/banners/…`). */
+    val avatarUrl: String? = null,
+    val bannerUrl: String? = null,
     val beatsAll: Long = 0,
+    val rankAll: Long? = null,
+    val rankWeek: Long? = null,
     val grooveMaster: Long = 0,
     val supporter: Boolean = false,
+    /** `YYYY-MM`: the month only, never the day. */
+    val joined: String? = null,
     val badges: List<PublicBadge> = emptyList(),
+    /** Songs they brought in that earned Trailblazer: the same shape as my own discoveries, without milestones. */
+    val broughtIn: List<Discovery> = emptyList(),
+    val broughtInTotal: Long = 0,
+    /** Shared sets pinned to the profile: the first page, and the cursor for the next. */
+    val pinnedSets: List<ProfileSet> = emptyList(),
+    val pinnedSetsNext: String? = null,
+    /** Opt-in sections: null unless the owner shows them (always filled on my own). */
+    val streak: Long? = null,
+    val tempoZone: TempoZone? = null,
+    val loves: List<Discovery>? = null,
 )
+@Serializable data class ProfileSetPage(val items: List<ProfileSet> = emptyList(), val nextCursor: String? = null)
+@Serializable data class ProfileSet(val slug: String, val name: String, val songs: Long = 0, val bpmLow: Float? = null, val bpmHigh: Float? = null)
+/** The middle half of someone's recent tempos, e.g. 158–172 BPM over 40 songs. */
+@Serializable data class TempoZone(val low: Int, val high: Int, val songs: Long = 0)
+/** My own profile with everything on it, and the switches for what others see. */
+@Serializable data class MyProfile(
+    val profile: PublicProfile,
+    val public: Boolean = true,
+    val showStreak: Boolean = false,
+    val showTempoZone: Boolean = false,
+    val showLoves: Boolean = false,
+    val sharedSets: List<MySharedSet> = emptyList(),
+)
+@Serializable data class MySharedSet(val slug: String, val name: String, val songs: Long = 0, val pinned: Boolean = false)
+@Serializable data class PinIn(val pinned: Boolean)
+@Serializable data class ArtItem(val id: String, val url: String)
+/** The stock of avatars and background pictures to pick from. */
+@Serializable data class ProfileArt(val avatars: List<ArtItem> = emptyList(), val banners: List<ArtItem> = emptyList())
+@Serializable data class PinOut(val pinned: Boolean)
 
 // Unnamed songs and name suggestions (PLAN §5c)
 

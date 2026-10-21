@@ -29,6 +29,11 @@ import com.boimin.beatradar.net.ApiJson
 import com.boimin.beatradar.net.Landmarks
 import com.boimin.beatradar.net.LoveState
 import com.boimin.beatradar.net.NicknameReport
+import com.boimin.beatradar.net.MyProfile
+import com.boimin.beatradar.net.PinIn
+import com.boimin.beatradar.net.PinOut
+import com.boimin.beatradar.net.ProfileArt
+import com.boimin.beatradar.net.ProfileSetPage
 import com.boimin.beatradar.net.PublicProfile
 import com.boimin.beatradar.net.RecognizeIn
 import com.boimin.beatradar.net.RecognizeOut
@@ -142,6 +147,16 @@ class LibraryRepository(private val account: AccountRepository) {
     suspend fun leaderboard(allTime: Boolean): BoardView = api.get("v1/leaderboard", mapOf("period" to if (allTime) "all" else "week"))
 
     suspend fun profile(nickname: String): PublicProfile = api.get("v1/users/$nickname")
+
+    suspend fun myProfile(): MyProfile = api.get("v1/me/profile")
+
+    suspend fun profileArt(): ProfileArt = api.get("v1/profile-art", auth = false)
+
+    /** The next page of someone's pinned sets ([nickname] null: mine). */
+    suspend fun profileSets(nickname: String?, cursor: String): ProfileSetPage =
+        api.get(if (nickname == null) "v1/me/profile/sets" else "v1/users/$nickname/sets", mapOf("cursor" to cursor))
+
+    suspend fun pinSet(slug: String, pinned: Boolean): PinOut = api.put<PinIn, PinOut>("v1/me/set-shares/$slug/pin", PinIn(pinned))
 
     suspend fun reportNickname(nickname: String, note: String?) {
         api.post<NicknameReport, Unit>("v1/users/$nickname/reports", NicknameReport(note))

@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.boimin.beatradar.R
+import com.boimin.beatradar.rewards.ProfileAvatar
 import com.boimin.beatradar.data.Settings
 import com.boimin.beatradar.data.ThemeMode
 import com.boimin.beatradar.i18n.LanguageSheet
@@ -340,6 +341,28 @@ private fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled
 /** 15 (MB) for 30 clips of ~0.5 MB. */
 internal fun clipStorageMb(limit: Int): Int = (limit * Settings.CLIP_MB).roundToInt()
 
+/** Change the nickname: 3–24 characters, checked again by the server. */
+@Composable
+internal fun NicknameDialog(current: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    var nickname by remember { mutableStateOf(current) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str(R.string.settings_nickname_title)) },
+        text = {
+            OutlinedTextField(
+                value = nickname,
+                onValueChange = { nickname = it.take(24) },
+                singleLine = true,
+                supportingText = { Text(str(R.string.settings_nickname_hint)) },
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(nickname) }, enabled = nickname.trim().length >= 3) { Text(str(R.string.settings_save)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(str(R.string.settings_cancel)) } },
+    )
+}
+
 /** The account part of Settings (PLAN §8: sign in, sign out and delete live here, not in a tab). */
 class AccountSettings(
     val user: Me?,
@@ -377,15 +400,7 @@ private fun AccountSection(a: AccountSettings) {
     val name = user.nickname ?: str(R.string.settings_account_no_nickname)
     Card {
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            // The nickname's first letter in a violet circle.
-            Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) {
-                Text(
-                    user.nickname?.firstOrNull()?.uppercase(appLocale()) ?: "?",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                )
-            }
+            ProfileAvatar(user.nickname, 40)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -402,25 +417,7 @@ private fun AccountSection(a: AccountSettings) {
             TextButton(onClick = { confirmDelete = true }) { Text(str(R.string.settings_account_delete), color = MaterialTheme.colorScheme.error) }
         }
     }
-    if (renaming) {
-        var nickname by remember { mutableStateOf(user.nickname.orEmpty()) }
-        AlertDialog(
-            onDismissRequest = { renaming = false },
-            title = { Text(str(R.string.settings_nickname_title)) },
-            text = {
-                OutlinedTextField(
-                    value = nickname,
-                    onValueChange = { nickname = it.take(24) },
-                    singleLine = true,
-                    supportingText = { Text(str(R.string.settings_nickname_hint)) },
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { renaming = false; a.onRename(nickname) }, enabled = nickname.trim().length >= 3) { Text(str(R.string.settings_save)) }
-            },
-            dismissButton = { TextButton(onClick = { renaming = false }) { Text(str(R.string.settings_cancel)) } },
-        )
-    }
+    if (renaming) NicknameDialog(user.nickname.orEmpty(), onSave = { renaming = false; a.onRename(it) }, onDismiss = { renaming = false })
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },

@@ -16,6 +16,11 @@ import com.boimin.beatradar.net.Facets
 import com.boimin.beatradar.net.PlaylistBpm
 import com.boimin.beatradar.net.SharedSet
 import com.boimin.beatradar.net.Trending
+import com.boimin.beatradar.account.AccountViewModel
+import com.boimin.beatradar.net.MyProfile
+import com.boimin.beatradar.net.ProfileArt
+import com.boimin.beatradar.net.ProfileSet
+import com.boimin.beatradar.net.ProfileUpdate
 import com.boimin.beatradar.net.PublicProfile
 import com.boimin.beatradar.net.SongLink
 import com.boimin.beatradar.net.SongDetail
@@ -227,6 +232,12 @@ class LibraryViewModel(application: Application, private val saved: SavedStateHa
 
     /** Shares a set as a link (sharing again updates the same link). Returns the text for the share sheet. */
     suspend fun shareSet(setId: Long): String? {
+        val (set, songs, out) = publishSet(setId) ?: return null
+        return context.str(R.string.sets_share_text, set.name, SetRules.span(context, songs.minOf { it.bpm }, songs.maxOf { it.bpm }), out.url)
+    }
+
+    /** Puts the set's current songs online as its share snapshot; null (with a message) when it can't. */
+    private suspend fun publishSet(setId: Long): Triple<com.boimin.beatradar.data.SongSet, List<SetSong>, com.boimin.beatradar.net.ShareOut>? {
         val set = setDao.byId(setId) ?: return null
         val songs = setDao.songs(setId)
         if (songs.isEmpty()) {
@@ -236,10 +247,28 @@ class LibraryViewModel(application: Application, private val saved: SavedStateHa
         return try {
             val out = repo.shareSet(set.syncId, set.name, songs.map { it.slug })
             setDao.setShareSlug(setId, out.slug)
-            context.str(R.string.sets_share_text, set.name, SetRules.span(context, songs.minOf { it.bpm }, songs.maxOf { it.bpm }), out.url)
+            Triple(set, songs, out)
         } catch (e: ApiException) {
             _message.value = describe(e)
             null
+        }
+    }
+
+    /** Shows one of my sets on my profile: shares its current songs, then pins that share. */
+    fun showSetOnProfile(setId: Long) {
+        if (!signedIn) {
+            _message.value = context.str(R.string.library_error_sign_in)
+            return
+        }
+        viewModelScope.launch {
+            val (_, _, out) = publishSet(setId) ?: return@launch
+            try {
+                repo.pinSet(out.slug, true)
+                _message.value = context.str(R.string.profile_set_shown)
+            } catch (e: ApiException) {
+                _message.value = describe(e)
+            }
+            refreshMyProfile()
         }
     }
 
@@ -401,8 +430,27 @@ class LibraryViewModel(application: Application, private val saved: SavedStateHa
         saved.get<String>(OPEN_SONG)?.let(::open)
     }
 
-    private val _profile = MutableStateFlow<PublicProfile?>(null)
-    val profile: StateFlow<PublicProfile?> = _profile
+    private val _profiles = MutableStateFlow<List<ProfilePage>>(emptyList())
+    /** Open profile pages, the top one showing; empty when none is open. */
+    val profiles: StateFlow<List<ProfilePage>> = _profiles
+    private var nextProfileKey = 0
+
+    private val _profileArt = MutableStateFlow<ProfileArt?>(null)
+    /** The stock pictures to pick from, loaded when the picker opens. */
+    val profileArt: StateFlow<ProfileArt?> = _profileArt
+
+    fun loadProfileArt() {
+        viewModelScope.launch {
+            try {
+                _profileArt.value = repo.profileArt()
+            } catch (e: ApiException) {
+                _message.value = describe(e)
+            }
+        }
+    }
+
+    /** My nickname, so tapping myself anywhere opens my own page (with its switches). */
+    val myNickname = MutableStateFlow<String?>(null)
 
     private val _message = MutableStateFlow<String?>(null)
     /** A one-off message for a snackbar (e.g. "Report sent"). */
@@ -545,17 +593,139 @@ class LibraryViewModel(application: Application, private val saved: SavedStateHa
     }
 
     fun openProfile(nickname: String) {
+        if (nickname.equals(myNickname.value, ignoreCase = true)) openMyProfile() else pushProfile(nickname)
+    }
+
+    fun openMyProfile() = pushProfile(null)
+
+    /**
+     * Opens a profile page over whatever shows. A song page or shared set open underneath closes and comes back on
+     * Back, so profile → song → profile → … reads like a stack without a navigation library.
+     */
+    private fun pushProfile(nickname: String?) {
+        if (_profiles.value.lastOrNull()?.let { it.nickname == nickname && it.isMe == (nickname == null) } == true) return
+        val song = _detail.value?.slug
+        val set = _sharedSet.value?.slug
+        if (song != null) close()
+        if (set != null) closeSharedSet()
+        val page = ProfilePage(key = nextProfileKey++, nickname = nickname, returnToSong = song, returnToSet = set)
+        _profiles.update { (it + page).takeLast(MAX_PROFILES) }
+        loadProfile(page.key)
+    }
+
+    fun backFromProfile() {
+        val top = _profiles.value.lastOrNull() ?: return
+        _profiles.update { it.dropLast(1) }
+        top.returnToSet?.let(::openSharedSet)
+        top.returnToSong?.let(::open)
+    }
+
+    fun closeProfiles() {
+        _profiles.value = emptyList()
+    }
+
+    /** Reloads my own page wherever it is open (after signing in or out, or a change). */
+    fun refreshMyProfile() = _profiles.value.filter { it.isMe }.forEach { loadProfile(it.key) }
+
+    fun refreshProfile(key: Int) = loadProfile(key)
+
+    private fun loadProfile(key: Int) {
+        val page = _profiles.value.firstOrNull { it.key == key } ?: return
         viewModelScope.launch {
-            try {
-                _profile.value = repo.profile(nickname)
+            val loaded = try {
+                if (page.isMe) {
+                    if (signedIn) {
+                        val mine = repo.myProfile()
+                        page.copy(mine = mine, error = null, moreSets = emptyList(), setsNext = mine.profile.pinnedSetsNext)
+                    } else {
+                        page.copy(mine = null, error = null)
+                    }
+                } else {
+                    val profile = repo.profile(page.nickname!!)
+                    page.copy(profile = profile, error = null, moreSets = emptyList(), setsNext = profile.pinnedSetsNext)
+                }
             } catch (e: ApiException) {
-                _message.value = if (e.http == 404) context.str(R.string.library_profile_hidden) else describe(e)
+                page.copy(error = if (e.http == 404 && !page.isMe) context.str(R.string.library_profile_hidden) else describe(e))
+            }
+            _profiles.update { stack -> stack.map { if (it.key == key) loaded else it } }
+        }
+    }
+
+    /** The next page of pinned sets, as the page scrolls near its end. */
+    fun loadMoreSets(key: Int) {
+        val page = _profiles.value.firstOrNull { it.key == key } ?: return
+        val cursor = page.setsNext ?: return
+        if (page.loadingSets) return
+        _profiles.update { stack -> stack.map { if (it.key == key) it.copy(loadingSets = true) else it } }
+        viewModelScope.launch {
+            val next = try {
+                repo.profileSets(page.nickname, cursor)
+            } catch (e: ApiException) {
+                _message.value = describe(e)
+                null
+            }
+            _profiles.update { stack ->
+                stack.map { p ->
+                    when {
+                        p.key != key -> p
+                        next == null || p.setsNext != cursor -> p.copy(loadingSets = false)
+                        else -> p.copy(moreSets = p.moreSets + next.items, setsNext = next.nextCursor, loadingSets = false)
+                    }
+                }
             }
         }
     }
 
-    fun closeProfile() {
-        _profile.value = null
+    private fun updateMine(change: (MyProfile) -> MyProfile) {
+        _profiles.update { stack -> stack.map { p -> if (p.isMe && p.mine != null) p.copy(mine = change(p.mine)) else p } }
+    }
+
+    /** Who sees my profile, and which opt-in sections. The switch moves at once; a failure puts it back. */
+    fun updateMySections(update: ProfileUpdate) {
+        updateMine {
+            it.copy(
+                public = update.onLeaderboard ?: it.public,
+                showStreak = update.showStreak ?: it.showStreak,
+                showTempoZone = update.showTempoZone ?: it.showTempoZone,
+                showLoves = update.showLoves ?: it.showLoves,
+                profile = it.profile.copy(
+                    avatarUrl = update.avatar?.let { id -> "/media/avatars/$id" } ?: it.profile.avatarUrl,
+                    bannerUrl = update.banner?.let { id -> "/media/banners/$id" } ?: it.profile.bannerUrl,
+                ),
+            )
+        }
+        viewModelScope.launch {
+            try {
+                getApplication<Application>().app.account.updateProfile(update)
+            } catch (e: ApiException) {
+                _message.value = describe(e)
+                refreshMyProfile()
+            }
+        }
+    }
+
+    fun renameMe(nickname: String) {
+        viewModelScope.launch {
+            try {
+                val me = getApplication<Application>().app.account.updateProfile(nickname = nickname.trim())
+                myNickname.value = me.nickname
+                refreshMyProfile()
+            } catch (e: ApiException) {
+                _message.value = if (e.code == "nickname_taken" || e.code == "nickname_not_allowed") AccountViewModel.describe(context, e) else describe(e)
+            }
+        }
+    }
+
+    fun pinSet(slug: String, pinned: Boolean) {
+        updateMine { m -> m.copy(sharedSets = m.sharedSets.map { if (it.slug == slug) it.copy(pinned = pinned) else it }) }
+        viewModelScope.launch {
+            try {
+                repo.pinSet(slug, pinned)
+            } catch (e: ApiException) {
+                _message.value = describe(e)
+            }
+            refreshMyProfile()
+        }
     }
 
     fun reportNickname(nickname: String) {
@@ -594,6 +764,30 @@ class LibraryViewModel(application: Application, private val saved: SavedStateHa
 
     }
 }
+
+/**
+ * An open profile page: someone's by [nickname], or mine when it is null ([mine] then, else [profile]). Back reopens
+ * the song page or shared set it was opened from.
+ */
+data class ProfilePage(
+    val key: Int,
+    val nickname: String?,
+    val profile: PublicProfile? = null,
+    val mine: MyProfile? = null,
+    val error: String? = null,
+    val returnToSong: String? = null,
+    val returnToSet: String? = null,
+    /** Pinned sets loaded past the first page, and the cursor for more (null: all loaded). */
+    val moreSets: List<ProfileSet> = emptyList(),
+    val setsNext: String? = null,
+    val loadingSets: Boolean = false,
+) {
+    val isMe: Boolean get() = nickname == null
+    val sets: List<ProfileSet> get() = (mine?.profile ?: profile)?.pinnedSets.orEmpty() + moreSets
+}
+
+/** Profile pages kept for Back; older ones drop off. */
+private const val MAX_PROFILES = 8
 
 /** [SavedStateHandle] key: the slug of the open song page. */
 private const val OPEN_SONG = "openSong"

@@ -433,6 +433,9 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
                         BarIcon(R.drawable.ic_more, str(R.string.library_more), 22, Tone.text2) { menu = true }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(text = { Text(str(R.string.sets_rename)) }, onClick = { menu = false; renaming = true })
+                            if (actions.signedIn) {
+                                DropdownMenuItem(text = { Text(str(R.string.sets_show_on_profile)) }, onClick = { menu = false; vm.showSetOnProfile(set.id) })
+                            }
                             DropdownMenuItem(text = { Text(str(R.string.sets_delete_set), color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; deleting = true })
                         }
                     }

@@ -113,13 +113,58 @@
     <string name="rewards_discovery_milestone">%1$s+ reached</string>
 
     <!-- Rewards: someone's public profile -->
-    <plurals name="rewards_profile_beats">
-        <item quantity="one">%1$s beat</item>
-        <item quantity="other">%1$s beats</item>
-    </plurals>
-    <string name="rewards_groove_master_count">Groove Master ×%1$d</string>
     <string name="rewards_profile_no_badges">No badges yet</string>
     <string name="rewards_profile_report">Report this nickname</string>
+    <!-- %1$s = month and year, e.g. "October 2026" -->
+    <string name="rewards_profile_joined">Joined %1$s</string>
+    <!-- %1$s = number of songs -->
+    <string name="rewards_profile_brought_in_header">BROUGHT IN · %1$s</string>
+    <!-- My profile: who can see it -->
+    <string name="rewards_profile_public">Public profile</string>
+    <string name="rewards_profile_public_desc">Anyone can open your profile. Never your name, email or log.</string>
+    <string name="rewards_profile_hidden_desc">Hidden: you\'re off the leaderboards and nobody can open your profile.</string>
+
+    <!-- Profile page -->
+    <string name="profile_title">Profile</string>
+    <string name="profile_guest_title">Your profile</string>
+    <string name="profile_guest_body">Sign in to get a nickname, keep your beats and show your badges and the songs you brought in.</string>
+    <string name="profile_all_badges">All badges and progress →</string>
+    <string name="profile_stat_beats">Beats</string>
+    <string name="profile_stat_rank">Rank</string>
+    <!-- Whether others see a section of my profile -->
+    <string name="profile_section_public">Public</string>
+    <string name="profile_section_private">Only you</string>
+    <string name="profile_streak_header">STREAK</string>
+    <plurals name="profile_streak_days">
+        <item quantity="one">day in a row</item>
+        <item quantity="other">days in a row</item>
+    </plurals>
+    <string name="profile_see_all">See all →</string>
+    <string name="profile_pictures">Profile pictures</string>
+    <string name="profile_pictures_avatar">Avatar</string>
+    <string name="profile_pictures_background">Background</string>
+    <string name="profile_pictures_empty">No pictures to choose from yet.</string>
+    <string name="profile_supporter">☕ Supporter</string>
+    <string name="profile_tempo_zone_header">TEMPO ZONE</string>
+    <!-- %1$d, %2$d = BPM -->
+    <string name="profile_tempo_zone_range">%1$d–%2$d</string>
+    <plurals name="profile_tempo_zone_songs">
+        <item quantity="one">BPM · %1$s song, last 90 days</item>
+        <item quantity="other">BPM · %1$s songs, last 90 days</item>
+    </plurals>
+    <string name="profile_tempo_zone_empty">Measure 20 different songs to get a tempo zone.</string>
+    <string name="profile_loves_header">LOVED SONGS</string>
+    <string name="profile_loves_empty">No loved songs yet.</string>
+    <string name="profile_sets_header">PINNED SETS</string>
+    <string name="profile_sets_hint">Sets you add show here. Anyone who opens your profile can open and copy them.</string>
+    <string name="profile_add_set">+ Add a set</string>
+    <string name="profile_remove_set">Remove</string>
+    <string name="profile_pick_set_title">Show a set on your profile</string>
+    <string name="profile_pick_set_empty">Make a set in the Sets tab first.</string>
+    <string name="profile_set_shown">Set shown on your profile</string>
+    <string name="profile_show_all">Show all</string>
+    <string name="profile_show_less">Show less</string>
+    <string name="profile_set_bpm">%1$d–%2$d BPM</string>
 
     <!-- Badges. The app names them by code; the server's English name is only a fallback for codes it doesn't know. -->
     <!-- %1$s = badge name, %2$d = times earned -->

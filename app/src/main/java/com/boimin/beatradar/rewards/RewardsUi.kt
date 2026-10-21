@@ -53,18 +53,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.boimin.beatradar.BuildConfig
 import com.boimin.beatradar.R
+import coil3.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import com.boimin.beatradar.account.AccountViewModel
+import com.boimin.beatradar.i18n.appLocale
 import com.boimin.beatradar.i18n.str
 import com.boimin.beatradar.i18n.strPlural
-import com.boimin.beatradar.library.Pill
 import com.boimin.beatradar.net.BadgeView
 import com.boimin.beatradar.net.BoardEntry
 import com.boimin.beatradar.net.Discovery
-import com.boimin.beatradar.net.PublicProfile
 import com.boimin.beatradar.net.Rewards
 import com.boimin.beatradar.ui.theme.Brand
 import java.text.NumberFormat
+import java.util.Locale
 import kotlin.math.roundToInt
 import com.boimin.beatradar.ui.Skeleton
 import com.boimin.beatradar.ui.SkeletonBox
@@ -131,10 +134,16 @@ fun BeatsChip(rewards: Rewards?, compact: Boolean = false, onClick: () -> Unit) 
     }
 }
 
-/** Beats, rank, streak, badges and the leaderboards (PLAN §7b). */
+/** Beats, rank, streak, badges and the leaderboards (PLAN §7b). A row on the board opens that person's profile. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String) -> Unit, onDismiss: () -> Unit) {
+fun RewardsSheet(
+    vm: AccountViewModel,
+    onSignIn: () -> Unit,
+    onOpenSong: (String) -> Unit,
+    onOpenProfile: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
     val rewards by vm.rewards.collectAsStateWithLifecycle()
     val discoveries by vm.discoveries.collectAsStateWithLifecycle()
     val board by vm.board.collectAsStateWithLifecycle()
@@ -339,12 +348,12 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String
                 val me = b.me
                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     b.entries.forEach { entry ->
-                        BoardRow(entry, highlight = me != null && entry.rank == me.rank && entry.nickname == me.nickname)
+                        BoardRow(entry, highlight = me != null && entry.rank == me.rank && entry.nickname == me.nickname, onClick = { onOpenProfile(entry.nickname) })
                     }
                     // The user's own row stays visible even outside the top 100.
                     if (me != null && b.entries.none { it.nickname == me.nickname }) {
                         HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outline)
-                        BoardRow(me, highlight = true)
+                        BoardRow(me, highlight = true, onClick = { onOpenProfile(me.nickname) })
                     }
                 }
             }
@@ -352,6 +361,32 @@ fun RewardsSheet(vm: AccountViewModel, onSignIn: () -> Unit, onOpenSong: (String
     }
     rewards?.badges?.firstOrNull { it.code == opened }?.let { BadgeDetailSheet(it, onDismiss = { opened = null }) }
 }
+
+private val AVATAR_COLORS = listOf(Brand.Violet, Brand.Coral, Brand.MintDeep, Brand.Indigo)
+
+/**
+ * A nickname's avatar: the stock picture at [avatarUrl] (a path on the API host) when there is one, over the
+ * nickname's first letter on a colour picked from the nickname, which shows while it loads or when there is none.
+ */
+@Composable
+fun ProfileAvatar(nickname: String?, size: Int, avatarUrl: String? = null) {
+    val bg = nickname?.let { AVATAR_COLORS[Math.floorMod(it.lowercase(Locale.ROOT).hashCode(), AVATAR_COLORS.size)] }
+        ?: MaterialTheme.colorScheme.primary
+    Box(Modifier.size(size.dp).clip(CircleShape).background(bg), contentAlignment = Alignment.Center) {
+        Text(
+            nickname?.firstOrNull()?.uppercase(appLocale()) ?: "?",
+            fontSize = (size * 0.42f).sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+        )
+        mediaUrl(avatarUrl)?.let {
+            AsyncImage(model = it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
+        }
+    }
+}
+
+/** A stock picture path from the API (`/media/…`) as a full URL. */
+fun mediaUrl(path: String?): String? = path?.let { BuildConfig.API_BASE_URL.trimEnd('/') + it }
 
 @Composable
 private fun BentoStatCard(label: String, value: String?, sub: String?, modifier: Modifier = Modifier) {
@@ -394,7 +429,7 @@ private fun BentoStatCard(label: String, value: String?, sub: String?, modifier:
 private const val DISCOVERIES_SHOWN = 5
 
 @Composable
-private fun DiscoveryRow(d: Discovery, onClick: () -> Unit) {
+internal fun DiscoveryRow(d: Discovery, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -428,7 +463,7 @@ private fun DiscoveryRow(d: Discovery, onClick: () -> Unit) {
 }
 
 @Composable
-private fun BoardRow(e: BoardEntry, highlight: Boolean) {
+private fun BoardRow(e: BoardEntry, highlight: Boolean, onClick: () -> Unit) {
     val bg = if (highlight) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainerHigh
     val border = if (highlight) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f) else Color.Transparent
     Row(
@@ -437,6 +472,7 @@ private fun BoardRow(e: BoardEntry, highlight: Boolean) {
             .clip(RoundedCornerShape(10.dp))
             .background(bg)
             .border(1.dp, border, RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -447,6 +483,8 @@ private fun BoardRow(e: BoardEntry, highlight: Boolean) {
             color = if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(36.dp),
         )
+        ProfileAvatar(e.nickname, 26, e.avatarUrl)
+        Spacer(Modifier.width(8.dp))
         if (e.grooveMaster > 0) {
             Icon(
                 painterResource(R.drawable.ic_crown),
@@ -488,59 +526,6 @@ fun BadgeCelebration(badges: List<BadgeView>, onDone: () -> Unit) {
         },
         confirmButton = { TextButton(onClick = onDone) { Text(str(R.string.badge_celebration_ok)) } },
     )
-}
-
-/** Someone's public profile: nickname, beats, badges. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ProfileSheet(profile: PublicProfile, onReport: () -> Unit, onDismiss: () -> Unit) {
-    CalmBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberCalmSheetState(),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-    ) {
-        Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 32.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(painterResource(R.drawable.ic_account), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(profile.nickname, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-                    Text(strPlural(R.plurals.rewards_profile_beats, profile.beatsAll.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), number(profile.beatsAll)), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                if (profile.grooveMaster > 0) Pill(str(R.string.rewards_groove_master_count, profile.grooveMaster))
-            }
-            Spacer(Modifier.height(16.dp))
-            if (profile.badges.isEmpty()) Text(str(R.string.rewards_profile_no_badges), style = MaterialTheme.typography.bodyMedium)
-            profile.badges.chunked(3).forEach { row ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    row.forEach { b ->
-                        Column(
-                            Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
-                                .padding(vertical = 10.dp, horizontal = 6.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            BadgeArt(b.code, b.tier.coerceAtLeast(1), 44, count = b.count)
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                badgeName(b.code, b.name).let { if (b.count > 1) str(R.string.badge_name_count, it, b.count) else it },
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center,
-                            )
-                        }
-                    }
-                    repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            TextButton(onClick = onReport) { Text(str(R.string.rewards_profile_report)) }
-        }
-    }
 }
 
 private fun number(n: Long): String = NumberFormat.getIntegerInstance().format(n)

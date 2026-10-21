@@ -75,11 +75,18 @@ internal fun SharedSetScreen(state: SharedSetState, vm: LibraryViewModel, settin
                             listOfNotNull(
                                 strPlural(R.plurals.sets_song_count, set.songs.size, set.songs.size),
                                 bpmSpan(sorted.firstOrNull()?.bpm, sorted.lastOrNull()?.bpm),
-                                set.sharedBy?.let { str(R.string.sets_shared_by, it) },
                             ).joinToString(" · "),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        set.sharedBy?.let { by ->
+                            Text(
+                                str(R.string.sets_shared_by, by),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.clickable { vm.openProfile(by) },
+                            )
+                        }
                         Button(onClick = { scope.launch { vm.createSetWith(set.name, set.songs)?.let(onSaved) } }) { Text(str(R.string.sets_copy)) }
                     }
                 }

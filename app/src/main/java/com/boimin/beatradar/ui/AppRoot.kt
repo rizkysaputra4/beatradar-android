@@ -88,7 +88,9 @@ import com.boimin.beatradar.library.LibraryViewModel
 import com.boimin.beatradar.net.SongSummary
 import com.boimin.beatradar.rewards.BadgeCelebration
 import com.boimin.beatradar.rewards.BeatsChip
-import com.boimin.beatradar.rewards.ProfileSheet
+import com.boimin.beatradar.rewards.ProfileActions
+import com.boimin.beatradar.rewards.ProfileAvatar
+import com.boimin.beatradar.rewards.ProfileScreen
 import com.boimin.beatradar.rewards.RewardsSheet
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -142,7 +144,10 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
     val celebrate by accountVm.celebrate.collectAsStateWithLifecycle()
     val accountToast by accountVm.toast.collectAsStateWithLifecycle()
     val libraryMessage by libraryVm.message.collectAsStateWithLifecycle()
-    val profile by libraryVm.profile.collectAsStateWithLifecycle()
+    val profiles by libraryVm.profiles.collectAsStateWithLifecycle()
+    val sharedSetOpen by libraryVm.sharedSet.collectAsStateWithLifecycle()
+    val mySets by libraryVm.sets.collectAsStateWithLifecycle()
+    val profileArt by libraryVm.profileArt.collectAsStateWithLifecycle()
     val coffee by actions.coffee.collectAsStateWithLifecycle()
 
     var tab by rememberSaveable { mutableIntStateOf(TAB_LISTEN) }
@@ -156,11 +161,17 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { accountVm.loadRewards() }
+    // My profile page follows the account: signed in or out, renamed.
+    LaunchedEffect(user?.id, user?.nickname) {
+        libraryVm.myNickname.value = user?.nickname
+        libraryVm.refreshMyProfile()
+    }
     // Back in the app (e.g. after listening with the screen off): beats may have come in meanwhile.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { accountVm.loadRewards() }
     // A share link (App Link) opens the song in the Library.
     LaunchedEffect(openSong) {
         openSong?.let { slug ->
+            libraryVm.closeProfiles()
             tab = TAB_LIBRARY
             libraryVm.open(slug)
             vm.openSong.value = null
@@ -170,6 +181,7 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
     val sharedPlaylist by libraryVm.sharedPlaylistLink.collectAsStateWithLifecycle()
     LaunchedEffect(sharedPlaylist) {
         sharedPlaylist?.let { link ->
+            libraryVm.closeProfiles()
             tab = TAB_SETS
             libraryVm.close()
             libraryVm.openPlaylist(link)
@@ -179,6 +191,7 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
     val sharedSetLink by libraryVm.sharedSetLink.collectAsStateWithLifecycle()
     LaunchedEffect(sharedSetLink) {
         sharedSetLink?.let { slug ->
+            libraryVm.closeProfiles()
             tab = TAB_SETS
             libraryVm.close()
             libraryVm.openSharedSet(slug)
@@ -188,6 +201,7 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
     val recent by vm.recent.collectAsStateWithLifecycle()
     val songOpen by libraryVm.detail.collectAsStateWithLifecycle()
     val setOpen by libraryVm.openSetId.collectAsStateWithLifecycle()
+    val profilePage = profiles.lastOrNull()
     LaunchedEffect(accountToast) { accountToast?.let { snackbar.showSnackbar(it); accountVm.toastShown() } }
     LaunchedEffect(logMessage) { logMessage?.let { snackbar.showSnackbar(it); vm.messageShown() } }
     LaunchedEffect(libraryMessage) { libraryMessage?.let { snackbar.showSnackbar(it); libraryVm.messageShown() } }
@@ -220,8 +234,8 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             // A song page has its own bar (back, share, ⋮), so the app header steps aside.
-            // An open set has its own bar too (back, share, ⋮).
-            if (!(songOpen != null && (tab == TAB_LIBRARY || tab == TAB_SETS)) && !(tab == TAB_SETS && setOpen != null)) {
+            // An open set and a profile page have their own bar too.
+            if (profilePage == null && !(songOpen != null && (tab == TAB_LIBRARY || tab == TAB_SETS)) && !(tab == TAB_SETS && setOpen != null)) {
                 Header(
                     when (tab) {
                         TAB_LISTEN -> wordmark()
@@ -230,13 +244,16 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                         else -> AnnotatedString(str(R.string.app_title_discover))
                     },
                     rewards = { compact -> BeatsChip(rewards, compact) { showRewards = true } },
-                    onSettings = { showSettings = true },
+                    nickname = user?.nickname,
+                    avatarUrl = rewards?.avatarUrl,
+                    onProfile = libraryVm::openMyProfile,
                 )
             }
         },
         bottomBar = {
             TabBar(selected = tab, onSelect = {
-                // Another tab: any open song page closes.
+                // Any tab closes profile pages; another tab closes an open song page too.
+                libraryVm.closeProfiles()
                 if (it != tab) libraryVm.close()
                 tab = it
             })
@@ -257,7 +274,49 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
         val modifier = Modifier
-        when (tab) {
+        val libraryActions = LibraryActions(
+            signedIn = user != null,
+            requireSignIn = requireSignIn,
+            share = actions.shareSong,
+            openUrl = actions.openUrl,
+            shareText = actions.shareText,
+            updateSettings = vm::updateSettings,
+        )
+        if (profilePage != null) {
+            // A profile page sits over the tabs; a song or shared set opened from it shows over it, and Back returns.
+            if (songOpen != null || sharedSetOpen != null) {
+                SetsScreen(vm = libraryVm, settings = settings, actions = libraryActions, modifier = modifier)
+            } else {
+                BackHandler { libraryVm.backFromProfile() }
+                ProfileScreen(
+                    profilePage,
+                    signedIn = user != null,
+                    a = ProfileActions(
+                        onBack = libraryVm::backFromProfile,
+                        onSettings = { showSettings = true },
+                        onSignIn = { requireSignIn {} },
+                        onRetry = { libraryVm.refreshProfile(profilePage.key) },
+                        onOpenSong = libraryVm::open,
+                        onOpenSet = libraryVm::openSharedSet,
+                        onOpenRewards = { showRewards = true },
+                        onReport = { profilePage.nickname?.let(libraryVm::reportNickname) },
+                        onRename = libraryVm::renameMe,
+                        onSections = { update ->
+                            libraryVm.updateMySections(update)
+                            // The header shows my avatar too.
+                            if (update.avatar != null) scope.launch { kotlinx.coroutines.delay(800); accountVm.loadRewards() }
+                        },
+                        onPin = libraryVm::pinSet,
+                        mySets = mySets,
+                        onShowSet = libraryVm::showSetOnProfile,
+                        onMoreSets = { libraryVm.loadMoreSets(profilePage.key) },
+                        art = profileArt,
+                        onLoadArt = libraryVm::loadProfileArt,
+                    ),
+                    modifier = modifier,
+                )
+            }
+        } else when (tab) {
             TAB_LISTEN -> ListenScreen(
                 state = monitor,
                 settings = settings,
@@ -308,14 +367,6 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                 modifier = modifier,
             )
             else -> {
-                val libraryActions = LibraryActions(
-                    signedIn = user != null,
-                    requireSignIn = requireSignIn,
-                    share = actions.shareSong,
-                    openUrl = actions.openUrl,
-                    shareText = actions.shareText,
-                    updateSettings = vm::updateSettings,
-                )
                 if (tab == TAB_SETS) {
                     SetsScreen(vm = libraryVm, settings = settings, actions = libraryActions, modifier = modifier)
                 } else {
@@ -370,10 +421,10 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
     if (showRewards) RewardsSheet(
         accountVm,
         onSignIn = { showRewards = false; requireSignIn {} },
-        onOpenSong = { slug -> showRewards = false; tab = TAB_LIBRARY; libraryVm.open(slug) },
+        onOpenSong = { slug -> showRewards = false; if (profilePage == null) tab = TAB_LIBRARY; libraryVm.open(slug) },
+        onOpenProfile = { nickname -> showRewards = false; libraryVm.openProfile(nickname) },
         onDismiss = { showRewards = false },
     )
-    profile?.let { p -> ProfileSheet(p, onReport = { libraryVm.reportNickname(p.nickname); libraryVm.closeProfile() }, onDismiss = libraryVm::closeProfile) }
     if (celebrate.isNotEmpty()) BadgeCelebration(celebrate, onDone = accountVm::celebrated)
     if (showCoffee) CoffeeSheet(coffee, actions.buyCoffee, onDismiss = { showCoffee = false; actions.coffeeThanksShown() })
     if (confirmSignOut) {
@@ -488,15 +539,15 @@ private fun wordmark(): AnnotatedString = buildAnnotatedString {
     }
 }
 
-/** Slim header: squircle logo badge + title on the left, beats chip and bordered settings button on the right. */
+/** Slim header: squircle logo badge + title on the left, beats chip and the profile button (Settings live there) on the right. */
 @Composable
-private fun Header(title: AnnotatedString, rewards: @Composable (compact: Boolean) -> Unit, onSettings: () -> Unit) {
-    // Design: a 40 dp logo tile, the title at 20 sp bold, the beats chip and a bare 36 dp settings button.
+private fun Header(title: AnnotatedString, rewards: @Composable (compact: Boolean) -> Unit, nickname: String?, avatarUrl: String?, onProfile: () -> Unit) {
+    // Design: a 40 dp logo tile, the title at 20 sp bold, the beats chip and a bare 36 dp profile button.
     BoxWithConstraints(
         Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            // In landscape the navigation bar can sit at a side; keep the settings button clear of it.
+            // In landscape the navigation bar can sit at a side; keep the profile button clear of it.
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal)),
     ) {
         // A narrow header (a 320 dp phone, or a large font / display size): the chip drops the beats count, and the
@@ -536,10 +587,15 @@ private fun Header(title: AnnotatedString, rewards: @Composable (compact: Boolea
                 Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .clickable(onClick = onSettings),
+                    .clickable(onClickLabel = str(R.string.profile_title), onClick = onProfile),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(painterResource(R.drawable.ic_settings), contentDescription = str(R.string.app_settings), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                // Signed in: my avatar; a guest: the plain account icon.
+                if (nickname != null) {
+                    ProfileAvatar(nickname, 28, avatarUrl)
+                } else {
+                    Icon(painterResource(R.drawable.ic_account), contentDescription = str(R.string.profile_title), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+                }
             }
         }
     }

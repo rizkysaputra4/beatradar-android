@@ -66,6 +66,9 @@ class ApiClient(
 
     suspend inline fun <reified T> put(path: String): T = call("PUT", path, serializer(), "{}")
 
+    suspend inline fun <reified B, reified T> put(path: String, body: B): T =
+        call("PUT", path, serializer(), ApiJson.encodeToString(serializer<B>(), body))
+
     suspend inline fun <reified T> delete(path: String): T = call("DELETE", path, serializer())
 
     /** PUTs raw bytes (e.g. an audio clip) and returns the HTTP status (2xx); errors throw [ApiException]. */

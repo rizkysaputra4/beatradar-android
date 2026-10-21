@@ -57,7 +57,7 @@
     <string name="settings_save">Save</string>
     <string name="settings_cancel">Cancel</string>
     <string name="settings_delete_title">Delete your account?</string>
-    <string name="settings_delete_text">Your loves, log backup, badges and nickname are deleted for good. Songs you measured stay in the Library without your name. This phone\'s log stays.</string>
+    <string name="settings_delete_text">Your nickname, profile, loves, sets backup, log backup and badges are deleted for good. What you gave the Library (tempos, songs you brought in, votes, shared sets) stays, without your name. This phone\'s log stays.</string>
     <string name="settings_delete_confirm">Delete</string>
 
     <!-- What I've shared (ui/SharedSheet.kt) -->
