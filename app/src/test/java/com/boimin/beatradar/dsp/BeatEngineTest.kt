@@ -31,6 +31,30 @@ class BeatEngineTest {
         return t
     }
 
+    private class GapRecorder : BeatEngine.Listener {
+        var gaps = 0
+        override fun onSongGap() { gaps++ }
+    }
+
+    /** Music, a quiet moment (as between two tracks in a room: not silent), music again: one gap. */
+    @Test fun aQuietMomentBetweenSongsIsAGap() {
+        val rec = GapRecorder()
+        val engine = BeatEngine(rate, rec)
+        val song = TestSignals.clickTrack(128.0, 8.0, rate)
+        val room = FloatArray(2 * rate) { (kotlin.random.Random(it).nextFloat() * 2 - 1) * 0.004f }
+        var t = engine.play(TestSignals.toPcm16(song), 0)
+        t = engine.play(TestSignals.toPcm16(room), t)
+        engine.play(TestSignals.toPcm16(song), t)
+        assertEquals(1, rec.gaps)
+    }
+
+    @Test fun continuousMusicHasNoGap() {
+        val rec = GapRecorder()
+        val engine = BeatEngine(rate, rec)
+        engine.play(TestSignals.toPcm16(TestSignals.clickTrack(100.0, 20.0, rate)), 0)
+        assertEquals(0, rec.gaps)
+    }
+
     @Test fun readsContinuouslyEveryHalfSecond() {
         val rec = Recorder()
         val engine = BeatEngine(rate, rec)

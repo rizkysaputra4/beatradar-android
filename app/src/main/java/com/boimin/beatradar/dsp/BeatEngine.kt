@@ -28,6 +28,11 @@ class BeatEngine(
         /** A hit the mic just heard (drum, pluck, chord), [strength] 0..1 relative to the song's own hits. */
         fun onHit(atMs: Long, strength: Float) {}
         fun onSilenceChanged(silent: Boolean) {}
+        /**
+         * The gap between two songs: the sound fell far below the music for a moment. A room is never silent, so this
+         * is relative to how loud the music was, unlike [onSilenceChanged]. Detection has already started over.
+         */
+        fun onSongGap() {}
     }
 
     private val decimation = (inputSampleRate / TARGET_RATE).coerceAtLeast(1)
@@ -49,6 +54,12 @@ class BeatEngine(
     private var onsetReads = 0
     private var lastHitMs = Long.MIN_VALUE / 2
     private var settled = false
+    /** The sound level over the last ~0.2 s. */
+    private var shortLevel = 0.0
+    /** How loud the music has been lately: follows [shortLevel] up at once, sinks slowly. */
+    private var musicLevel = 0.0
+    private var quietSinceMs: Long? = null
+    private var lastFeedMs: Long? = null
 
     /** Safe to call from any thread; the detector starts fresh before the next buffer. */
     fun requestReset() = resetRequested.set(true)
@@ -73,6 +84,7 @@ class BeatEngine(
             }
         }
         if (silent) return
+        detectGap(bufferRms, nowMs)
 
         val n = decimate(pcm, count)
         if (level >= QUIET_RMS) {
@@ -114,6 +126,25 @@ class BeatEngine(
         onsetCeiling = maxOf(hit, onsetCeiling * 0.995)
         if (onsetReads <= ONSET_WARMUP_READS || silent || level < QUIET_RMS) return 0f
         return (hit / onsetCeiling).coerceIn(0.0, 1.0).toFloat()
+    }
+
+    private fun detectGap(bufferRms: Double, nowMs: Long) {
+        val dt = (nowMs - (lastFeedMs ?: nowMs)).coerceIn(0, 500).toDouble()
+        lastFeedMs = nowMs
+        shortLevel += (bufferRms - shortLevel) * (1 - kotlin.math.exp(-dt / SHORT_LEVEL_MS))
+        musicLevel = maxOf(shortLevel, musicLevel * kotlin.math.exp(-dt / MUSIC_LEVEL_MS))
+        if (musicLevel < GAP_MIN_MUSIC_RMS || shortLevel >= musicLevel * GAP_RATIO) {
+            quietSinceMs = null
+            return
+        }
+        val since = quietSinceMs ?: nowMs.also { quietSinceMs = it }
+        if (nowMs - since >= GAP_MS) {
+            quietSinceMs = null
+            // The quiet is the new reference: the next song has to be music again before another gap counts.
+            musicLevel = shortLevel
+            reset()
+            listener.onSongGap()
+        }
     }
 
     /** Fingerprint landmarks produced since the last call. Safe to call from any thread. */
@@ -171,6 +202,15 @@ class BeatEngine(
         const val MIN_CONFIDENCE = 0.4f
         /** Quick first guesses (before ~4 s) must be surer. */
         const val MIN_EARLY_CONFIDENCE = 0.5f
+        /** A gap between songs: the sound stays under this share of the music's level (~ -16 dB) ... */
+        const val GAP_RATIO = 0.15
+        /** ... for this long. */
+        const val GAP_MS = 1_000L
+        /** Music this quiet is too close to the room's own noise to tell a gap from it. */
+        const val GAP_MIN_MUSIC_RMS = 3e-3
+        /** Time constants: the short level follows ~0.2 s; the music level sinks by e in 10 s. */
+        const val SHORT_LEVEL_MS = 200.0
+        const val MUSIC_LEVEL_MS = 10_000.0
         /** Weaker hits than this (relative to the song's strongest) are not reported. */
         const val HIT_MIN = 0.3f
         /** One hit can spill over two reads; hits closer than this count once. */

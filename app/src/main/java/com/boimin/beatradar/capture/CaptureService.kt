@@ -302,10 +302,12 @@ class CaptureService : Service() {
         }
 
         override fun onSilenceChanged(silent: Boolean) {
-            if (silent) scope.launch(serial) {
-                resetSong()
-                Monitor.update { it.copy(bpm = null, confidence = null, lastBeatAtMs = null, matchProgress = 0f, matched = false) }
-            }
+            if (silent) scope.launch(serial) { endSong() }
+        }
+
+        override fun onSongGap() {
+            if (BuildConfig.DEBUG) Log.d(TAG, "gap between songs")
+            scope.launch(serial) { endSong() }
         }
     }
 
@@ -385,7 +387,7 @@ class CaptureService : Service() {
             val adopted = lastLogged
             if (name != null && adopted != null && NameSource.shouldReplace(earlier.nameSource, name.source)) {
                 nameLogged(adopted, name)
-            } else if (earlier.title != null) {
+            } else {
                 Monitor.update { it.copy(title = earlier.title, artist = earlier.artist) }
             }
             applyServerName()
@@ -408,7 +410,7 @@ class CaptureService : Service() {
         dao.trim()
         dao.trimPrints()
         lastLogged = LoggedSong(id, now, nameSource = name?.source, inRange = false, learning = true, placeholderNo = placeholder)
-        Monitor.update { it.copy(placeholderNo = placeholder, entryId = id) }
+        Monitor.update { it.copy(title = name?.title, artist = name?.artist, placeholderNo = placeholder, entryId = id) }
         if (placeholder != null) {
             scheduleClip(id)
             app.requestSyncAfterSong()
@@ -428,7 +430,9 @@ class CaptureService : Service() {
             dao.delete(current.id)
         }
         // The song already playing logged again (a new steady tempo) is the same play, not another one.
-        if (earlier.id == lastLogged?.id) dao.touch(earlier.id, now) else dao.countPlay(earlier.id, now)
+        val samePlay = earlier.id == lastLogged?.id ||
+            (earlier.id == endedSongId && SystemClock.elapsedRealtime() - endedAtMs < SAME_PLAY_AFTER_GAP_MS)
+        if (samePlay) dao.touch(earlier.id, now) else dao.countPlay(earlier.id, now)
         // More coverage of the song makes the next recognition easier, but only add it when sure:
         // a borderline match that was wrong would otherwise teach this entry a different song.
         val certain = lastMatchCertain
@@ -473,6 +477,9 @@ class CaptureService : Service() {
 
     /** Set by [findSameSong]: the last match was clear-cut (same title, or a fingerprint well above the bar). */
     private var lastMatchCertain = false
+    /** The song that ended at the last silence or gap, in case the "gap" was a quiet bridge in it. */
+    private var endedSongId: Long? = null
+    private var endedAtMs = 0L
 
     /** The log entry for what is playing now: same title, or an audio fingerprint that lines up. */
     private suspend fun findSameSong(title: String?, artist: String?, excludeId: Long): BeatLogEntry? {
@@ -588,6 +595,14 @@ class CaptureService : Service() {
         saveClip(id)
     }
 
+    /** Silence or a gap between songs: the song is over; the next one starts from scratch. */
+    private fun endSong() {
+        endedSongId = lastLogged?.id
+        endedAtMs = SystemClock.elapsedRealtime()
+        resetSong()
+        Monitor.update { it.copy(bpm = null, confidence = null, lastBeatAtMs = null, matchProgress = 0f, matched = false, inTargetSinceMs = null) }
+    }
+
     private fun resetSong() {
         judge.reset()
         lastLogged = null
@@ -655,6 +670,8 @@ class CaptureService : Service() {
         private const val RECOGNITION_WINDOW_MS = 90_000L
         /** Recognition looks at this much recent audio. */
         private const val QUERY_SECONDS = 12.0
+        /** The same song found again this soon after a gap is the same play (the gap was a quiet part of it). */
+        private const val SAME_PLAY_AFTER_GAP_MS = 60_000L
         private val QUERY_FRAMES = (QUERY_SECONDS * Fingerprinter.FRAMES_PER_SECOND).toInt()
         private const val MIN_QUERY_PRINTS = 20
         /** A whole song of up to ~5 minutes at 10–15 landmarks/s (~50 bytes each in the database). */
