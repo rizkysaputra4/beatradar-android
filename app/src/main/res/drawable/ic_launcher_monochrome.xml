@@ -3,31 +3,40 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Pulse Line (Monochrome) -->
-    <path
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="6.5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M 18,54 H 24 L 28,61 L 34,26 L 40,78 L 45,54 H 49" />
-    <!-- Radar Arc 1 (Inner) -->
-    <path
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="6.5"
-        android:strokeLineCap="round"
-        android:pathData="M 49,43 A 11,11 0 0,1 49,65" />
-    <!-- Radar Arc 2 (Middle) -->
-    <path
-        android:strokeColor="#FFFFFF"
-        android:strokeAlpha="0.8"
-        android:strokeWidth="6.5"
-        android:strokeLineCap="round"
-        android:pathData="M 49,33 A 21,21 0 0,1 49,75" />
-    <!-- Radar Arc 3 (Outer) -->
-    <path
-        android:strokeColor="#FFFFFF"
-        android:strokeAlpha="0.5"
-        android:strokeWidth="6.5"
-        android:strokeLineCap="round"
-        android:pathData="M 49,23 A 31,31 0 0,1 49,85" />
+    <!-- Half the visible tile (~36 of the 72 units a launcher shows): drawn at 52 %, centred.
+         Its own centre is (49, 54), so it moves 5 right to sit at the icon centre (54, 54). -->
+    <group
+        android:pivotX="49"
+        android:pivotY="54"
+        android:scaleX="0.52"
+        android:scaleY="0.52"
+        android:translateX="5">
+        <!-- Pulse Line (Monochrome) -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="6.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M 18,54 H 24 L 28,61 L 34,26 L 40,78 L 45,54 H 49" />
+        <!-- Radar Arc 1 (Inner) -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="6.5"
+            android:strokeLineCap="round"
+            android:pathData="M 49,43 A 11,11 0 0,1 49,65" />
+        <!-- Radar Arc 2 (Middle) -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeAlpha="0.8"
+            android:strokeWidth="6.5"
+            android:strokeLineCap="round"
+            android:pathData="M 49,33 A 21,21 0 0,1 49,75" />
+        <!-- Radar Arc 3 (Outer) -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeAlpha="0.5"
+            android:strokeWidth="6.5"
+            android:strokeLineCap="round"
+            android:pathData="M 49,23 A 31,31 0 0,1 49,85" />
+    </group>
 </vector>
