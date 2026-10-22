@@ -1,6 +1,8 @@
 package com.boimin.beatradar.library
 
 import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -56,6 +58,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.em
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.boimin.beatradar.R
@@ -415,7 +419,9 @@ private fun TempoSheet(query: SongQuery, settings: Settings, onChange: (SongQuer
             Box(Modifier.padding(top = 10.dp, bottom = 16.dp).size(36.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(Tone.sheetLine))
         },
     ) {
-        Column(Modifier.imePadding().padding(start = 20.dp, end = 20.dp, bottom = 28.dp)) {
+        // A short screen or an open keyboard leaves less room than the sheet needs: it scrolls rather than squeezing
+        // fixed-height parts (Done, the steppers, the name field) out of shape.
+        Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 28.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(str(R.string.library_tempo_title), fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 Text(
@@ -464,7 +470,7 @@ private fun TempoSheet(query: SongQuery, settings: Settings, onChange: (SongQuer
                 )
             }
             Spacer(Modifier.height(16.dp))
-            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text(str(R.string.library_done)) }
+            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(str(R.string.library_done)) }
         }
     }
 }
@@ -483,7 +489,15 @@ private fun TempoPresetTile(name: String, range: String, selected: Boolean, modi
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(name, fontSize = 13.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            name,
+            lineHeight = 1.15.em,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 13.sp),
+        )
         Text(range, fontSize = 11.sp, lineHeight = 13.sp, color = if (selected) Tone.text2 else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

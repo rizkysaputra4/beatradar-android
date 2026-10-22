@@ -580,11 +580,12 @@ private fun TargetSheet(settings: Settings, onSettingsChange: ((Settings) -> Set
             Box(Modifier.padding(top = 10.dp, bottom = 16.dp).size(36.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFF3A3946)))
         },
     ) {
-        Column(Modifier.imePadding().padding(start = 20.dp, end = 20.dp, bottom = 28.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(str(R.string.listen_target_range_title), fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Text(str(R.string.listen_vibrates_after), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+        // A short screen or an open keyboard leaves less room than the sheet needs: it scrolls rather than squeezing
+        // fixed-height parts (Done, the steppers, the name field) out of shape.
+        Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 28.dp)) {
+            // Title over the hint: side by side they broke "Target range" over two lines on a 320 dp phone.
+            Text(str(R.string.listen_target_range_title), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(str(R.string.listen_vibrates_after), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(16.dp))
             TempoRangeEditor(
                 low = settings.targetLow,

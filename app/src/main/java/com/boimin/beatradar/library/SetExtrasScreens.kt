@@ -1,6 +1,7 @@
 package com.boimin.beatradar.library
 
 import androidx.compose.foundation.background
+import com.boimin.beatradar.ui.tempoRangeShort
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -133,7 +134,7 @@ internal fun BuildSetScreen(state: BuildState, vm: LibraryViewModel, settings: S
             Card {
                 Text(str(R.string.sets_build_me_a_set), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(
-                    str(R.string.sets_build_body, range.first, range.last),
+                    str(R.string.sets_build_body, tempoRangeShort(settings.targetLow, settings.targetHigh)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -180,7 +181,7 @@ internal fun BuildSetScreen(state: BuildState, vm: LibraryViewModel, settings: S
                         Text(str(R.string.sets_estimated), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     if (result.songs.isNotEmpty()) {
-                        val setName = str(R.string.sets_build_name, minutes, range.first, range.last)
+                        val setName = str(R.string.sets_build_name, minutes, tempoRangeShort(settings.targetLow, settings.targetHigh))
                         Button(onClick = {
                             scope.launch { vm.createSetWith(setName, result.songs.map { it.summary() })?.let(onSaved) }
                         }) { Text(str(R.string.sets_save_as_set)) }

@@ -65,8 +65,8 @@
     <string name="song_added_by_you">You added this song to the Library</string>
     <string name="song_brought_in_by">Brought in by @%1$s</string>
     <string name="song_also_heard_at">Also heard at %1$d BPM</string>
-    <string name="song_in_target">In your %1$d–%2$d target</string>
-    <string name="song_outside_target">Outside your %1$d–%2$d target</string>
+    <string name="song_in_target">In your %1$s target</string>
+    <string name="song_outside_target">Outside your %1$s target</string>
     <string name="song_play_click">Play a click</string>
     <string name="song_feels_different">Feels different?</string>
     <plurals name="song_in_sets">
@@ -140,8 +140,8 @@
     <string name="sets_delete_set">Delete set</string>
     <string name="sets_minutes">%1$d min</string>
     <string name="sets_about_minutes">about %1$d min</string>
-    <string name="sets_all_in_target">All in your %1$d–%2$d target</string>
-    <string name="sets_some_in_target">%1$d of %2$d in your %3$d–%4$d target</string>
+    <string name="sets_all_in_target">All in your %1$s target</string>
+    <string name="sets_some_in_target">%1$d of %2$d in your %3$s target</string>
     <string name="sets_play_in">Play set in %1$s</string>
     <string name="sets_change">Change</string>
     <string name="sets_empty_set">Open any song in Library and tap Add to set to put it here. Songs are sorted by tempo.</string>
@@ -176,7 +176,7 @@
     <string name="sets_shared_missing">This shared set doesn\'t exist anymore</string>
     <string name="sets_shared_by">shared by %1$s</string>
     <string name="sets_copy">Copy this set</string>
-    <string name="sets_build_body">Well-confirmed songs at your target %1$d–%2$d BPM. Change the target on the Listen tab.</string>
+    <string name="sets_build_body">Well-confirmed songs at your target %1$s BPM. Change the target on the Listen tab.</string>
     <string name="sets_only_heard">Only songs I\'ve heard</string>
     <string name="sets_only_heard_body">Songs this phone measured</string>
     <string name="sets_building">Building…</string>
@@ -193,7 +193,7 @@
     </plurals>
     <string name="sets_estimated">Some lengths are guesses (3:30).</string>
     <string name="sets_save_as_set">Save as set</string>
-    <string name="sets_build_name">%1$d min at %2$d–%3$d</string>
+    <string name="sets_build_name">%1$d min at %2$s</string>
 
     <!-- BPM of a playlist (PlaylistScreen) -->
     <string name="playlist_title">BPM of a playlist</string>

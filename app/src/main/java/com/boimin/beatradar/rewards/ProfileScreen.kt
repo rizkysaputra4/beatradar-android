@@ -56,6 +56,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.text.TextAutoSize
 import com.boimin.beatradar.R
 import com.boimin.beatradar.data.SetSummary
 import com.boimin.beatradar.i18n.appLocale
@@ -433,7 +435,15 @@ private fun Stats(p: PublicProfile) {
 private fun Stat(value: String, label: String, modifier: Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(value, fontSize = 22.sp, lineHeight = 26.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-        Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            label,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 11.sp),
+        )
     }
 }
 
@@ -479,7 +489,7 @@ private fun SectionCard(title: String, trailing: (@Composable () -> Unit)? = nul
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(Modifier.fillMaxWidth().height(28.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically) {
             SectionTitle(title, Modifier.weight(1f))
             trailing?.invoke()
         }
@@ -526,11 +536,14 @@ private fun VisibilityChip(shown: Boolean, onShown: (Boolean) -> Unit) {
     ) {
         Icon(painterResource(if (shown) R.drawable.ic_groups else R.drawable.ic_account), null, tint = if (shown) Tone.primarySoft else Tone.text3, modifier = Modifier.size(14.dp))
         Spacer(Modifier.width(5.dp))
+        // A half-width card on a 320 dp phone with a large font: "Only you" shrinks instead of breaking in two.
         Text(
             str(if (shown) R.string.profile_section_public else R.string.profile_section_private),
-            fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             color = if (shown) Tone.primarySoft else Tone.text3,
+            maxLines = 1,
+            softWrap = false,
+            autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 11.sp),
         )
     }
 }

@@ -1,6 +1,7 @@
 package com.boimin.beatradar.library
 
 import androidx.compose.ui.graphics.Color
+import com.boimin.beatradar.ui.tempoRangeShort
 import com.boimin.beatradar.ui.theme.Tone
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -230,7 +231,7 @@ private fun SongPage(
             if (settings.rangeEnabled) {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    if (inTarget) str(R.string.song_in_target, settings.targetRange.first, settings.targetRange.last) else str(R.string.song_outside_target, settings.targetRange.first, settings.targetRange.last),
+                    tempoRangeShort(settings.targetLow, settings.targetHigh).let { if (inTarget) str(R.string.song_in_target, it) else str(R.string.song_outside_target, it) },
                     fontSize = 13.sp,
                     lineHeight = 15.sp,
                     color = if (inTarget) inTargetColor() else MaterialTheme.colorScheme.onSurfaceVariant,

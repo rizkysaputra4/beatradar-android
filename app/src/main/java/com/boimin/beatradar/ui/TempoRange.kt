@@ -8,6 +8,11 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -79,6 +84,13 @@ internal fun tempoRangeShort(low: Int?, high: Int?): String = when {
     else -> "–"
 }
 
+/** Below this width a stepper can't sit beside another one. */
+private val STEPPER_MIN_WIDTH = 125.dp
+/** From this width a stepper keeps its full 44 dp − and + buttons. */
+private val STEPPER_ROOMY_WIDTH = 140.dp
+/** How far apart the ends of a range start when one end comes back. */
+private const val DEFAULT_SPAN = 10
+
 private enum class RangeMode(val label: Int) {
     ANY(R.string.tempo_mode_any),
     BETWEEN(R.string.tempo_mode_between),
@@ -111,9 +123,15 @@ internal fun TempoRangeEditor(
     fun pick(m: RangeMode) = when (m) {
         RangeMode.ANY -> onChange(null, null)
         RangeMode.BETWEEN -> {
-            val a = low ?: minOf(fallbackLow, high ?: fallbackLow)
-            val b = high ?: maxOf(fallbackHigh, a)
-            onChange(minOf(a, b), maxOf(a, b))
+            // From "140+" or "up to 110" the missing end comes back from the fallback, or [DEFAULT_SPAN] away when the
+            // fallback is on the wrong side; never a range as wide as nothing (140–140).
+            val (a, b) = when {
+                low != null && high != null -> low to high
+                low != null -> low to (if (fallbackHigh > low) fallbackHigh else low + DEFAULT_SPAN)
+                high != null -> (if (fallbackLow < high) fallbackLow else high - DEFAULT_SPAN) to high
+                else -> fallbackLow to maxOf(fallbackHigh, fallbackLow + 1)
+            }
+            onChange(a.coerceIn(floor, ceiling), b.coerceIn(floor, ceiling))
         }
         RangeMode.AT_LEAST -> onChange(low ?: fallbackLow, null)
         RangeMode.UP_TO -> onChange(null, high ?: fallbackHigh)
@@ -136,14 +154,26 @@ internal fun TempoRangeEditor(
         }
         Spacer(Modifier.height(12.dp))
         when (mode) {
-            RangeMode.BETWEEN -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                TempoStepper(str(R.string.listen_from), low!!, Modifier.weight(1f), ::setLow)
-                TempoStepper(str(R.string.listen_to), high!!, Modifier.weight(1f), ::setHigh)
+            RangeMode.BETWEEN -> BoxWithConstraints {
+                // Side by side each stepper needs room for − + and the number; on a narrow sheet (a 320 dp phone with a
+                // large font, or a large display size) they stack instead of squeezing the number out.
+                val sideBySide = (maxWidth - 10.dp) / 2 >= STEPPER_MIN_WIDTH * LocalDensity.current.fontScale.coerceAtLeast(1f)
+                if (sideBySide) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        TempoStepper(str(R.string.listen_from), low!!, Modifier.weight(1f), ::setLow)
+                        TempoStepper(str(R.string.listen_to), high!!, Modifier.weight(1f), ::setHigh)
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TempoStepper(str(R.string.listen_from), low!!, Modifier.fillMaxWidth(), ::setLow)
+                        TempoStepper(str(R.string.listen_to), high!!, Modifier.fillMaxWidth(), ::setHigh)
+                    }
+                }
             }
             RangeMode.AT_LEAST -> TempoStepper(str(R.string.tempo_mode_at_least), low!!, Modifier.fillMaxWidth(), ::setLow)
             RangeMode.UP_TO -> TempoStepper(str(R.string.tempo_mode_up_to), high!!, Modifier.fillMaxWidth(), ::setHigh)
             // Same height as a stepper, so picking a mode doesn't make the sheet jump.
-            RangeMode.ANY -> Box(Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(14.dp)).background(Tone.track), Alignment.Center) {
+            RangeMode.ANY -> Box(Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(14.dp)).background(Tone.track), Alignment.Center) {
                 Text(str(R.string.tempo_any_hint), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -155,26 +185,31 @@ private fun ModeChip(label: String, selected: Boolean, modifier: Modifier, onCli
     val shape = RoundedCornerShape(50)
     Box(
         modifier
-            .height(36.dp)
+            .heightIn(min = 36.dp)
             .clip(shape)
             .background(if (selected) Tone.selected else Tone.track)
             .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
+        // Four chips across a 320 dp sheet with a large font: "Between" shrinks instead of turning into "Betw…".
         Text(
             label,
-            fontSize = 13.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
+            softWrap = false,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 6.dp),
+            autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 13.sp),
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
         )
     }
 }
 
-/** "From 140": a 56 dp field with − and + (hold to repeat); the number itself can be typed over. */
+/**
+ * "From 140": a field at least 56 dp tall with − and + (hold to repeat); the number itself can be typed over. The
+ * buttons shrink on a narrow stepper so the number keeps its room.
+ */
 @Composable
 private fun TempoStepper(label: String, value: Int, modifier: Modifier, onValue: (Int) -> Unit) {
     // Steps count from what is shown, not from [value]: a saved setting comes back a moment later, and a held button
@@ -186,20 +221,31 @@ private fun TempoStepper(label: String, value: Int, modifier: Modifier, onValue:
         shown = v.coerceIn(Settings.BPM_FLOOR, Settings.BPM_CEILING)
         onValue(shown)
     }
-    Row(
-        modifier
-            .height(56.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(Tone.track)
-            .padding(horizontal = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RepeatStepButton(R.drawable.ic_remove, str(R.string.listen_step_lower, label), onHold = { holding = it }) { set(shown - 1) }
-        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, fontSize = 11.sp, lineHeight = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            BpmNumberField(shown, ::set)
+    BoxWithConstraints(modifier) {
+        val button = if (maxWidth < STEPPER_ROOMY_WIDTH) 36.dp else 44.dp
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Tone.track)
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RepeatStepButton(R.drawable.ic_remove, str(R.string.listen_step_lower, label), button, onHold = { holding = it }) { set(shown - 1) }
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    label,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 11.sp),
+                )
+                BpmNumberField(shown, ::set)
+            }
+            RepeatStepButton(R.drawable.ic_add, str(R.string.listen_step_raise, label), button, onHold = { holding = it }) { set(shown + 1) }
         }
-        RepeatStepButton(R.drawable.ic_add, str(R.string.listen_step_raise, label), onHold = { holding = it }) { set(shown + 1) }
     }
 }
 
@@ -215,7 +261,8 @@ private fun BpmNumberField(value: Int, onCommit: (Int) -> Unit) {
     }
     BasicTextField(
         value = text,
-        onValueChange = { if (it.text.length <= 3 && it.text.all(Char::isDigit)) text = it },
+        // Nothing above the ceiling can be typed, so a typo like 999 doesn't quietly become a 200–200 range.
+        onValueChange = { if (it.text.length <= 3 && it.text.all(Char::isDigit) && (it.text.toIntOrNull() ?: 0) <= Settings.BPM_CEILING) text = it },
         singleLine = true,
         textStyle = TextStyle(
             fontSize = 20.sp,
@@ -237,16 +284,16 @@ private fun BpmNumberField(value: Int, onCommit: (Int) -> Unit) {
     )
 }
 
-/** A 44 dp round − / + that steps once on press and keeps stepping while held. */
+/** A round − / + ([size], 44 dp unless the stepper is narrow) that steps once on press and keeps stepping while held. */
 @Composable
-private fun RepeatStepButton(icon: Int, description: String, onHold: (Boolean) -> Unit, onStep: () -> Unit) {
+private fun RepeatStepButton(icon: Int, description: String, size: Dp, onHold: (Boolean) -> Unit, onStep: () -> Unit) {
     val step by rememberUpdatedState(onStep)
     val hold by rememberUpdatedState(onHold)
     val focus = LocalFocusManager.current
     var pressed by remember { mutableStateOf(false) }
     Box(
         Modifier
-            .size(44.dp)
+            .size(size)
             .clip(CircleShape)
             .background(if (pressed) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else Color.Transparent)
             .semantics {

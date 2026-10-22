@@ -1,6 +1,7 @@
 package com.boimin.beatradar.library
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import com.boimin.beatradar.ui.BpmValue
 import com.boimin.beatradar.ui.CalmBottomSheet
@@ -60,6 +61,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.unit.em
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -381,6 +383,8 @@ private suspend fun playSet(vm: LibraryViewModel, actions: LibraryActions, playA
 
 /** "From your log" shows once this many songs are waiting. */
 private const val LOG_CARD_MIN = 3
+/** Below this width a set page's Change button is just its arrow, so "Play set in YouTube" keeps its words. */
+private val NARROW_PLAY_ROW = 290.dp
 
 @Composable
 private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings, actions: LibraryActions, onBack: () -> Unit, modifier: Modifier) {
@@ -463,8 +467,8 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
                             Spacer(Modifier.width(6.dp))
                         }
                         Text(
-                            if (inTarget == songs.size) str(R.string.sets_all_in_target, settings.targetRange.first, settings.targetRange.last)
-                            else str(R.string.sets_some_in_target, inTarget, songs.size, settings.targetRange.first, settings.targetRange.last),
+                            if (inTarget == songs.size) str(R.string.sets_all_in_target, tempoRangeShort(settings.targetLow, settings.targetHigh))
+                            else str(R.string.sets_some_in_target, inTarget, songs.size, tempoRangeShort(settings.targetLow, settings.targetHigh)),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
                             color = if (inTarget > 0) inTargetColor() else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -473,40 +477,62 @@ private fun SetDetail(set: SetSummary, vm: LibraryViewModel, settings: Settings,
                 }
                 if (songs.isNotEmpty()) {
                     Spacer(Modifier.height(20.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Row(
-                            Modifier
-                                .height(52.dp)
-                                .clip(RoundedCornerShape(26.dp))
-                                .background(MaterialTheme.colorScheme.primary)
-                                .clickable { play(0) }
-                                .padding(horizontal = 24.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(painterResource(R.drawable.ic_play), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(str(R.string.sets_play_in, appName), fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White)
-                        }
-                        Box {
+                    // Play takes what Change leaves: on a 320 dp phone its label shrinks instead of squeezing Change (the
+                    // only way to pick Spotify) down to an empty pill.
+                    BoxWithConstraints {
+                        val narrow = maxWidth < NARROW_PLAY_ROW
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                             Row(
                                 Modifier
-                                    .height(54.dp)
+                                    .weight(1f)
+                                    .height(52.dp)
                                     .clip(RoundedCornerShape(26.dp))
-                                    .border(1.dp, Tone.line, RoundedCornerShape(26.dp))
-                                    .clickable { choosingApp = true }
-                                    .padding(horizontal = 16.dp),
+                                    .background(MaterialTheme.colorScheme.primary)
+                                    .clickable { play(0) }
+                                    .padding(horizontal = 18.dp),
+                                horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(str(R.string.sets_change), fontSize = 14.sp, color = Tone.text2)
-                                Spacer(Modifier.width(4.dp))
-                                Icon(painterResource(R.drawable.ic_expand_more), contentDescription = null, tint = Tone.text2, modifier = Modifier.size(18.dp))
+                                Icon(painterResource(R.drawable.ic_play), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    str(R.string.sets_play_in, appName),
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
+                                    autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 16.sp),
+                                )
                             }
-                            DropdownMenu(expanded = choosingApp, onDismissRequest = { choosingApp = false }) {
-                                for ((value, label) in listOf("youtube" to "YouTube", "spotify" to "Spotify")) {
-                                    DropdownMenuItem(
-                                        text = { Text(if (settings.playApp == value) "✓ $label" else label) },
-                                        onClick = { choosingApp = false; actions.updateSettings { it.copy(playApp = value) } },
+                            Box {
+                                Row(
+                                    Modifier
+                                        .height(54.dp)
+                                        .clip(RoundedCornerShape(26.dp))
+                                        .border(1.dp, Tone.line, RoundedCornerShape(26.dp))
+                                        .clickable { choosingApp = true }
+                                        .padding(horizontal = if (narrow) 15.dp else 16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    if (!narrow) {
+                                        Text(str(R.string.sets_change), fontSize = 14.sp, color = Tone.text2, maxLines = 1, softWrap = false)
+                                        Spacer(Modifier.width(4.dp))
+                                    }
+                                    Icon(
+                                        painterResource(R.drawable.ic_expand_more),
+                                        contentDescription = if (narrow) str(R.string.sets_change) else null,
+                                        tint = Tone.text2,
+                                        modifier = Modifier.size(if (narrow) 22.dp else 18.dp),
                                     )
+                                }
+                                DropdownMenu(expanded = choosingApp, onDismissRequest = { choosingApp = false }) {
+                                    for ((value, label) in listOf("youtube" to "YouTube", "spotify" to "Spotify")) {
+                                        DropdownMenuItem(
+                                            text = { Text(if (settings.playApp == value) "✓ $label" else label) },
+                                            onClick = { choosingApp = false; actions.updateSettings { it.copy(playApp = value) } },
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -711,7 +737,9 @@ private fun NameSheet(
             Box(Modifier.padding(top = 10.dp, bottom = 16.dp).size(36.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(Tone.sheetLine))
         },
     ) {
-        Column(Modifier.imePadding().padding(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
+        // A short screen or an open keyboard leaves less room than the sheet needs: it scrolls rather than squeezing
+        // fixed-height parts (Done, the steppers, the name field) out of shape.
+        Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Tone.selected),
