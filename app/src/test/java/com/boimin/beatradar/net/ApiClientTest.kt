@@ -1,5 +1,7 @@
 package com.boimin.beatradar.net
 
+import com.boimin.beatradar.update.AppUpdate
+import com.boimin.beatradar.update.UpdateNeed
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -35,6 +37,18 @@ class ApiClientTest {
         val req = server.takeRequest()
         assertEquals("Bearer old", req.headers["Authorization"])
         assertEquals("/v1/songs?q=halo%20%C3%BC&bpmMin=120", req.url.encodedPath + "?" + req.url.encodedQuery)
+    }
+
+    @Test fun sendsItsVersionAndHearsUpdateRequired() = runBlocking {
+        server.enqueue(MockResponse.Builder().code(426).body("""{"error":{"code":"update_required","message":"Too old"}}""").build())
+        try {
+            ApiClient(server.url("/").toString(), appVersion = 7).get<SongPage>("v1/songs", auth = false)
+            fail("expected an error")
+        } catch (e: ApiException) {
+            assertEquals("update_required", e.code)
+        }
+        assertEquals("7", server.takeRequest().headers["X-App-Version"])
+        assertEquals(UpdateNeed.REQUIRED, AppUpdate.state.value.need)
     }
 
     @Test fun retriesOnceWithANewTokenAfter401() = runBlocking {

@@ -15,6 +15,9 @@ val ApiJson = Json {
 
 // Installs
 
+/** `GET /v1/app/version`: below [minVersionCode] the app must update; below [latestVersionCode] it may. 0 = none. */
+@Serializable data class AppVersionInfo(val minVersionCode: Int = 0, val latestVersionCode: Int = 0, val message: String? = null)
+
 @Serializable data class RegisterInstall(val installId: String, val installSecret: String, val platform: String? = "android", val appVersion: String? = null)
 @Serializable data class InstallToken(val installToken: String, val integrityRequestHash: String)
 @Serializable data class IntegrityRequest(val integrityToken: String)

@@ -17,6 +17,7 @@ import com.boimin.beatradar.notify.RecapWorker
 import com.boimin.beatradar.sync.LibrarySync
 import com.boimin.beatradar.sync.SyncWorker
 import com.boimin.beatradar.sync.UnnamedRules
+import com.boimin.beatradar.update.AppUpdate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -35,6 +36,9 @@ class BeatRadarApplication : Application() {
         super.onCreate()
         // The kept language first, so the first screen is drawn in it; then check for a newer or different pack.
         Strings.load(this)
+        // What the server last said about updates, so an outdated app opens on the update screen even offline.
+        AppUpdate.init(this)
+        scope.launch { AppUpdate.check(account.api) }
         scope.launch { LanguageSync.refresh(this@BeatRadarApplication) }
         Notifier.createChannels(this)
         // A Shazam result after "Identify" on a logged clip names that entry (and deletes its clip).

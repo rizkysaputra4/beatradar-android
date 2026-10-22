@@ -42,6 +42,10 @@ import com.boimin.beatradar.ui.AppActions
 import com.boimin.beatradar.ui.AppRoot
 import com.boimin.beatradar.ui.MainViewModel
 import com.boimin.beatradar.ui.theme.BeatRadarTheme
+import com.boimin.beatradar.update.AppUpdate
+import com.boimin.beatradar.update.UpdateAvailableDialog
+import com.boimin.beatradar.update.UpdateNeed
+import com.boimin.beatradar.update.UpdateRequiredScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -92,9 +96,17 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val settings by vm.settings.collectAsStateWithLifecycle()
+            val update by AppUpdate.state.collectAsStateWithLifecycle()
             settings?.let { s ->
                 BeatRadarTheme(s.theme) {
-                    AppRoot(vm = vm, accountVm = accountVm, libraryVm = libraryVm, settings = s, actions = actions)
+                    if (update.need == UpdateNeed.REQUIRED) {
+                        UpdateRequiredScreen(update.message, onUpdate = ::openStore)
+                    } else {
+                        AppRoot(vm = vm, accountVm = accountVm, libraryVm = libraryVm, settings = s, actions = actions)
+                        if (update.offerSuggestion) {
+                            UpdateAvailableDialog(update.message, onUpdate = { AppUpdate.dismissSuggestion(); openStore() }, onLater = AppUpdate::dismissSuggestion)
+                        }
+                    }
                 }
             }
         }
@@ -176,6 +188,13 @@ class MainActivity : ComponentActivity() {
     private fun openUrl(url: String) {
         runCatching { startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
             .onFailure { Toast.makeText(this, str(R.string.main_activity_no_app_for_link), Toast.LENGTH_SHORT).show() }
+    }
+
+    /** BeatRadar's page in the Play Store app, or on the web without it. */
+    private fun openStore() {
+        val market = Intent(Intent.ACTION_VIEW, "market://details?id=$packageName".toUri())
+        runCatching { startActivity(market) }
+            .onFailure { openUrl("https://play.google.com/store/apps/details?id=$packageName") }
     }
 
     private fun requestStart() {

@@ -76,6 +76,14 @@
     <string name="app_tab_library">Library</string>
     <string name="app_tab_sets">Sets</string>
 
+    <!-- App shell: forced and suggested updates (update/AppUpdate.kt) -->
+    <string name="app_update_required_title">Update BeatRadar</string>
+    <string name="app_update_required_body">This version is too old to use the Library, sync and your account. Update from Google Play to keep going. Your log stays on this phone.</string>
+    <string name="app_update_button">Update</string>
+    <string name="app_update_available_title">Update available</string>
+    <string name="app_update_available_body">A newer BeatRadar is on Google Play.</string>
+    <string name="app_update_later">Later</string>
+
     <!-- App shell: sign-out dialog -->
     <string name="app_sign_out_title">Keep this phone\'s log?</string>
     <string name="app_sign_out_body">Your log stays backed up in your account either way.</string>

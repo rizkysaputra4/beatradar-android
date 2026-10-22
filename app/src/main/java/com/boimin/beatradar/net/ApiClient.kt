@@ -1,5 +1,7 @@
 package com.boimin.beatradar.net
 
+import com.boimin.beatradar.BuildConfig
+import com.boimin.beatradar.update.AppUpdate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
@@ -29,12 +31,14 @@ interface TokenSource {
 
 /**
  * Small JSON client on OkHttp. Paths are relative to [baseUrl] (e.g. "v1/songs"). Without network, calls throw
- * [ApiException] with http 0 and code "offline", so callers have one error type to handle.
+ * [ApiException] with http 0 and code "offline", so callers have one error type to handle. Every request carries
+ * [appVersion] (`X-App-Version`); a 426 from the server means this build is too old ([AppUpdate]).
  */
 class ApiClient(
     baseUrl: String,
     private val tokens: TokenSource? = null,
     private val http: OkHttpClient = defaultHttp(),
+    private val appVersion: Int = BuildConfig.VERSION_CODE,
 ) {
     private val base: HttpUrl = baseUrl.toHttpUrl()
 
@@ -90,6 +94,7 @@ class ApiClient(
         }.build()
         val token = if (auth) tokens?.token() else null
         val request = Request.Builder().url(url).apply {
+            header(APP_VERSION_HEADER, appVersion.toString())
             if (token != null) header("Authorization", "Bearer $token")
             for ((k, v) in headers) header(k, v)
             method(method, body)
@@ -103,6 +108,7 @@ class ApiClient(
             }
         }
         if (code in 200..299) return code to text
+        if (code == 426) AppUpdate.onUpdateRequired()
         if (code == 401 && token != null && !retried && tokens?.onUnauthorized(token) == true) {
             return send(method, path, body, headers, query, auth, timeoutMs, retried = true)
         }
@@ -111,6 +117,7 @@ class ApiClient(
 
     companion object {
         private val JSON = "application/json".toMediaType()
+        const val APP_VERSION_HEADER = "X-App-Version"
 
         fun defaultHttp(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
