@@ -106,6 +106,9 @@ import com.boimin.beatradar.ui.tour.TourTargets
 import com.boimin.beatradar.ui.tour.tourTarget
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.ScrollState
+import com.boimin.beatradar.library.openDiscover
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -201,6 +204,11 @@ private fun AppContent(
         rewardsScroll = ScrollState(0)
         showRewards = true
     }
+    // Discover's list and trending row live here too: a song or profile opened over Discover comes back to the same
+    // place, and only opening the tab (not Back from those) loads it afresh.
+    val discoverList = rememberLazyListState()
+    val discoverTrending = rememberScrollState()
+    LaunchedEffect(tab) { if (tab == TAB_LIBRARY) openDiscover(libraryVm, settings) }
     var showCoffee by rememberSaveable { mutableStateOf(false) }
     var showShared by rememberSaveable { mutableStateOf(false) }
     var confirmSignOut by rememberSaveable { mutableStateOf(false) }
@@ -448,7 +456,14 @@ private fun AppContent(
                 if (tab == TAB_SETS) {
                     SetsScreen(vm = libraryVm, settings = settings, actions = libraryActions, modifier = modifier)
                 } else {
-                    LibraryScreen(vm = libraryVm, settings = settings, actions = libraryActions, modifier = modifier)
+                    LibraryScreen(
+                        vm = libraryVm,
+                        settings = settings,
+                        actions = libraryActions,
+                        modifier = modifier,
+                        listState = discoverList,
+                        trendingScroll = discoverTrending,
+                    )
                 }
             }
         }

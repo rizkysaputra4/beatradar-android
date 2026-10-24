@@ -20,8 +20,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -83,32 +85,53 @@ class LibraryActions(
     val updateSettings: ((Settings) -> Settings) -> Unit = {},
 )
 
+/**
+ * Discover. [listState] and [trendingScroll] are kept by the caller, so a song or profile opened over the list (which
+ * takes it out of composition) comes back to the same place. The caller also calls [openDiscover] when the tab opens.
+ */
 @Composable
-fun LibraryScreen(vm: LibraryViewModel, settings: Settings, actions: LibraryActions, modifier: Modifier = Modifier) {
+fun LibraryScreen(
+    vm: LibraryViewModel,
+    settings: Settings,
+    actions: LibraryActions,
+    modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState(),
+    trendingScroll: ScrollState = rememberScrollState(),
+) {
     val detail by vm.detail.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) {
-        // Starts at the user's own target range, like the Listen screen.
-        if (!vm.list.value.loadedOnce && settings.rangeEnabled) {
-            vm.query.value = vm.query.value.copy(bpmMin = settings.targetLow, bpmMax = settings.targetHigh, halfDouble = settings.halfDoubleMatch)
-        }
-        // Discover shows live counts and loves: fresh data every time the tab is opened.
-        vm.refresh()
-    }
     val d = detail
     if (d != null) {
         BackHandler { vm.close() }
         SongDetailScreen(d, vm, actions, settings, modifier)
     } else {
-        SongList(vm, settings, actions, modifier)
+        SongList(vm, settings, actions, listState, trendingScroll, modifier)
     }
 }
 
+/**
+ * The Discover tab was opened: fresh live counts and loves. Not on Back from a song or profile opened over it, which
+ * would reload the list as if the tab were opened again.
+ */
+fun openDiscover(vm: LibraryViewModel, settings: Settings) {
+    // Starts at the user's own target range, like the Listen screen.
+    if (!vm.list.value.loadedOnce && settings.rangeEnabled) {
+        vm.query.value = vm.query.value.copy(bpmMin = settings.targetLow, bpmMax = settings.targetHigh, halfDouble = settings.halfDoubleMatch)
+    }
+    vm.refresh()
+}
+
 @Composable
-private fun SongList(vm: LibraryViewModel, settings: Settings, actions: LibraryActions, modifier: Modifier) {
+private fun SongList(
+    vm: LibraryViewModel,
+    settings: Settings,
+    actions: LibraryActions,
+    listState: LazyListState,
+    trendingScroll: ScrollState,
+    modifier: Modifier,
+) {
     val list by vm.list.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
     val extras by vm.extras.collectAsStateWithLifecycle()
-    val listState = rememberLazyListState()
     val context = LocalContext.current
     // Long-press starts selecting songs to add to a set together.
     var selected by remember { mutableStateOf(mapOf<String, SongSummary>()) }
@@ -129,6 +152,7 @@ private fun SongList(vm: LibraryViewModel, settings: Settings, actions: LibraryA
         if (query != shownQuery) {
             shownQuery = query
             listState.scrollToItem(0)
+            trendingScroll.scrollTo(0)
         }
     }
     val trending = extras.trending?.takeIf { query.text.isBlank() && !query.lovedOnly && it.items.isNotEmpty() }
@@ -243,6 +267,7 @@ private fun SongList(vm: LibraryViewModel, settings: Settings, actions: LibraryA
                         TrendingRow(
                             title = if (trending.fallback) str(R.string.library_most_confirmed_here) else str(R.string.library_trending_here),
                             songs = trending.items,
+                            scroll = trendingScroll,
                             onOpen = { vm.open(it) },
                         )
                     }
@@ -269,10 +294,10 @@ private fun SongList(vm: LibraryViewModel, settings: Settings, actions: LibraryA
 
 /** "Trending at your tempo": this week's most measured songs in the range, swiping sideways above the list. */
 @Composable
-private fun TrendingRow(title: String, songs: List<SongSummary>, onOpen: (String) -> Unit) {
+private fun TrendingRow(title: String, songs: List<SongSummary>, scroll: ScrollState, onOpen: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(title, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.horizontalScroll(scroll), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             songs.forEach { s ->
                 Column(
                     Modifier

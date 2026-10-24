@@ -9,6 +9,21 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.boimin.beatradar.ui.theme.Tone
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +35,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,35 +56,63 @@ import java.text.DateFormat
 import java.util.Date
 
 /** Weekly Tempo Recap: songs heard, the tempo spread, the BPM you lived in, streak and beats, shareable as a card. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecapSheet(recap: Recap, streak: Long?, beatsWeek: Long?, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    CalmBottomSheet(onDismissRequest = onDismiss, sheetState = rememberCalmSheetState()) {
-        Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(str(R.string.recap_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-            Text(period(recap), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (recap.songs == 0) {
-                Text(str(R.string.recap_empty), style = MaterialTheme.typography.bodyMedium)
-                return@Column
+    // A card in the middle of the screen (not a bottom sheet), like sign-in; a tap outside it closes it.
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss)
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(20.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            // A dialog sits outside the app's Surface, so text would default to black: give it the theme's colour.
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+                RecapCard(recap, streak, beatsWeek, context)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Stat(str(R.string.recap_stat_songs), recap.songs.toString(), Modifier.weight(1f))
-                Stat(str(R.string.recap_stat_your_bpm), recap.topBand?.let { "$it–${it + 9}" } ?: "—", Modifier.weight(1f))
-                Stat(str(R.string.recap_stat_in_target), recap.inTarget.toString(), Modifier.weight(1f))
-            }
-            Histogram(recap)
-            val extras = listOfNotNull(
-                recap.averageBpm?.let { str(R.string.recap_average, it) },
-                streak?.takeIf { it > 0 }?.let { strPlural(R.plurals.recap_streak, it.toInt(), it) },
-                beatsWeek?.takeIf { it > 0 }?.let { strPlural(R.plurals.recap_beats, it.toInt(), it) },
-            )
-            if (extras.isNotEmpty()) Text(extras.joinToString(" · "), style = MaterialTheme.typography.bodyMedium)
-            recap.topSongs.firstOrNull()?.let { (label, plays) ->
-                Text(if (plays > 1) str(R.string.recap_most_played_times, label, plays) else str(R.string.recap_most_played, label), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Button(onClick = { shareRecap(context, recap, streak, beatsWeek) }) { Text(str(R.string.recap_share_card)) }
         }
+    }
+}
+
+@Composable
+private fun RecapCard(recap: Recap, streak: Long?, beatsWeek: Long?, context: Context) {
+    Column(
+        Modifier
+            .widthIn(max = 440.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(Tone.sheet)
+            // Taps on the card itself don't fall through to the backdrop.
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+            .verticalScroll(rememberScrollState())
+            .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(str(R.string.recap_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+        Text(period(recap), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (recap.songs == 0) {
+            Text(str(R.string.recap_empty), style = MaterialTheme.typography.bodyMedium)
+            return@Column
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Stat(str(R.string.recap_stat_songs), recap.songs.toString(), Modifier.weight(1f))
+            Stat(str(R.string.recap_stat_your_bpm), recap.topBand?.let { "$it–${it + 9}" } ?: "—", Modifier.weight(1f))
+            Stat(str(R.string.recap_stat_in_target), recap.inTarget.toString(), Modifier.weight(1f))
+        }
+        Histogram(recap)
+        val extras = listOfNotNull(
+            recap.averageBpm?.let { str(R.string.recap_average, it) },
+            streak?.takeIf { it > 0 }?.let { strPlural(R.plurals.recap_streak, it.toInt(), it) },
+            beatsWeek?.takeIf { it > 0 }?.let { strPlural(R.plurals.recap_beats, it.toInt(), it) },
+        )
+        if (extras.isNotEmpty()) Text(extras.joinToString(" · "), style = MaterialTheme.typography.bodyMedium)
+        recap.topSongs.firstOrNull()?.let { (label, plays) ->
+            Text(if (plays > 1) str(R.string.recap_most_played_times, label, plays) else str(R.string.recap_most_played, label), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Button(onClick = { shareRecap(context, recap, streak, beatsWeek) }) { Text(str(R.string.recap_share_card)) }
     }
 }
 

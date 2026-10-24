@@ -7,6 +7,9 @@ import com.boimin.beatradar.ui.tempoRangeLabel
 import com.boimin.beatradar.ui.tempoRangeShort
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import kotlin.math.roundToInt
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,12 +23,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -160,6 +165,26 @@ internal fun BuildSetScreen(state: BuildState, vm: LibraryViewModel, settings: S
                         Chip(str(R.string.sets_minutes, m), selected = minutes == m, modifier = Modifier.weight(1f)) { minutes = m }
                     }
                 }
+                // Any length in 5-minute steps; the chips above are just shortcuts.
+                val minutesLabel = str(R.string.sets_minutes, minutes)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Slider(
+                        value = minutes.toFloat(),
+                        onValueChange = { minutes = ((it / BUILD_STEP_MINUTES).roundToInt() * BUILD_STEP_MINUTES).coerceIn(BUILD_MIN_MINUTES, BUILD_MAX_MINUTES) },
+                        valueRange = BUILD_MIN_MINUTES.toFloat()..BUILD_MAX_MINUTES.toFloat(),
+                        modifier = Modifier.weight(1f).semantics { stateDescription = minutesLabel },
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        minutesLabel,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.widthIn(min = 64.dp),
+                    )
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(str(R.string.sets_only_heard), style = MaterialTheme.typography.bodyMedium)
@@ -231,6 +256,11 @@ internal fun BuildSetScreen(state: BuildState, vm: LibraryViewModel, settings: S
 
 /** The result's header in [BuildSetScreen]'s list, after the back button and the options card. */
 private const val RESULT_ITEM = 2
+
+/** Build-me-a-set length bounds; the server accepts 1–240 minutes. */
+private const val BUILD_MIN_MINUTES = 5
+private const val BUILD_MAX_MINUTES = 240
+private const val BUILD_STEP_MINUTES = 5
 
 /**
  * The tempo a set is built at, as a full-width row that opens [TempoSheet]: styled as a field (not a picked chip), the
