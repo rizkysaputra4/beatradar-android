@@ -22,7 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -143,11 +143,15 @@ fun RewardsSheet(
     onOpenSong: (String) -> Unit,
     onOpenProfile: (String) -> Unit,
     onDismiss: () -> Unit,
+    /** The board shown (week or all time) and where the sheet is scrolled, kept by the caller so that coming back from
+     *  a profile opened here shows the sheet as it was. */
+    allTime: Boolean,
+    onAllTime: (Boolean) -> Unit,
+    scroll: ScrollState,
 ) {
     val rewards by vm.rewards.collectAsStateWithLifecycle()
     val discoveries by vm.discoveries.collectAsStateWithLifecycle()
     val board by vm.board.collectAsStateWithLifecycle()
-    var allTime by rememberSaveable { mutableStateOf(false) }
     // The badge whose detail is open, by code so it follows fresh progress.
     var opened by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { vm.loadRewards() }
@@ -161,7 +165,7 @@ fun RewardsSheet(
     ) {
         Column(
             Modifier
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scroll)
                 .padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
         ) {
             val r = rewards
@@ -307,7 +311,7 @@ fun RewardsSheet(
                             Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(if (active) MaterialTheme.colorScheme.primary else Color.Transparent)
-                                .clickable { allTime = all }
+                                .clickable { onAllTime(all) }
                                 .padding(horizontal = 9.dp, vertical = 4.dp),
                         ) {
                             Text(

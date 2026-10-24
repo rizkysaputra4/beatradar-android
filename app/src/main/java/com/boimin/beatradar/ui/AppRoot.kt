@@ -96,6 +96,16 @@ import com.boimin.beatradar.rewards.ProfileScreen
 import com.boimin.beatradar.rewards.RewardsSheet
 import com.boimin.beatradar.ui.setup.QuickSetupRules
 import com.boimin.beatradar.ui.setup.QuickSetupScreen
+import com.boimin.beatradar.ui.tour.LocalTourTargets
+import com.boimin.beatradar.ui.tour.QuickTourOverlay
+import com.boimin.beatradar.ui.tour.QuickTourRules
+import com.boimin.beatradar.ui.tour.TabTip
+import com.boimin.beatradar.ui.tour.TourTab
+import com.boimin.beatradar.ui.tour.TourTarget
+import com.boimin.beatradar.ui.tour.TourTargets
+import com.boimin.beatradar.ui.tour.tourTarget
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.ScrollState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -133,9 +143,26 @@ private const val TAB_LISTEN = 0
 private const val TAB_LOG = 1
 private const val TAB_LIBRARY = 2
 private const val TAB_SETS = 3
+// TourTab follows the tabs' order: a tour step's tab.ordinal is its TAB_*.
 
 @Composable
 fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryViewModel, settings: Settings, actions: AppActions) {
+    // The quick tour's targets (ui/tour): the screens below mark theirs, the tour spotlights them.
+    val tourTargets = remember { TourTargets() }
+    CompositionLocalProvider(LocalTourTargets provides tourTargets) {
+        AppContent(vm, accountVm, libraryVm, settings, actions, tourTargets)
+    }
+}
+
+@Composable
+private fun AppContent(
+    vm: MainViewModel,
+    accountVm: AccountViewModel,
+    libraryVm: LibraryViewModel,
+    settings: Settings,
+    actions: AppActions,
+    tourTargets: TourTargets,
+) {
     val monitor by vm.monitor.collectAsStateWithLifecycle()
     val log by vm.log.collectAsStateWithLifecycle()
     val playingClip by com.boimin.beatradar.data.ClipStore.playing.collectAsStateWithLifecycle()
@@ -165,11 +192,32 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showSignIn by rememberSaveable { mutableStateOf(false) }
     var showRewards by rememberSaveable { mutableStateOf(false) }
+    // The beats sheet's board and scroll live here, so Back from a profile opened on its leaderboard finds it as it was.
+    var rewardsAllTime by rememberSaveable { mutableStateOf(false) }
+    var rewardsScroll by remember { mutableStateOf(ScrollState(0)) }
+    // Opened afresh (the header chip): this week's board, from the top.
+    val openRewards = {
+        rewardsAllTime = false
+        rewardsScroll = ScrollState(0)
+        showRewards = true
+    }
     var showCoffee by rememberSaveable { mutableStateOf(false) }
     var showShared by rememberSaveable { mutableStateOf(false) }
     var confirmSignOut by rememberSaveable { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    // The quick tour, from Settings only (after Quick Setup the app is ready to listen; the tabs explain themselves with
+    // a tip the first time they open). Each step opens its tab, with song pages and profiles closed, so what it points
+    // at is on screen.
+    var touring by rememberSaveable { mutableStateOf(false) }
+    var tourStep by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(touring, tourStep) {
+        if (touring) {
+            libraryVm.closeProfiles()
+            libraryVm.close()
+            tab = QuickTourRules.step(tourStep).tab.ordinal
+        }
+    }
 
     LaunchedEffect(Unit) { accountVm.loadRewards() }
     // My profile page follows the account: signed in or out, renamed.
@@ -228,6 +276,13 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
             if (result == SnackbarResult.ActionPerformed) u.undo()
         }
     }
+    val reopenRewards by libraryVm.reopenRewards.collectAsStateWithLifecycle()
+    LaunchedEffect(reopenRewards) {
+        if (reopenRewards) {
+            showRewards = true
+            libraryVm.reopenRewards.value = false
+        }
+    }
     LaunchedEffect(celebrate) { if (celebrate.isNotEmpty()) actions.celebrateHaptic() }
     // Back from another tab goes to Listen first, as in most Android apps; only Listen leaves the app. An open song
     // page or set handles Back itself (registered later, so it goes first).
@@ -254,7 +309,7 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                         TAB_SETS -> AnnotatedString(str(R.string.app_title_my_sets))
                         else -> AnnotatedString(str(R.string.app_title_discover))
                     },
-                    rewards = { compact -> BeatsChip(rewards, compact) { showRewards = true } },
+                    rewards = { compact -> BeatsChip(rewards, compact) { openRewards() } },
                     nickname = user?.nickname,
                     avatarUrl = rewards?.avatarUrl,
                     onProfile = libraryVm::openMyProfile,
@@ -309,7 +364,7 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                         onRetry = { libraryVm.refreshProfile(profilePage.key) },
                         onOpenSong = libraryVm::open,
                         onOpenSet = libraryVm::openSharedSet,
-                        onOpenRewards = { showRewards = true },
+                        onOpenRewards = openRewards,
                         onReport = { profilePage.nickname?.let(libraryVm::reportNickname) },
                         onRename = libraryVm::renameMe,
                         onSections = { update ->
@@ -338,6 +393,8 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                 onRejectSuggestion = { currentEntry?.let(vm::rejectSuggestion) },
                 recent = recent,
                 onOpenSong = { slug -> tab = TAB_LIBRARY; libraryVm.open(slug) },
+                targetHint = !touring && QuickTourRules.showsListenHint(settings),
+                onTargetHintSeen = { vm.updateSettings { QuickTourRules.tipSeen(it, TourTab.LISTEN) } },
                 modifier = modifier,
             )
             TAB_LOG -> LogScreen(
@@ -406,6 +463,34 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
         }
     }
 
+    AnimatedVisibility(visible = touring, enter = fadeIn(), exit = fadeOut()) {
+        QuickTourOverlay(
+            index = tourStep,
+            targets = tourTargets,
+            onStep = { tourStep = it },
+            onClose = { finished ->
+                touring = false
+                tourStep = 0
+                // Finished: back to Listen, where it all starts (its button says so), and the tabs' tips would only
+                // repeat it. Skipped: it stays where it is.
+                if (finished) {
+                    tab = TAB_LISTEN
+                    vm.updateSettings(QuickTourRules::allTipsSeen)
+                }
+            },
+        )
+    }
+    // A tab's tip, the first time it opens on its own page (not under a song, set or profile). Listen's is in its page.
+    val tipTab = TourTab.entries[tab]
+    val tip = QuickTourRules.tipsFor(tipTab)
+        .takeIf { !touring && QuickTourRules.showsTip(settings, tipTab) && profilePage == null && songOpen == null && setOpen == null }
+    AnimatedVisibility(visible = tip != null, enter = fadeIn(), exit = fadeOut()) {
+        // Kept through the fade-out, when tip is already null.
+        val shown = remember { mutableStateOf(tip) }
+        if (tip != null) shown.value = tip
+        shown.value?.let { steps -> TabTip(steps, tourTargets, onDismiss = { vm.updateSettings { QuickTourRules.tipSeen(it, steps.first().tab) } }) }
+    }
+
     if (showSettings) {
         SettingsSheet(
             settings = settings,
@@ -429,6 +514,11 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                 libraryVm.closeProfiles()
                 vm.updateSettings(QuickSetupRules::again)
             },
+            onRunTour = {
+                showSettings = false
+                tourStep = 0
+                touring = true
+            },
             onOpenUrl = actions.openUrl,
             onDismiss = { showSettings = false },
         )
@@ -450,8 +540,11 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
         accountVm,
         onSignIn = { showRewards = false; requireSignIn {} },
         onOpenSong = { slug -> showRewards = false; if (profilePage == null) tab = TAB_LIBRARY; libraryVm.open(slug) },
-        onOpenProfile = { nickname -> showRewards = false; libraryVm.openProfile(nickname) },
+        onOpenProfile = { nickname -> showRewards = false; libraryVm.openProfile(nickname, fromRewards = true) },
         onDismiss = { showRewards = false },
+        allTime = rewardsAllTime,
+        onAllTime = { rewardsAllTime = it },
+        scroll = rewardsScroll,
     )
     if (celebrate.isNotEmpty()) BadgeCelebration(celebrate, onDone = accountVm::celebrated)
     if (showCoffee) CoffeeSheet(coffee, actions.buyCoffee, onDismiss = { showCoffee = false; actions.coffeeThanksShown() })
@@ -568,23 +661,27 @@ private fun Header(title: AnnotatedString, rewards: @Composable (compact: Boolea
                 autoSize = TextAutoSize.StepBased(minFontSize = 15.sp, maxFontSize = 20.sp),
                 modifier = Modifier.weight(1f),
             )
-            rewards(compact)
-            Spacer(Modifier.width(6.dp))
-            val profileLabel = str(R.string.profile_title)
-            Box(
-                Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .clickable(onClickLabel = profileLabel, onClick = onProfile)
-                    .semantics { contentDescription = profileLabel },
-                contentAlignment = Alignment.Center,
-            ) {
-                // Signed in: my avatar; a guest: the plain account icon. The avatar's initial is hidden from TalkBack,
-                // which would otherwise read the button as just "C".
-                if (nickname != null) {
-                    Box(Modifier.clearAndSetSemantics {}) { ProfileAvatar(nickname, 28, avatarUrl) }
-                } else {
-                    Icon(painterResource(R.drawable.ic_account), contentDescription = str(R.string.profile_title), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+            // The beats chip and the profile button: the tour's and the Sets tip's last steps point at them.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.tourTarget(TourTarget.HEADER_BEATS)) { rewards(compact) }
+                Spacer(Modifier.width(6.dp))
+                val profileLabel = str(R.string.profile_title)
+                Box(
+                    Modifier
+                        .tourTarget(TourTarget.HEADER_PROFILE)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .clickable(onClickLabel = profileLabel, onClick = onProfile)
+                        .semantics { contentDescription = profileLabel },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // Signed in: my avatar; a guest: the plain account icon. The avatar's initial is hidden from TalkBack,
+                    // which would otherwise read the button as just "C".
+                    if (nickname != null) {
+                        Box(Modifier.clearAndSetSemantics {}) { ProfileAvatar(nickname, 28, avatarUrl) }
+                    } else {
+                        Icon(painterResource(R.drawable.ic_account), contentDescription = str(R.string.profile_title), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+                    }
                 }
             }
         }
@@ -593,6 +690,9 @@ private fun Header(title: AnnotatedString, rewards: @Composable (compact: Boolea
 
 /** Below this width the header goes compact. */
 private val COMPACT_HEADER = 340.dp
+
+/** Each tab's button as a tour target, in the tabs' order. */
+private val TAB_TARGETS = listOf(TourTarget.TAB_LISTEN, TourTarget.TAB_LOG, TourTarget.TAB_LIBRARY, TourTarget.TAB_SETS)
 
 /** The floating tab bar: a 62 dp pill, four 48 dp items, the active one filled. */
 @Composable
@@ -620,6 +720,7 @@ private fun TabBar(selected: Int, onSelect: (Int) -> Unit) {
             Column(
                 Modifier
                     .weight(1f)
+                    .tourTarget(TAB_TARGETS[i])
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(25.dp))
                     .background(if (active) MaterialTheme.colorScheme.primary else Color.Transparent)

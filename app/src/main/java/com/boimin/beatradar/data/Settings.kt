@@ -7,8 +7,10 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.boimin.beatradar.ui.setup.QuickSetupRules
+import com.boimin.beatradar.ui.tour.QuickTourRules
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -51,6 +53,11 @@ data class Settings(
      * sharing questions ([QuickSetupRules.setupDone]), so only new installs see it.
      */
     val setupDone: Boolean = false,
+    /**
+     * The tabs (TourTab names) whose first-visit tip (ui/tour) was closed. Phones from before the tips count as having
+     * seen them all once set up ([QuickTourRules.tipsSeen]), so only new installs get them.
+     */
+    val tipsSeen: Set<String> = emptySet(),
     val theme: ThemeMode = ThemeMode.SYSTEM,
     /** The app sets play in: "youtube" (the whole set as one queue) or "spotify" (a song at a time). */
     val playApp: String = "youtube",
@@ -108,6 +115,7 @@ class SettingsRepository(private val context: Context) {
         val SHARE_CLIPS = booleanPreferencesKey("share_clips")
         val SHARING_CONSENT = booleanPreferencesKey("sharing_consent_asked")
         val SETUP_DONE = booleanPreferencesKey("setup_done")
+        val TIPS_SEEN = stringSetPreferencesKey("tips_seen")
         val THEME = stringPreferencesKey("theme")
         val PLAY_APP = stringPreferencesKey("play_app")
     }
@@ -134,6 +142,7 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.SHARE_CLIPS] = s.shareClips
             prefs[Keys.SHARING_CONSENT] = s.sharingConsentAsked
             prefs[Keys.SETUP_DONE] = s.setupDone
+            prefs[Keys.TIPS_SEEN] = s.tipsSeen
             prefs[Keys.THEME] = s.theme.name
             prefs[Keys.PLAY_APP] = s.playApp
         }
@@ -141,6 +150,7 @@ class SettingsRepository(private val context: Context) {
 
     private fun Preferences.toSettings(): Settings {
         val d = Settings()
+        val setupDone = QuickSetupRules.setupDone(this[Keys.SETUP_DONE], this[Keys.SHARING_CONSENT] ?: d.sharingConsentAsked)
         return Settings(
             rangeEnabled = this[Keys.RANGE_ENABLED] ?: d.rangeEnabled,
             minBpm = this[Keys.MIN_BPM] ?: d.minBpm,
@@ -155,7 +165,8 @@ class SettingsRepository(private val context: Context) {
             contribute = this[Keys.CONTRIBUTE] ?: d.contribute,
             shareClips = this[Keys.SHARE_CLIPS] ?: d.shareClips,
             sharingConsentAsked = this[Keys.SHARING_CONSENT] ?: d.sharingConsentAsked,
-            setupDone = QuickSetupRules.setupDone(this[Keys.SETUP_DONE], this[Keys.SHARING_CONSENT] ?: d.sharingConsentAsked),
+            setupDone = setupDone,
+            tipsSeen = QuickTourRules.tipsSeen(this[Keys.TIPS_SEEN], setupDone),
             theme = enumOrDefault(this[Keys.THEME], d.theme),
             playApp = this[Keys.PLAY_APP]?.takeIf { it == "youtube" || it == "spotify" } ?: d.playApp,
         )

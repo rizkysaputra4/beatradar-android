@@ -598,23 +598,27 @@ class LibraryViewModel(application: Application, private val saved: SavedStateHa
         }
     }
 
-    fun openProfile(nickname: String) {
-        if (nickname.equals(myNickname.value, ignoreCase = true)) openMyProfile() else pushProfile(nickname)
+    /** [fromRewards]: opened from the beats sheet's leaderboard, which comes back on Back ([reopenRewards]). */
+    fun openProfile(nickname: String, fromRewards: Boolean = false) {
+        pushProfile(nickname.takeUnless { it.equals(myNickname.value, ignoreCase = true) }, fromRewards)
     }
 
     fun openMyProfile() = pushProfile(null)
+
+    /** Back left a profile opened from the beats sheet: the app shows that sheet again, as it was. */
+    val reopenRewards = MutableStateFlow(false)
 
     /**
      * Opens a profile page over whatever shows. A song page or shared set open underneath closes and comes back on
      * Back, so profile → song → profile → … reads like a stack without a navigation library.
      */
-    private fun pushProfile(nickname: String?) {
+    private fun pushProfile(nickname: String?, fromRewards: Boolean = false) {
         if (_profiles.value.lastOrNull()?.let { it.nickname == nickname && it.isMe == (nickname == null) } == true) return
         val song = _detail.value?.slug
         val set = _sharedSet.value?.slug
         if (song != null) close()
         if (set != null) closeSharedSet()
-        val page = ProfilePage(key = nextProfileKey++, nickname = nickname, returnToSong = song, returnToSet = set)
+        val page = ProfilePage(key = nextProfileKey++, nickname = nickname, returnToSong = song, returnToSet = set, returnToRewards = fromRewards)
         _profiles.update { (it + page).takeLast(MAX_PROFILES) }
         loadProfile(page.key)
     }
@@ -624,6 +628,7 @@ class LibraryViewModel(application: Application, private val saved: SavedStateHa
         _profiles.update { it.dropLast(1) }
         top.returnToSet?.let(::openSharedSet)
         top.returnToSong?.let(::open)
+        if (top.returnToRewards) reopenRewards.value = true
     }
 
     fun closeProfiles() {
@@ -783,6 +788,8 @@ data class ProfilePage(
     val error: String? = null,
     val returnToSong: String? = null,
     val returnToSet: String? = null,
+    /** Opened from the beats sheet's leaderboard: Back shows the sheet again. */
+    val returnToRewards: Boolean = false,
     /** Pinned sets loaded past the first page, and the cursor for more (null: all loaded). */
     val moreSets: List<ProfileSet> = emptyList(),
     val setsNext: String? = null,

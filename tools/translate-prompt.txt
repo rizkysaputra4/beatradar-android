@@ -104,6 +104,22 @@ Be consistent: once you've picked a word for "Library", "Log", "Set", "beats", "
 
 
 ==============================================================================
+5b. CONTEXT TRAPS AND FALSE FRIENDS (AVOID THESE MISTAKES)
+==============================================================================
+
+Never translate idioms or technical terms word-for-word. Check the true UI context:
+- "This build is too old" (app_update_required_body): Means the app version is obsolete or no longer supported. DO NOT translate "old" as a duration of time (e.g. Indonesian "terlalu lama" means "taking too long", which is completely wrong; use "sudah usang").
+- "Try another mix" (sets_try_another): In playlist generation, this means generate another track selection/combination. DO NOT translate "mix" as a kitchen/chemical/herbal recipe (e.g. Indonesian "racikan" or Malay "campuran" or Portuguese "mistura"). Use "combination", "selection" or keep the DJ term "mix".
+- "Locked" (listen_locked): Means tempo detection has stabilized and locked onto the BPM. DO NOT translate as "blocked/barred/prohibited" (German "Gesperrt" is WRONG) or "crashed/frozen" (Portuguese "Travado" is WRONG).
+- "Songs you brought in" / "Brought in": Songs the user contributed or discovered first for the public Library. DO NOT translate as physically carrying objects/smuggling (e.g. Indonesian "dibawa masuk", Russian "привели", Filipino "dinala mo"). Use "contributed" or "first added".
+- "The BPM I lived in" (recap_card_bpm_lived_in): Colloquial idiom for the user's dominant BPM range this week. DO NOT translate as physical dwelling/housing (e.g. "where I resided").
+- "Confidence" (listen_confidence_bars): Sensor / algorithm accuracy score (1 to 3 bars). DO NOT translate as religious faith or psychological self-confidence (e.g. Indonesian "keyakinan"). Use "accuracy" or "reliability".
+- "Practice click" (practice_title): An audio metronome click. DO NOT translate as physical punching, clicking, or tapping.
+- "Founding Runner" (badge_founding): Awarded for joining during the first month. BeatRadar is also used by dancers, musicians and DJs; make sure the badge title feels like an early pioneer / charter member.
+
+
+
+==============================================================================
 6. WHERE EACH STRING APPEARS (THE KEY PREFIX)
 ==============================================================================
 

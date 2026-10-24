@@ -493,23 +493,23 @@ private fun StatusRow(
     }
 }
 
+/** The switch sits by the title; the explanation runs the card's full width under both, so a long one leaves no gap. */
 @Composable
 private fun ToggleRow(title: String, body: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
-    Row(
+    Column(
         Modifier
             .fillMaxWidth()
             .clickable(enabled = enabled, role = Role.Switch) { onChange(!checked) }
             .padding(horizontal = 14.dp, vertical = 12.dp)
             .alpha(if (enabled) 1f else 0.38f),
-        verticalAlignment = Alignment.Top,
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
-            Text(body, fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(12.dp))
+            Switch(checked = checked && enabled, onCheckedChange = null, enabled = enabled, colors = brandSwitchColors())
         }
-        Spacer(Modifier.width(12.dp))
-        Switch(checked = checked && enabled, onCheckedChange = null, enabled = enabled, colors = brandSwitchColors())
+        Spacer(Modifier.height(6.dp))
+        Text(body, fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

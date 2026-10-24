@@ -8,7 +8,7 @@ Last updated 2026-10-24.
 
 - **In packs:** every `<string>` and `<plurals>` in `app/src/main/res/values/strings*.xml`, except `app_name`,
   `widget_description` and `tile_label` (the system shows those, not the app) and anything `translatable="false"`.
-  That's **635 strings + 31 plurals** today. `tools/export_strings.py` defines this set (`english()`, `SKIP`).
+  That's **657 strings + 31 plurals** today. `tools/export_strings.py` defines this set (`english()`, `SKIP`).
 - **A pack** is `{ "name", "nativeName", "strings": { key: text } }`. A plural is one key per CLDR form,
   `name#one`, `name#other`, … Keys left out show in English.
 - **Not in packs (English only today):** emails (`beatradar-backend/templates/email.html`, `src/auth/mod.rs`), the
@@ -25,7 +25,7 @@ Regenerate this table with `python tools/export_strings.py --inventory`.
 
 | Prefix (chunk) | Strings | Plurals | Source file | Download | Screen |
 |---|---:|---:|---|---|---|
-| `app_` | 71 | 0 | strings_main.xml | CORE | App frame: tabs, titles, dialogs, tip sheet, update screen (`app_update_`), **Quick Setup** (`app_setup_`), Library consent texts (`app_consent_`) |
+| `app_` | 99 | 0 | strings_main.xml | CORE | App frame: tabs, titles, dialogs, tip sheet, update screen (`app_update_`), **Quick Setup** (`app_setup_`), **quick tour and tab tips** (`app_tour_`), Library consent texts (`app_consent_`) |
 | `sets_` | 57 | 6 | strings_library.xml | ORDER #5 | Sets tab: own playlists, building and sharing a set |
 | `settings_` | 60 | 1 | strings_settings.xml | ORDER #4 | Settings sheet, incl. "Email not verified" row |
 | `account_` | 56 | 0 | strings_settings.xml | ORDER #9 | Sign in, create account, email code, password reset with code (one sheet, `account/SignInSheet.kt`) |
@@ -48,7 +48,7 @@ Regenerate this table with `python tools/export_strings.py --inventory`.
 | `tile_` | 4 | 0 | strings_system.xml | CORE | Quick Settings tile |
 | `billing_` | 3 | 0 | strings_settings.xml | ORDER #15 | Tip sizes |
 | `data_` | 2 | 0 | strings_system.xml | CORE | Default song labels ("Song #3") |
-| **total** | **629** | **31** | | | |
+| **total** | **657** | **31** | | | |
 
 ## Languages
 
@@ -59,7 +59,7 @@ gitignored and stale: running one drops strings). "Missing" counts string names 
 | Code | Language | Native name | Plural forms | Missing | Server | Notes |
 |---|---|---|---|---:|---|---|
 | `en` | English | English | one other | 0 | built in | Generated: `python tools/export_strings.py > tools/packs/en.json` (gitignored) |
-| `id` | Indonesian | Bahasa Indonesia | other | 0 | uploaded 10-24 | |
+| `id` | Indonesian | Bahasa Indonesia | other | 0 | uploaded 10-24 | Overhauled 10-24: human, context-aware Indonesian (Log → Riwayat, Pustaka unified, metronome and music terminology corrected) |
 | `de` | German | Deutsch | one other | 0 | uploaded 10-24 | |
 | `es` | Spanish | Español | one other | 0 | uploaded 10-24 | |
 | `fr` | French | Français | one other | 0 | uploaded 10-24 | |
@@ -83,8 +83,21 @@ gained `account_sign_in_text`, `account_forgot_text`, `account_show_password`, `
 `account_back`, changed `account_password_hint` and `account_error_weak_password`, and lost
 `account_confirm_password`, `account_passwords_differ`, `account_error_breached_password`. Re-uploaded 10-24 (all but `ar`).
 
-All new packs (10-24) were machine-translated by Claude; have a native speaker review them before or soon after
-publishing, starting with badge names and the recap texts.
+Later on 10-24 the quick tour (`ui/tour/`) added 19 `app_tour_*` strings, translated in every pack. Re-uploaded
+10-24 with the audit fixes below (all but `ar`; server versions now 3–4). The tour then went tab by tab: every pack
+gained `app_tour_finish`, `app_tour_open`, `app_tour_next_tab`, `app_tour_go_hint`, `app_tour_go_log_body`,
+`app_tour_go_library_body`, `app_tour_go_sets_body`, changed `app_tour_welcome_body` and lost `app_tour_done`.
+Re-uploaded 10-24 (all but `ar`; server versions now 4–5). Then the tour moved to Settings only and each tab got a
+first-visit tip (its tour step): every pack gained `app_tour_got_it`. Re-uploaded 10-24 (all but `ar`; versions 5–6). The Sets tip then also pointed at the header: every pack swapped
+`app_tour_me_title`/`_body` for `app_tour_beats_*` and `app_tour_profile_*`. Re-uploaded 10-24 (versions 6–7).
+
+All packs were audited and overhauled on 2026-10-24 to eliminate literal machine translation traps:
+- German: replaced misleading "Gesperrt" (banned/blocked) with "Tempo erfasst", fixed "Liebe Songs" imperative, corrected metronome terms.
+- Portuguese (Brazil): replaced "Travado" (app frozen/crashed) with "Tempo fixado", fixed "mistura" to "combinação".
+- Russian: fixed personified track translations ("привели" → contributed), fixed psychological confidence terms to accuracy.
+- Indonesian & Malay: full humanized rewrite, unifying Pustaka/Discover, Log → Riwayat/Rekod, and fixing domain idioms.
+- Spanish, French, Italian, Turkish, Vietnamese, Thai, Filipino, Polish, Hindi, Japanese, Korean, Chinese: corrected metronome clicks, inclusive pioneer badges, and tempo zone idioms.
+- Arabic: still held (do not publish until bidi/RTL engine work is complete).
 
 ## When you add or change app text (screens, settings, messages)
 

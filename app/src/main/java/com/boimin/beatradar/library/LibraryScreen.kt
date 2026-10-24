@@ -67,6 +67,8 @@ import com.boimin.beatradar.ui.tempoRangeLabel
 import com.boimin.beatradar.ui.theme.Brand
 import kotlin.math.roundToInt
 import com.boimin.beatradar.ui.SkeletonSongList
+import com.boimin.beatradar.ui.tour.TourTarget
+import com.boimin.beatradar.ui.tour.tourTarget
 
 /** What the Library needs from the rest of the app. */
 class LibraryActions(
@@ -142,6 +144,7 @@ private fun SongList(vm: LibraryViewModel, settings: Settings, actions: LibraryA
             Modifier
                 .fillMaxWidth()
                 .padding(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 8.dp)
+                .tourTarget(TourTarget.LIBRARY_SEARCH)
                 .height(38.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainer)

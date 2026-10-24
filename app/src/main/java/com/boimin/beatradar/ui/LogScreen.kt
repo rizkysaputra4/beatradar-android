@@ -78,6 +78,8 @@ import com.boimin.beatradar.i18n.str
 import com.boimin.beatradar.i18n.strPlural
 import com.boimin.beatradar.data.BeatLogEntry
 import com.boimin.beatradar.ui.theme.Brand
+import com.boimin.beatradar.ui.tour.TourTarget
+import com.boimin.beatradar.ui.tour.tourTarget
 import kotlin.math.roundToInt
 
 @Composable
@@ -131,7 +133,8 @@ fun LogScreen(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 8.dp),
+                .padding(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 8.dp)
+                .tourTarget(TourTarget.LOG_SEARCH),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {

@@ -79,6 +79,8 @@ fun SettingsSheet(
     onOpenUrl: (String) -> Unit,
     /** "Run Quick Setup again": closes Settings and shows the first-run steps, every choice kept. */
     onRunSetup: () -> Unit,
+    /** Shows the quick tour again. */
+    onRunTour: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var access by remember { mutableStateOf(hasNotificationAccess()) }
@@ -214,6 +216,8 @@ fun SettingsSheet(
             SectionLabel(str(R.string.settings_section_about))
             Card {
                 NavRow(R.drawable.ic_settings, str(R.string.app_setup_again), str(R.string.app_setup_again_desc), onClick = onRunSetup)
+                Divider()
+                NavRow(R.drawable.ic_radar, str(R.string.app_tour_again), str(R.string.app_tour_again_desc), onClick = onRunTour)
                 Divider()
                 NavRow(
                     R.drawable.ic_verified_outline,

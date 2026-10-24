@@ -89,6 +89,8 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
 import com.boimin.beatradar.ui.tempoRangeShort
 import com.boimin.beatradar.ui.tempoRangeLabel
+import com.boimin.beatradar.ui.tour.TourTarget
+import com.boimin.beatradar.ui.tour.tourTarget
 
 /** "My sets" in the Library tab: the user's song lists by tempo. */
 @Composable
@@ -147,7 +149,7 @@ fun SetsScreen(vm: LibraryViewModel, settings: Settings, actions: LibraryActions
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth().tourTarget(TourTarget.SETS_ACTIONS), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SetsAction(R.drawable.ic_set_add, str(R.string.sets_new_set), primary = true, Modifier.weight(1f)) { creating = true }
                     SetsAction(R.drawable.ic_queue, str(R.string.sets_build_me_a_set), primary = false, Modifier.weight(1f)) { vm.openBuild() }
                     SetsAction(R.drawable.ic_library_music, str(R.string.playlist_title), primary = false, Modifier.weight(1f)) { vm.openPlaylist() }

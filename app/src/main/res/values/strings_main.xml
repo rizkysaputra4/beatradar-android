@@ -139,6 +139,36 @@
     <string name="app_setup_again">Run Quick Setup again</string>
     <string name="app_setup_again_desc">Activity, permissions, sharing and account, step by step</string>
 
+    <!-- Quick tour (ui/tour/QuickTour.kt), from Settings, and each tab's first-visit tip (its tour step); app_ is a core chunk -->
+    <string name="app_tour_skip">Skip tour</string>
+    <string name="app_tour_next">Next</string>
+    <string name="app_tour_got_it">Got it</string>
+    <string name="app_tour_finish">Back to %1$s</string>
+    <string name="app_tour_open">Open %1$s</string>
+    <string name="app_tour_next_tab">Next: %1$s</string>
+    <string name="app_tour_go_hint">Tap the button below or the highlighted tab to go there.</string>
+    <string name="app_tour_welcome_title">Welcome to BeatRadar</string>
+    <string name="app_tour_welcome_body">BeatRadar has four tabs: Listen measures the tempo, Log keeps every song, Library shares tempos with everyone, and Sets turns them into playlists. We\'ll go through them in order. Skip anytime; you can replay it from Settings.</string>
+    <string name="app_tour_dial_title">Tap the dial to listen</string>
+    <string name="app_tour_dial_body">Hold the phone near the music. The BPM shows live, and BeatRadar keeps listening with the screen off.</string>
+    <string name="app_tour_target_title">Your target tempo</string>
+    <string name="app_tour_target_body">Tap to set the range you want. When a song stays in it for 10 seconds, the phone vibrates.</string>
+    <string name="app_tour_go_log_body">Every song you hear is saved there with its tempo, so you can find it again.</string>
+    <string name="app_tour_log_title">Every song lands in Log</string>
+    <string name="app_tour_log_body">Each song you hear is saved with its BPM. Search and filter by tempo, name the songs BeatRadar didn\'t recognise, and open My week for your recap.</string>
+    <string name="app_tour_go_library_body">The tempos everyone has measured, gathered in one place you can search.</string>
+    <string name="app_tour_library_title">Discover the Library</string>
+    <string name="app_tour_library_body">One BPM per song, agreed on by everyone who measured it. Search and filter by tempo, then open a song to vote on its tempo, love it or play it.</string>
+    <string name="app_tour_go_sets_body">The last tab: songs grouped into playlists for your run, workout or DJ set.</string>
+    <string name="app_tour_sets_title">Build sets by tempo</string>
+    <string name="app_tour_sets_body">Group songs for a run, a workout or a DJ set, let BeatRadar build one at your target, or check the BPM of a playlist.</string>
+    <string name="app_tour_beats_title">Beats and the leaderboard</string>
+    <string name="app_tour_beats_body">The flame counts the days in a row you\'ve listened, the note the beats you\'ve earned by measuring songs. Tap here for your badges and the leaderboard; tap a name on it to see that person\'s profile.</string>
+    <string name="app_tour_profile_title">Your profile and Settings</string>
+    <string name="app_tour_profile_body">Tap here for your profile and stats. Settings is the gear at the top right of your profile; you can take the full tour again from there.</string>
+    <string name="app_tour_again">Take the quick tour</string>
+    <string name="app_tour_again_desc">What each tab does, in a few steps</string>
+
     <!-- App shell: buy me a coffee sheet -->
     <string name="app_coffee_title">Buy me a coffee ☕</string>
     <string name="app_coffee_unavailable">Tips aren\'t available on this device.</string>

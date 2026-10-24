@@ -9,6 +9,14 @@ import com.boimin.beatradar.ui.theme.inTargetColor
 import com.boimin.beatradar.data.BeatLogEntry
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.graphics.Path
+import androidx.compose.foundation.layout.offset
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -96,6 +104,8 @@ import com.boimin.beatradar.i18n.strPlural
 import androidx.annotation.StringRes
 import com.boimin.beatradar.ui.theme.Brand
 import com.boimin.beatradar.ui.theme.brandSwitchColors
+import com.boimin.beatradar.ui.tour.TourTarget
+import com.boimin.beatradar.ui.tour.tourTarget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -117,6 +127,9 @@ fun ListenScreen(
     /** The last few songs in the log, for "Heard recently". */
     recent: List<BeatLogEntry> = emptyList(),
     onOpenSong: (String) -> Unit = {},
+    /** Show the target chip's hint (ui/tour): new installs, until it's closed or the chip is tapped. */
+    targetHint: Boolean = false,
+    onTargetHintSeen: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val listening = state.status == MonitorStatus.LISTENING
@@ -135,7 +148,9 @@ fun ListenScreen(
                 .padding(horizontal = 18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Dial(state, settings, inTarget, height = dialHeight, onToggle = if (state.active) actions.stop else actions.start)
+            Box(Modifier.tourTarget(TourTarget.DIAL)) {
+                Dial(state, settings, inTarget, height = dialHeight, onToggle = if (state.active) actions.stop else actions.start)
+            }
             if (listening && state.title != null) {
                 Spacer(Modifier.height(if (compact) 6.dp else 12.dp))
                 Text(
@@ -147,7 +162,16 @@ fun ListenScreen(
                 )
             }
             Spacer(Modifier.height(if (compact) 8.dp else 18.dp))
-            TargetChip(settings, open = editingTarget, onClick = { editingTarget = true })
+            Box(Modifier.tourTarget(TourTarget.TARGET_CHIP)) {
+                TargetChip(settings, open = editingTarget, onClick = {
+                    editingTarget = true
+                    if (targetHint) onTargetHintSeen()
+                })
+            }
+            // Listen's tip sits in the page, not over it: right after Quick Setup the dial stays free to tap.
+            AnimatedVisibility(visible = targetHint, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+                TargetHint(onDismiss = onTargetHintSeen, modifier = Modifier.padding(top = 10.dp))
+            }
             Spacer(Modifier.height(if (compact) 12.dp else 22.dp))
             NowPlayingCard(
                 state = state,
@@ -578,6 +602,48 @@ private const val SONAR_RIPPLE_MS = 3_400
 private const val SONAR_RINGS = 2
 
 /** "● Target 171–185 BPM ⌄" under the dial (42 dp); tapping it opens the target sheet. */
+/** What the target chip is for, under it: a card with a notch pointing up at the chip, and Got it. */
+@Composable
+private fun TargetHint(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    val line = MaterialTheme.colorScheme.primary
+    val fill = Tone.selected
+    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Canvas(Modifier.size(width = 16.dp, height = 8.dp)) {
+            val notch = Path().apply {
+                moveTo(0f, size.height)
+                lineTo(size.width / 2, 0f)
+                lineTo(size.width, size.height)
+                close()
+            }
+            drawPath(notch, fill)
+            drawPath(notch, line, style = Stroke(1.dp.toPx()))
+        }
+        Column(
+            Modifier
+                .offset(y = (-1).dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(fill)
+                .border(1.dp, line, RoundedCornerShape(16.dp))
+                .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 4.dp)
+                .semantics { liveRegion = LiveRegionMode.Polite },
+        ) {
+            Text(str(R.string.app_tour_target_title), fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(end = 8.dp))
+            Spacer(Modifier.height(2.dp))
+            Text(
+                str(R.string.app_tour_target_body),
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(end = 8.dp),
+            )
+            TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+                Text(str(R.string.app_tour_got_it), color = Tone.primarySoft, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
 @Composable
 private fun TargetChip(settings: Settings, open: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(18.dp)
