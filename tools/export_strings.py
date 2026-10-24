@@ -5,6 +5,7 @@
     python tools/export_strings.py --prompt "Indonesian" > prompt.txt   # tools/translate-prompt.txt with the strings in
     python tools/export_strings.py --check id.json           # a translated pack: keys, placeholders, plurals, JSON
     python tools/export_strings.py --sql id id.json | psql "$DATABASE_URL"   # checks it, then stores it as language `id`
+    python tools/export_strings.py --inventory               # Markdown tables for docs/LANGUAGES.md: prefixes, packs
 
 Translate the values (keep %1$s / %2$d placeholders, and plural keys like `name#one`, `name#other`; add the forms the
 language needs, e.g. `name#few`), set "name" and "nativeName", then upload it in the backoffice (Languages) or with
@@ -23,6 +24,8 @@ SKIP = {"app_name", "widget_description", "tile_label"}
 PROMPT = pathlib.Path(__file__).resolve().parent / "translate-prompt.txt"
 PLACEHOLDER = re.compile(r"%(?:\d+\$)?[sd]|%%")
 PLURAL_CATEGORIES = {"zero", "one", "two", "few", "many", "other"}
+LANGUAGE_SYNC = RES.parent.parent / "java" / "com" / "boimin" / "beatradar" / "i18n" / "LanguageSync.kt"
+PACKS = pathlib.Path(__file__).resolve().parent / "packs"
 
 
 def android_text(el):
@@ -95,14 +98,53 @@ def check(path):
     return problems
 
 
+def inventory():
+    """Markdown tables: what the app has to translate, by key prefix (= download chunk), and how far each pack is."""
+    sync = LANGUAGE_SYNC.read_text(encoding="utf-8")
+    chunk_list = lambda name: re.findall(r'"([a-z]+)"', re.search(rf"val {name} = listOf\(([^)]*)\)", sync).group(1))
+    core, order = chunk_list("CORE"), chunk_list("ORDER")
+    rows = {}
+    for f in sorted(RES.glob("strings*.xml")):
+        for el in ET.parse(f).getroot():
+            name = el.get("name")
+            if name in SKIP or el.get("translatable") == "false":
+                continue
+            r = rows.setdefault(name.split("_")[0], {"strings": 0, "plurals": 0, "files": set()})
+            r["strings" if el.tag == "string" else "plurals"] += 1
+            r["files"].add(f.name)
+    print("| Prefix (chunk) | Strings | Plurals | Source file | Download |")
+    print("|---|---:|---:|---|---|")
+    for prefix in sorted(rows, key=lambda k: -(rows[k]["strings"] + rows[k]["plurals"])):
+        r = rows[prefix]
+        when = "CORE" if prefix in core else f"ORDER #{order.index(prefix) + 1}" if prefix in order else "**last (not listed)**"
+        print(f"| `{prefix}_` | {r['strings']} | {r['plurals']} | {', '.join(sorted(r['files']))} | {when} |")
+    total_s, total_p = sum(r["strings"] for r in rows.values()), sum(r["plurals"] for r in rows.values())
+    print(f"| **total** | **{total_s}** | **{total_p}** | | |")
+    print()
+    source = english()
+    names = {k.split("#")[0] for k in source}
+    print("| Code | Language | Native name | Plural forms | Missing names |")
+    print("|---|---|---|---|---:|")
+    for f in sorted(PACKS.glob("*.json")):
+        pack = json.loads(f.read_text(encoding="utf-8"))
+        have = {k.split("#")[0] for k in pack.get("strings", {})}
+        forms = sorted({k.split("#")[1] for k in pack.get("strings", {}) if "#" in k}, key=["zero", "one", "two", "few", "many", "other"].index)
+        print(f"| `{f.stem}` | {pack.get('name')} | {pack.get('nativeName')} | {' '.join(forms)} | {len(names - have)} |")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--merge", help="an existing pack: its translations are kept, strings the app no longer has are dropped")
     p.add_argument("--prompt", nargs="?", const="", metavar="LANGUAGE", help="print the translation prompt for LANGUAGE (blank: any)")
     p.add_argument("--check", metavar="PACK", help="check a translated pack before uploading it")
     p.add_argument("--sql", nargs=2, metavar=("CODE", "PACK"), help="check PACK, then print SQL that stores it as language CODE")
+    p.add_argument("--inventory", action="store_true", help="print the key-prefix and pack tables kept in docs/LANGUAGES.md")
     args = p.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
+
+    if args.inventory:
+        inventory()
+        return
 
     if args.check:
         problems = check(args.check)
