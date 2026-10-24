@@ -1,6 +1,9 @@
 package com.boimin.beatradar.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.layout.fillMaxHeight
 import com.boimin.beatradar.ui.theme.Tone
 import androidx.compose.foundation.layout.fillMaxSize
@@ -402,6 +405,7 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                 onCoffee = { showCoffee = true },
                 onShowShared = { showSettings = false; showShared = true },
             ),
+            onOpenUrl = actions.openUrl,
             onDismiss = { showSettings = false },
         )
     }
@@ -583,16 +587,19 @@ private fun Header(title: AnnotatedString, rewards: @Composable (compact: Boolea
             )
             rewards(compact)
             Spacer(Modifier.width(6.dp))
+            val profileLabel = str(R.string.profile_title)
             Box(
                 Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .clickable(onClickLabel = str(R.string.profile_title), onClick = onProfile),
+                    .clickable(onClickLabel = profileLabel, onClick = onProfile)
+                    .semantics { contentDescription = profileLabel },
                 contentAlignment = Alignment.Center,
             ) {
-                // Signed in: my avatar; a guest: the plain account icon.
+                // Signed in: my avatar; a guest: the plain account icon. The avatar's initial is hidden from TalkBack,
+                // which would otherwise read the button as just "C".
                 if (nickname != null) {
-                    ProfileAvatar(nickname, 28, avatarUrl)
+                    Box(Modifier.clearAndSetSemantics {}) { ProfileAvatar(nickname, 28, avatarUrl) }
                 } else {
                     Icon(painterResource(R.drawable.ic_account), contentDescription = str(R.string.profile_title), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
                 }

@@ -41,11 +41,13 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import com.boimin.beatradar.BuildConfig
 import com.boimin.beatradar.R
 import com.boimin.beatradar.rewards.ProfileAvatar
 import com.boimin.beatradar.data.Settings
@@ -74,6 +76,7 @@ fun SettingsSheet(
     onChange: ((Settings) -> Settings) -> Unit,
     onOpenNotificationAccess: () -> Unit,
     account: AccountSettings,
+    onOpenUrl: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var access by remember { mutableStateOf(hasNotificationAccess()) }
@@ -205,6 +208,31 @@ fun SettingsSheet(
                     NavRow(R.drawable.ic_coffee, str(R.string.settings_coffee_title), str(R.string.settings_coffee_desc), onClick = account.onCoffee, iconTint = Brand.Flame)
                 }
             }
+
+            SectionLabel(str(R.string.settings_section_about))
+            Card {
+                NavRow(
+                    R.drawable.ic_verified_outline,
+                    str(R.string.settings_privacy_title),
+                    str(R.string.settings_privacy_desc),
+                    onClick = { onOpenUrl("https://${BuildConfig.SHARE_HOST}/privacy") },
+                )
+                Divider()
+                NavRow(
+                    R.drawable.ic_open,
+                    str(R.string.settings_contact_title),
+                    BuildConfig.SUPPORT_EMAIL,
+                    onClick = { onOpenUrl("mailto:${BuildConfig.SUPPORT_EMAIL}") },
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                str(R.string.settings_version, BuildConfig.VERSION_NAME),
+                fontSize = 12.sp,
+                color = Tone.text3,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+            )
 
             Spacer(Modifier.height(20.dp))
             Box(

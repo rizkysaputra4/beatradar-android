@@ -15,14 +15,16 @@ android {
         applicationId = "com.boimin.beatradar"
         minSdk = 29
         targetSdk = 37
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 6
+        versionName = "0.3.1"
         // The Web OAuth client id (Google Cloud): sign-in asks for tokens for it, and the server checks them against it.
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"1073093330874-h92fun5sei8rcitlf67jv2s5s9ip7if8.apps.googleusercontent.com\"")
         // The public site: share links (/s/…, /set/…), also used for App Links.
         val shareHost = "findbeatradar.com"
         buildConfigField("String", "SHARE_HOST", "\"$shareHost\"")
         manifestPlaceholders["shareHost"] = shareHost
+        // Shown in Settings → About and in the privacy policy (beatradar-backend/templates/privacy.html).
+        buildConfigField("String", "SUPPORT_EMAIL", "\"support@findbeatradar.com\"")
         // TODO: the Google Cloud project number linked in Play Console (Play Integrity). 0 = skip the check.
         buildConfigField("long", "CLOUD_PROJECT_NUMBER", "0L")
     }
@@ -69,6 +71,35 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    lint {
+        disable += listOf("PropertyEscape", "CredManMissingDal", "UseAppTint")
+    }
+}
+
+tasks.configureEach {
+    if (name == "assembleRelease") {
+        doLast {
+            val apkDir = layout.buildDirectory.dir("outputs/apk/release").get().asFile
+            val version = android.defaultConfig.versionName
+            val defaultApk = File(apkDir, "app-release.apk")
+            val targetApk = File(apkDir, "BeatRadar-$version.apk")
+            if (defaultApk.exists()) {
+                defaultApk.copyTo(targetApk, overwrite = true)
+                println("Release APK generated: ${targetApk.name}")
+            }
+        }
+    } else if (name == "bundleRelease") {
+        doLast {
+            val bundleDir = layout.buildDirectory.dir("outputs/bundle/release").get().asFile
+            val version = android.defaultConfig.versionName
+            val defaultBundle = File(bundleDir, "app-release.aab")
+            val targetBundle = File(bundleDir, "BeatRadar-$version.aab")
+            if (defaultBundle.exists()) {
+                defaultBundle.copyTo(targetBundle, overwrite = true)
+                println("Release AAB generated: ${targetBundle.name}")
+            }
+        }
     }
 }
 

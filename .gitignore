@@ -17,3 +17,6 @@ __pycache__/
 /tools/build_*.py
 /tools/translate-prompt-full.txt
 /tools/packs/en.json
+
+# Play Store assets (screenshots, feature graphic, demo videos): made by hand, kept outside git
+/store/

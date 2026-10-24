@@ -32,6 +32,11 @@
     <string name="settings_access_allow">Allow</string>
     <string name="settings_auto_shazam_tip">Tip: turn on Auto Shazam in the Shazam app and songs around you get named automatically.</string>
     <string name="settings_section_library">Library</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_privacy_title">Privacy policy</string>
+    <string name="settings_privacy_desc">What BeatRadar collects, and your choices</string>
+    <string name="settings_contact_title">Contact support</string>
+    <string name="settings_version">BeatRadar %1$s</string>
     <string name="settings_contribute_title">Contribute to the Library</string>
     <string name="settings_contribute_desc">Shares the titles, tempos and audio fingerprints BeatRadar hears (never audio) to build a public tempo library</string>
     <string name="settings_share_clips_title">Help name unknown songs</string>
