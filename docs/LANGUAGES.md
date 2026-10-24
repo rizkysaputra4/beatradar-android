@@ -8,7 +8,7 @@ Last updated 2026-10-24.
 
 - **In packs:** every `<string>` and `<plurals>` in `app/src/main/res/values/strings*.xml`, except `app_name`,
   `widget_description` and `tile_label` (the system shows those, not the app) and anything `translatable="false"`.
-  That's **633 strings + 31 plurals** today. `tools/export_strings.py` defines this set (`english()`, `SKIP`).
+  That's **635 strings + 31 plurals** today. `tools/export_strings.py` defines this set (`english()`, `SKIP`).
 - **A pack** is `{ "name", "nativeName", "strings": { key: text } }`. A plural is one key per CLDR form,
   `name#one`, `name#other`, … Keys left out show in English.
 - **Not in packs (English only today):** emails (`beatradar-backend/templates/email.html`, `src/auth/mod.rs`), the
@@ -28,11 +28,11 @@ Regenerate this table with `python tools/export_strings.py --inventory`.
 | `app_` | 71 | 0 | strings_main.xml | CORE | App frame: tabs, titles, dialogs, tip sheet, update screen (`app_update_`), **Quick Setup** (`app_setup_`), Library consent texts (`app_consent_`) |
 | `sets_` | 57 | 6 | strings_library.xml | ORDER #5 | Sets tab: own playlists, building and sharing a set |
 | `settings_` | 60 | 1 | strings_settings.xml | ORDER #4 | Settings sheet, incl. "Email not verified" row |
-| `account_` | 54 | 0 | strings_settings.xml | ORDER #9 | Sign in, create account, email code, password reset with code |
+| `account_` | 56 | 0 | strings_settings.xml | ORDER #9 | Sign in, create account, email code, password reset with code (one sheet, `account/SignInSheet.kt`) |
 | `badge_` | 48 | 2 | strings_system.xml | ORDER #8 | Badge names, descriptions, celebration |
-| `library_` | 45 | 2 | strings_library.xml | ORDER #2 | Discover tab: search, filters, sorting |
-| `log_` | 44 | 1 | strings_settings.xml | ORDER #1 | Log tab: history, naming unnamed songs |
-| `listen_` | 39 | 2 | strings_main.xml | CORE | Listen tab: dial, live BPM, presets, recent songs |
+| `library_` | 44 | 2 | strings_library.xml | ORDER #2 | Discover tab: search, filters, sorting |
+| `log_` | 40 | 1 | strings_settings.xml | ORDER #1 | Log tab: history, naming unnamed songs |
+| `listen_` | 38 | 2 | strings_main.xml | CORE | Listen tab: dial, live BPM, presets, recent songs |
 | `shared_` | 33 | 0 | strings_settings.xml | ORDER #13 | "What I've shared" |
 | `song_` | 27 | 5 | strings_library.xml | ORDER #3 | Song page: tempo, votes, links, reports |
 | `profile_` | 30 | 2 | strings_system.xml | ORDER #7 | Profile page: stats, pictures, streak, tempo zone, pinned sets |
@@ -48,7 +48,7 @@ Regenerate this table with `python tools/export_strings.py --inventory`.
 | `tile_` | 4 | 0 | strings_system.xml | CORE | Quick Settings tile |
 | `billing_` | 3 | 0 | strings_settings.xml | ORDER #15 | Tip sizes |
 | `data_` | 2 | 0 | strings_system.xml | CORE | Default song labels ("Song #3") |
-| **total** | **633** | **31** | | | |
+| **total** | **629** | **31** | | | |
 
 ## Languages
 
@@ -78,8 +78,13 @@ gitignored and stale: running one drops strings). "Missing" counts string names 
 | `fil` | Filipino | Filipino | one other | 0 | uploaded 10-24 | New 10-24; Taglish; badge names kept in English |
 | `ar` | Arabic | العربية | zero one two few many other | 0 | **don't publish** | New 10-24 (MSA); blocked by the RTL work below |
 
+After the 10-24 upload the sign-in sheet was reworked (password rule now 6 characters, no breach check): every pack
+gained `account_sign_in_text`, `account_forgot_text`, `account_show_password`, `account_hide_password`,
+`account_back`, changed `account_password_hint` and `account_error_weak_password`, and lost
+`account_confirm_password`, `account_passwords_differ`, `account_error_breached_password`. Re-uploaded 10-24 (all but `ar`).
+
 All new packs (10-24) were machine-translated by Claude; have a native speaker review them before or soon after
-publishing, starting with badge names, `listen_confidence_bars` ("bars" = musical measures) and the recap texts.
+publishing, starting with badge names and the recap texts.
 
 ## When you add or change app text (screens, settings, messages)
 

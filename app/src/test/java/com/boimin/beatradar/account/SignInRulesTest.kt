@@ -58,12 +58,31 @@ class SignInRulesTest {
     }
 
     @Test
+    fun passwordNeedsSixCharacters() {
+        assertFalse(SignInRules.passwordOk(""))
+        assertFalse(SignInRules.passwordOk("abcde"))
+        assertTrue(SignInRules.passwordOk("abcdef"))
+        assertTrue(SignInRules.passwordOk("123456"))
+    }
+
+    @Test
+    fun backArrowGoesOneStepBack() {
+        assertNull(SignInRules.back(SignInMode.CHOOSE, SignInMode.SIGN_IN, signedIn = false))
+        assertEquals(SignInMode.CHOOSE, SignInRules.back(SignInMode.SIGN_IN, SignInMode.SIGN_IN, signedIn = false))
+        assertEquals(SignInMode.CHOOSE, SignInRules.back(SignInMode.REGISTER, SignInMode.SIGN_IN, signedIn = false))
+        assertEquals(SignInMode.SIGN_IN, SignInRules.back(SignInMode.FORGOT, SignInMode.SIGN_IN, signedIn = false))
+        assertEquals(SignInMode.REGISTER, SignInRules.back(SignInMode.VERIFY_CODE, SignInMode.REGISTER, signedIn = false))
+        assertEquals(SignInMode.FORGOT, SignInRules.back(SignInMode.RESET_CODE, SignInMode.FORGOT, signedIn = false))
+        // Confirming the account's own address from Settings: nowhere to go back to.
+        assertNull(SignInRules.back(SignInMode.VERIFY_CODE, SignInMode.SIGN_IN, signedIn = true))
+    }
+
+    @Test
     fun errorCodesHaveTexts() {
         assertEquals(R.string.account_error_invalid_code, SignInRules.errorText("invalid_code", 400))
         assertEquals(R.string.account_error_code_exhausted, SignInRules.errorText("code_exhausted", 400))
         assertEquals(R.string.account_error_email_pending, SignInRules.errorText("email_pending", 409))
         assertEquals(R.string.account_error_invalid_token, SignInRules.errorText("invalid_token", 400))
-        assertEquals(R.string.account_error_breached_password, SignInRules.errorText("breached_password", 400))
         assertEquals(R.string.account_error_invalid_email, SignInRules.errorText("invalid_email", 400))
         assertEquals(R.string.account_error_weak_password, SignInRules.errorText("weak_password", 400))
         assertEquals(R.string.account_error_email_not_verified, SignInRules.errorText("email_not_verified", 403))

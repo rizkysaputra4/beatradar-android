@@ -24,8 +24,10 @@ object SignInRules {
     /** The server ignores a resend within a minute of the last one, so the button waits as long. */
     const val RESEND_WAIT_MS = 60_000L
 
-    /** The server's minimum for a new password (`weak_password` below it). */
-    const val MIN_PASSWORD = 8
+    /** The server's only rule for a new password (`weak_password` below it). */
+    const val MIN_PASSWORD = 6
+
+    fun passwordOk(password: String): Boolean = password.length >= MIN_PASSWORD
 
     /** What a code field keeps of typed or pasted text: digits only ("482 913" → "482913"), at most [CODE_LENGTH]. */
     fun cleanCode(input: String): String = input.filter { it in '0'..'9' }.take(CODE_LENGTH)
@@ -67,6 +69,18 @@ object SignInRules {
         else -> SignInMode.SIGN_IN
     }
 
+    /**
+     * Where the sheet's back arrow goes, or null for none: the first step, and a code step opened from Settings while
+     * signed in (the address is the account's, so there's no form to go back to).
+     */
+    fun back(mode: SignInMode, codeFrom: SignInMode, signedIn: Boolean): SignInMode? = when (mode) {
+        SignInMode.CHOOSE -> null
+        SignInMode.SIGN_IN, SignInMode.REGISTER -> SignInMode.CHOOSE
+        SignInMode.FORGOT -> SignInMode.SIGN_IN
+        SignInMode.VERIFY_CODE -> if (signedIn) null else backFromCode(codeFrom)
+        SignInMode.RESET_CODE -> SignInMode.FORGOT
+    }
+
     /** The text for a server error code, or null when the server's own message is the best there is. */
     @StringRes
     fun errorText(code: String, http: Int): Int? = when (code) {
@@ -77,7 +91,6 @@ object SignInRules {
         "locked" -> R.string.account_error_locked
         "empty_password" -> R.string.account_error_empty_password
         "weak_password" -> R.string.account_error_weak_password
-        "breached_password" -> R.string.account_error_breached_password
         "password_required" -> R.string.account_error_password_required
         "invalid_email" -> R.string.account_error_invalid_email
         "email_taken" -> R.string.account_error_email_taken

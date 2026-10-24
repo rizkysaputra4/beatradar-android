@@ -107,7 +107,6 @@
     <string name="log_recap_action">Weekly tempo recap</string>
     <string name="log_my_week">My week</string>
     <string name="log_clear_action">Clear log</string>
-    <string name="log_filter_bpm_range">● BPM %1$d–%2$d</string>
     <string name="log_filter_named">Named</string>
     <string name="log_filter_unnamed">%1$d Unnamed</string>
     <string name="log_filter_unnamed_match">%1$d Unnamed · %2$d Match</string>
@@ -118,10 +117,7 @@
     </plurals>
     <string name="log_clear_confirm">Clear</string>
     <string name="log_cancel">Cancel</string>
-    <string name="log_min_bpm">Min BPM</string>
-    <string name="log_max_bpm">Max BPM</string>
     <string name="log_use_target">Use target</string>
-    <string name="log_listen_target">Listen target</string>
     <string name="log_delete">Delete</string>
     <string name="log_unnamed_song">Unnamed song #%1$d</string>
     <string name="log_stop_clip">Stop</string>
@@ -159,6 +155,11 @@
     <string name="account_pitch">Love songs, back up your log to every phone, and join the leaderboards. Counting BPM works without an account.</string>
     <string name="account_continue_google">Continue with Google</string>
     <string name="account_use_email">Use email</string>
+    <string name="account_sign_in_text">Welcome back. Sign in to sync your log, loves and beats.</string>
+    <string name="account_forgot_text">Enter the email of your account. We\'ll send a code to choose a new password.</string>
+    <string name="account_show_password">Show password</string>
+    <string name="account_hide_password">Hide password</string>
+    <string name="account_back">Back</string>
     <string name="account_email">Email</string>
     <string name="account_password">Password</string>
     <string name="account_create">Create account</string>
@@ -175,9 +176,7 @@
     <string name="account_code_link_hint">The email also has a link: opening it works too. Nothing there? Check your spam folder.</string>
     <string name="account_reset_code_sent">If %1$s has an account, we sent it a 6-digit code. Enter it with your new password.</string>
     <string name="account_new_password">New password</string>
-    <string name="account_confirm_password">Confirm new password</string>
-    <string name="account_password_hint">At least 8 characters</string>
-    <string name="account_passwords_differ">The passwords don\'t match</string>
+    <string name="account_password_hint">At least 6 characters</string>
     <string name="account_set_password">Set new password</string>
 
     <!-- Account messages (account/AccountViewModel.kt, account/GoogleAuth.kt) -->
@@ -190,11 +189,10 @@
     <string name="account_error_email_not_verified">Confirm your email first: enter the code we sent you.</string>
     <string name="account_error_locked">Too many attempts. Try again in a few minutes.</string>
     <string name="account_error_empty_password">Enter a password.</string>
-    <string name="account_error_weak_password">Use a password of at least 8 characters.</string>
+    <string name="account_error_weak_password">Use a password of at least 6 characters.</string>
     <string name="account_error_email_taken">There\'s already an account with this email. Sign in instead.</string>
     <string name="account_error_use_google">This email signs in with Google.</string>
     <string name="account_error_email_pending">We already sent a code to this address. Enter it, or ask for a new one.</string>
-    <string name="account_error_breached_password">This password has shown up in a data breach. Choose another one.</string>
     <string name="account_error_password_required">Enter your password again to finish.</string>
     <string name="account_error_invalid_email">That doesn\'t look like an email address.</string>
     <string name="account_error_invalid_code">That code is wrong or has expired.</string>
