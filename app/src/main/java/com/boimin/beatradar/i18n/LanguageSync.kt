@@ -45,10 +45,11 @@ object LanguageSync {
     private const val KEY_CHOICE = "choice"
     const val ENGLISH = "en"
 
-    /** Downloaded before the switch: the Listen tab, the app frame, notifications, widget and tile, this picker. */
-    private val CORE = listOf("app", "main", "listen", "language", "notif", "widget", "tile", "capture", "data")
+    /** Downloaded before the switch: the Listen tab and its tempo range, the app frame (Quick Setup too), notifications,
+     * widget and tile, this picker. */
+    private val CORE = listOf("app", "main", "listen", "tempo", "language", "notif", "widget", "tile", "capture", "data")
     /** The rest, most used first; chunks not named here come last. */
-    private val ORDER = listOf("log", "library", "song", "settings", "sets", "rewards", "badge", "account", "practice", "playlist", "recap", "shared", "shazam", "billing")
+    private val ORDER = listOf("log", "library", "song", "settings", "sets", "rewards", "profile", "badge", "account", "practice", "playlist", "recap", "shared", "shazam", "billing")
 
     private val api by lazy { ApiClient(BuildConfig.API_BASE_URL) }
     private val lock = Mutex()

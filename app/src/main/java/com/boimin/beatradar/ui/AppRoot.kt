@@ -42,7 +42,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -95,12 +94,21 @@ import com.boimin.beatradar.rewards.ProfileActions
 import com.boimin.beatradar.rewards.ProfileAvatar
 import com.boimin.beatradar.rewards.ProfileScreen
 import com.boimin.beatradar.rewards.RewardsSheet
+import com.boimin.beatradar.ui.setup.QuickSetupRules
+import com.boimin.beatradar.ui.setup.QuickSetupScreen
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /** Everything the UI can ask the Activity to do (permissions, system screens, the service). */
 class AppActions(
     val start: () -> Unit,
+    /** Asks for the mic (and notifications) without starting to listen: Quick Setup's permission step. */
+    val requestPermissions: () -> Unit,
+    /** The mic permission: true granted, false refused, null not asked yet. Re-checked on resume. */
+    val micPermission: StateFlow<Boolean?>,
     val stop: () -> Unit,
     val pause: () -> Unit,
     val resume: () -> Unit,
@@ -404,7 +412,13 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                 coffeeAvailable = coffee is CoffeeState.Ready,
                 onCoffee = { showCoffee = true },
                 onShowShared = { showSettings = false; showShared = true },
+                onVerifyEmail = { email -> accountVm.startVerification(email); showSignIn = true },
             ),
+            onRunSetup = {
+                showSettings = false
+                libraryVm.closeProfiles()
+                vm.updateSettings(QuickSetupRules::again)
+            },
             onOpenUrl = actions.openUrl,
             onDismiss = { showSettings = false },
         )
@@ -441,67 +455,26 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
             dismissButton = { TextButton(onClick = { confirmSignOut = false; accountVm.signOut(keepLog = false) }) { Text(str(R.string.app_sign_out_remove)) } },
         )
     }
-    if (!settings.sharingConsentAsked) {
-        SharingConsent(
-            onAnswer = { contribute, shareClips ->
-                vm.updateSettings {
-                    // Clips can only be shared if they're kept on the phone in the first place.
-                    it.copy(sharingConsentAsked = true, contribute = contribute, shareClips = shareClips, saveClips = it.saveClips || shareClips)
-                }
+    // First run (docs/plans/03-quick-setup.md): a few skippable steps over the Listen tab, once. Sheets it opens (sign-in,
+    // language) are windows of their own, so they show above it.
+    AnimatedVisibility(visible = !settings.setupDone, enter = fadeIn(), exit = fadeOut()) {
+        val micPermission by actions.micPermission.collectAsStateWithLifecycle()
+        QuickSetupScreen(
+            settings = settings,
+            onChange = vm::updateSettings,
+            micPermission = micPermission,
+            onRequestPermissions = actions.requestPermissions,
+            hasNotificationAccess = vm::hasNotificationAccess,
+            onOpenNotificationAccess = actions.openNotificationAccess,
+            user = user,
+            avatarUrl = rewards?.avatarUrl,
+            onSignIn = { requireSignIn {} },
+            onDone = { start ->
+                tab = TAB_LISTEN
+                if (start) actions.start()
             },
         )
     }
-}
-
-/**
- * First run (PLAN §9, §5d): asks, like a permission prompt, whether BeatRadar may contribute to the shared Library and,
- * only then, whether it may share clips of songs it can't name. Both can be changed later in Settings.
- */
-@Composable
-private fun SharingConsent(onAnswer: (contribute: Boolean, shareClips: Boolean) -> Unit) {
-    var step by rememberSaveable { mutableIntStateOf(1) }
-    if (step == 1) {
-        ConsentDialog(
-            step = str(R.string.app_consent_step, 1, 2),
-            title = str(R.string.app_consent_library_title),
-            body = str(R.string.app_consent_library_body),
-            onAllow = { step = 2 },
-            onDeny = { onAnswer(false, false) },
-        )
-    } else {
-        ConsentDialog(
-            step = str(R.string.app_consent_step, 2, 2),
-            title = str(R.string.app_consent_clips_title),
-            body = str(R.string.app_consent_clips_body),
-            onAllow = { onAnswer(true, true) },
-            onDeny = { onAnswer(true, false) },
-        )
-    }
-}
-
-@Composable
-private fun ConsentDialog(step: String, title: String, body: String, onAllow: () -> Unit, onDeny: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = {},
-        title = {
-            Column {
-                Text(step, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(title)
-            }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(body)
-                Text(
-                    str(R.string.app_consent_change_later),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        confirmButton = { Button(onClick = onAllow) { Text(str(R.string.app_consent_allow)) } },
-        dismissButton = { TextButton(onClick = onDeny) { Text(str(R.string.app_consent_deny)) } },
-    )
 }
 
 /** Three tips with Play's localised prices, then a thank-you (PLAN §8). */

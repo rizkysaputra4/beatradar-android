@@ -77,6 +77,8 @@ fun SettingsSheet(
     onOpenNotificationAccess: () -> Unit,
     account: AccountSettings,
     onOpenUrl: (String) -> Unit,
+    /** "Run Quick Setup again": closes Settings and shows the first-run steps, every choice kept. */
+    onRunSetup: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var access by remember { mutableStateOf(hasNotificationAccess()) }
@@ -211,6 +213,8 @@ fun SettingsSheet(
 
             SectionLabel(str(R.string.settings_section_about))
             Card {
+                NavRow(R.drawable.ic_settings, str(R.string.app_setup_again), str(R.string.app_setup_again_desc), onClick = onRunSetup)
+                Divider()
                 NavRow(
                     R.drawable.ic_verified_outline,
                     str(R.string.settings_privacy_title),
@@ -403,6 +407,8 @@ class AccountSettings(
     val onCoffee: () -> Unit,
     /** "What I've shared": what this phone sent, and how to ask for it to be deleted. */
     val onShowShared: () -> Unit,
+    /** "Email not verified": the sign-in sheet's code step for this address, with a fresh code. */
+    val onVerifyEmail: (email: String) -> Unit,
 )
 
 @Composable
@@ -438,6 +444,19 @@ private fun AccountSection(a: AccountSettings) {
             ActionChip(str(R.string.settings_account_rename), filled = false, onClick = { renaming = true })
         }
         Divider()
+        // An email account that never confirmed its address (from before codes): one tap to the code step.
+        val unverifiedEmail = user.email?.takeIf { !user.emailVerified && !user.googleLinked }
+        if (unverifiedEmail != null) {
+            NavRow(
+                R.drawable.ic_verified_outline,
+                str(R.string.settings_account_unverified),
+                str(R.string.settings_account_unverified_desc),
+                onClick = { a.onVerifyEmail(unverifiedEmail) },
+                iconTint = Brand.Flame,
+                trailing = { ActionChip(str(R.string.account_verify), filled = true, onClick = { a.onVerifyEmail(unverifiedEmail) }) },
+            )
+            Divider()
+        }
         SwitchRow(str(R.string.settings_account_leaderboard_title), str(R.string.settings_account_leaderboard_desc), user.onLeaderboard) { a.onLeaderboard(it) }
         Divider()
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {

@@ -53,6 +53,15 @@ val ApiJson = Json {
 
 @Serializable data class Credentials(val email: String, val password: String)
 @Serializable data class EmailOnly(val email: String)
+/** `POST /v1/auth/register` (202): no session yet; a 6-digit code (and a link) went to [email], as the server normalised it. */
+@Serializable data class RegisterResult(val verificationRequired: Boolean = true, val email: String? = null)
+/**
+ * `POST /v1/auth/verify-code`: confirms the address and signs in. [password] is the one typed at sign-up or sign-in,
+ * required for a registration never confirmed (the server sets it only now); left out for an older account.
+ */
+@Serializable data class CodeVerify(val email: String, val code: String, val password: String? = null)
+/** `POST /v1/auth/reset-password-code`: the code from the reset email and the new password. */
+@Serializable data class CodeReset(val email: String, val code: String, val password: String)
 @Serializable data class GoogleSignIn(val idToken: String)
 @Serializable data class RefreshRequest(val refreshToken: String)
 @Serializable data class Me(

@@ -4,6 +4,7 @@ import android.Manifest
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -22,6 +23,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.splashscreen.SplashScreenViewProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import androidx.core.net.toUri
 import com.boimin.beatradar.account.AccountViewModel
 import com.boimin.beatradar.billing.CoffeeBilling
@@ -57,11 +59,21 @@ class MainActivity : ComponentActivity() {
 
     private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
         if (grants[Manifest.permission.RECORD_AUDIO] == true) {
+            micPermission.value = true
             startListening()
         } else {
+            micPermission.value = false
             Toast.makeText(this, str(R.string.main_activity_mic_permission_needed), Toast.LENGTH_LONG).show()
         }
     }
+
+    /** Quick Setup's ask: the same permissions, without starting to listen (and no toast: the step says it). */
+    private val setupPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+        micPermission.value = grants[Manifest.permission.RECORD_AUDIO] == true
+    }
+
+    /** The mic permission: true granted, false refused here, null not asked yet (see [AppActions.micPermission]). */
+    private val micPermission = MutableStateFlow<Boolean?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
@@ -79,6 +91,8 @@ class MainActivity : ComponentActivity() {
 
         val actions = AppActions(
             start = ::requestStart,
+            requestPermissions = ::requestPermissions,
+            micPermission = micPermission,
             stop = { CaptureService.send(this, CaptureService.ACTION_STOP) },
             pause = { CaptureService.send(this, CaptureService.ACTION_PAUSE) },
             resume = { CaptureService.send(this, CaptureService.ACTION_RESUME) },
@@ -110,6 +124,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Granted (or taken back) in the system settings meanwhile.
+        if (hasMic()) micPermission.value = true else if (micPermission.value == true) micPermission.value = null
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -197,13 +217,30 @@ class MainActivity : ComponentActivity() {
             .onFailure { openUrl("https://play.google.com/store/apps/details?id=$packageName") }
     }
 
+    /** Start: asks for the mic (and notifications) if needed, then starts listening. */
     private fun requestStart() {
-        val needed = buildList {
-            add(Manifest.permission.RECORD_AUDIO)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-        permissions.launch(needed.toTypedArray())
+        permissions.launch(neededPermissions())
     }
+
+    /** Quick Setup: asks for the same permissions, once, without starting; the answer lands in [micPermission]. */
+    private fun requestPermissions() {
+        if (hasMic() && !needsNotificationPermission()) {
+            micPermission.value = true
+            return
+        }
+        setupPermissions.launch(neededPermissions())
+    }
+
+    private fun neededPermissions(): Array<String> = buildList {
+        add(Manifest.permission.RECORD_AUDIO)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
+    }.toTypedArray()
+
+    private fun hasMic(): Boolean = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+    private fun needsNotificationPermission(): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
 
     private fun startListening() = CaptureService.start(this)
 

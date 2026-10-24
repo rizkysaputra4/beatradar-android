@@ -5,6 +5,7 @@
     <string name="listen_start_listening">Start listening</string>
     <string name="listen_bpm_label">BPM</string>
     <string name="listen_confidence_percent">%1$d%%</string>
+    <string name="listen_confidence_bars">Confidence: %1$d of %2$d bars</string>
     <string name="listen_listening">Listening…</string>
     <string name="listen_paused">Paused</string>
     <string name="listen_tap_to_listen">Tap to listen</string>
@@ -90,15 +91,54 @@
     <string name="app_sign_out_keep">Keep</string>
     <string name="app_sign_out_remove">Remove</string>
 
-    <!-- App shell: first-run sharing consent -->
+    <!-- First-run sharing texts, now in Quick Setup's Library step (ui/setup/QuickSetupScreen.kt) -->
     <string name="app_consent_step">%1$d of %2$d</string>
     <string name="app_consent_library_title">Contribute to the Library?</string>
     <string name="app_consent_library_body">BeatRadar can share the titles, tempos and audio fingerprints of the songs it hears, so anyone can search a public tempo library. Fingerprints can\'t be turned back into sound, voices or words. No account needed; if you sign in, your nickname shows on leaderboards.</string>
     <string name="app_consent_clips_title">Help name unknown songs?</string>
     <string name="app_consent_clips_body">When BeatRadar can\'t name a song, it can send a 12-second clip of it, so an admin can listen and name it for everyone. Only music is clipped, clips are deleted within 30 days, and turning this off later deletes yours from the server.</string>
     <string name="app_consent_change_later">You can change this anytime in Settings.</string>
-    <string name="app_consent_allow">Allow</string>
-    <string name="app_consent_deny">Don\'t allow</string>
+
+    <!-- Quick Setup, first run (ui/setup/QuickSetupScreen.kt); app_ is a core chunk, so it's translated before it shows -->
+    <string name="app_setup_skip">Skip</string>
+    <string name="app_setup_skip_all">Skip setup</string>
+    <string name="app_setup_back">Back</string>
+    <string name="app_setup_continue">Continue</string>
+    <string name="app_setup_language">Change language</string>
+    <string name="app_setup_use_title">What will you use BeatRadar for?</string>
+    <string name="app_setup_use_body">Pick one and BeatRadar buzzes when the music matches your pace.</string>
+    <string name="app_setup_preset_run">Running</string>
+    <string name="app_setup_preset_walk">Brisk walking</string>
+    <string name="app_setup_preset_cycling">Cycling</string>
+    <string name="app_setup_preset_dj">DJ or practice</string>
+    <string name="app_setup_preset_free">Just exploring</string>
+    <string name="app_setup_preset_free_desc">No target, just see the tempo</string>
+    <string name="app_setup_with_half_double">%1$s · half and double tempo count</string>
+    <string name="app_setup_own_range">Set my own</string>
+    <string name="app_setup_own_range_desc">Any tempo range you like</string>
+    <string name="app_setup_hear_title">Let BeatRadar listen</string>
+    <string name="app_setup_hear_body">BeatRadar hears the beat through your microphone. The sound is analysed on your phone; no audio leaves it unless you choose to share clips.</string>
+    <string name="app_setup_mic_title">Microphone</string>
+    <string name="app_setup_mic_desc">Needed to hear the beat. A notification shows while it listens.</string>
+    <string name="app_setup_mic_allowed">Allowed</string>
+    <string name="app_setup_mic_denied">Not allowed. You can allow it later, when you tap Start.</string>
+    <string name="app_setup_allow_mic">Allow microphone</string>
+    <string name="app_setup_names_title">Name songs automatically</string>
+    <string name="app_setup_names_desc">Optional: reads song titles from music apps and Shazam notifications. Nothing leaves your phone.</string>
+    <string name="app_setup_allow">Allow</string>
+    <string name="app_setup_library_title">Help build the Library</string>
+    <string name="app_setup_library_body">The songs you hear can add their tempo to a free library anyone can search. You choose what to share.</string>
+    <string name="app_setup_account_title">Save your progress</string>
+    <string name="app_setup_account_body">With an account you get a nickname on the leaderboards, can love songs, and your log is backed up to every phone. Everything else works without one.</string>
+    <string name="app_setup_nickname_preview">Your nickname on the leaderboards. You can change it.</string>
+    <string name="app_setup_signed_in">Signed in. Your log is backed up.</string>
+    <string name="app_setup_sign_in">Sign in or create an account</string>
+    <string name="app_setup_tips">Tips</string>
+    <string name="app_setup_tip_widget">Add the BeatRadar widget to your home screen to start listening with one tap.</string>
+    <string name="app_setup_tip_tile">Or add the BeatRadar tile to Quick Settings: swipe down, tap Edit and drag it in.</string>
+    <string name="app_setup_start">Start listening</string>
+    <string name="app_setup_again">Run Quick Setup again</string>
+    <string name="app_setup_again_desc">Activity, permissions, sharing and account, step by step</string>
 
     <!-- App shell: buy me a coffee sheet -->
     <string name="app_coffee_title">Buy me a coffee ☕</string>

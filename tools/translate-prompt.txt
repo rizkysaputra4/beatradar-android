@@ -109,9 +109,12 @@ Be consistent: once you've picked a word for "Library", "Log", "Set", "beats", "
 
 A key's first word tells you the screen:
 
-  app_       app frame: bottom tabs, screen titles, dialogs, the tip sheet, the consent questions on first launch
+  app_       app frame: bottom tabs, screen titles, dialogs, the tip sheet, the "update the app" screen (app_update_),
+             and Quick Setup, the short guide on first launch (app_setup_: what the app is for, permissions, sharing
+             with the Library, signing in; app_consent_ are its Library questions)
   main_      small app-wide messages
   listen_    Listen tab: the big tap-to-listen dial, the live BPM, the target range, songs heard recently
+  tempo_     the target range editor (any tempo, between, at least, up to), on the Listen tab and in Quick Setup
   log_       Log tab: the history of songs heard, naming unnamed songs, filters
   library_   Discover tab: searching the shared Library, filters, sorting, playlists
   song_      a song's page: tempo, confirmations, votes, links, reports
@@ -120,9 +123,10 @@ A key's first word tells you the screen:
   playlist_  "BPM of a playlist": tempos of a shared Spotify or YouTube playlist
   recap_     the weekly recap card ("your week in tempo")
   settings_  Settings sheet
-  account_   signing in, creating an account, password reset
+  account_   signing in, creating an account, the 6-digit email code, password reset
   shared_    "What I've shared": what the user has sent to the Library
-  rewards_   beats, badges, leaderboards, profile
+  rewards_   beats, badges, leaderboards
+  profile_   the user's public profile page: stats, pictures, streak, tempo zone, loved songs, pinned sets
   badge_     the badge-earned celebration
   notif_     notifications: the listening notification, matches, the weekly recap
   widget_    home-screen widget

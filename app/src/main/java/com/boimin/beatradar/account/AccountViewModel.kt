@@ -21,13 +21,22 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-/** Sign-in sheet progress: what's busy, and the last error or info line. */
+/** Sign-in sheet progress: the step it shows, what's busy, and the last error or info line. */
 data class SignInState(
+    val mode: SignInMode = SignInMode.CHOOSE,
     val busy: Boolean = false,
     val error: String? = null,
     val info: String? = null,
-    /** The last sign-in failed because the address isn't verified yet: offer "Resend". */
-    val canResend: Boolean = false,
+    /** The address the last code went to (as the server normalised it), for VERIFY_CODE and RESET_CODE. */
+    val codeEmail: String? = null,
+    /** The form a code step came from: "Use another email" goes back there. */
+    val codeFrom: SignInMode = SignInMode.SIGN_IN,
+    /** When the last code was sent from this phone, for the resend countdown (null: resend at once). */
+    val codeSentAtMs: Long? = null,
+    /** How many codes were refused: each refusal empties the code field once. */
+    val codeRejections: Int = 0,
+    /** Signed in: the sheet closes (and offers to save an email password). */
+    val done: Boolean = false,
 )
 
 /** Accounts (PLAN §3, M2) and rewards (§7b, M5b) for the UI. */
@@ -61,6 +70,12 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
     /** Runs once the user is signed in (e.g. a love tapped as a guest). */
     private var afterSignIn: (() -> Unit)? = null
 
+    /**
+     * The password typed at sign-up or sign-in, kept in memory only while the code step shows: the server sets it when
+     * the code confirms a new registration.
+     */
+    private var pendingPassword: String? = null
+
     init {
         viewModelScope.launch {
             account.signedOut.collect { reason ->
@@ -86,36 +101,138 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
 
     fun setAfterSignIn(action: (() -> Unit)?) {
         afterSignIn = action
+        pendingPassword = null
         _signIn.value = SignInState()
     }
 
-    private fun signInStep(block: suspend () -> Unit) {
-        _signIn.value = SignInState(busy = true)
+    /** Moves the sheet to another form (Sign in, Create account, Forgot), clearing the last message. */
+    fun setSignInMode(mode: SignInMode) {
+        if (mode != SignInMode.VERIFY_CODE && mode != SignInMode.RESET_CODE) pendingPassword = null
+        _signIn.value = _signIn.value.copy(mode = mode, busy = false, error = null, info = null)
+    }
+
+    /**
+     * Settings' "Email not verified": the code step for the signed-in account's [email], with a fresh code. An older
+     * account sends no password with its code.
+     */
+    fun startVerification(email: String) {
+        afterSignIn = null
+        pendingPassword = null
+        _signIn.value = SignInState(mode = SignInMode.VERIFY_CODE, codeEmail = email, codeFrom = SignInMode.SIGN_IN)
+        resendCode()
+    }
+
+    /**
+     * Runs [block] with the sheet busy. An error lands in the state; a sign-in or sign-up of [email] refused because the
+     * address isn't confirmed yet goes to the code step, with a fresh code.
+     */
+    private fun signInStep(email: String? = null, block: suspend () -> Unit) {
+        val from = _signIn.value.mode
+        _signIn.value = _signIn.value.copy(busy = true, error = null, info = null)
         viewModelScope.launch {
             _signIn.value = try {
                 block()
-                SignInState()
+                _signIn.value.copy(busy = false)
             } catch (e: ApiException) {
-                SignInState(error = describe(e), canResend = e.code == "email_not_verified")
+                if (email != null && SignInRules.needsCode(e.code)) {
+                    runCatching { account.resendVerification(email) }
+                    codeStep(email, from)
+                } else {
+                    failed(e)
+                }
             }
         }
     }
 
+    private fun codeStep(email: String, from: SignInMode, mode: SignInMode = SignInMode.VERIFY_CODE) = SignInState(
+        mode = mode,
+        codeEmail = email.trim(),
+        codeFrom = from,
+        codeSentAtMs = System.currentTimeMillis(),
+    )
+
+    private fun failed(e: ApiException): SignInState {
+        val s = _signIn.value.copy(busy = false, error = describe(e), info = null)
+        return when {
+            // The server wants the password typed at sign-up with the code: back to the form to type it again.
+            e.code == "password_required" -> s.copy(mode = SignInRules.backFromCode(s.codeFrom))
+            SignInRules.clearsCode(e.code) -> s.copy(codeRejections = s.codeRejections + 1)
+            else -> s
+        }
+    }
+
     private fun signedIn() {
+        pendingPassword = null
         afterSignIn?.invoke()
         afterSignIn = null
         clearAccountData()
         loadRewards()
+        _signIn.value = _signIn.value.copy(done = true)
     }
 
-    fun login(email: String, password: String) = signInStep {
-        account.login(email, password)
-        signedIn()
+    fun login(email: String, password: String) {
+        // Kept for the code step, should the server want the address confirmed first.
+        pendingPassword = password
+        signInStep(email) {
+            account.login(email, password)
+            signedIn()
+        }
     }
 
-    fun register(email: String, password: String) = signInStep {
-        account.register(email, password)
-        signedIn()
+    fun register(email: String, password: String) {
+        pendingPassword = password
+        signInStep(email) {
+            val r = account.register(email, password)
+            if (r.verificationRequired) {
+                _signIn.value = codeStep(r.email ?: email, from = SignInMode.REGISTER)
+            } else {
+                signedIn()
+            }
+        }
+    }
+
+    /** Confirms the address with [code], then signs in. */
+    fun verifyCode(code: String) {
+        val email = _signIn.value.codeEmail ?: return
+        signInStep {
+            account.verifyCode(email, code, pendingPassword)
+            signedIn()
+        }
+    }
+
+    /** Sets the new password with [code], then signs in with it. */
+    fun resetWithCode(code: String, password: String) {
+        val email = _signIn.value.codeEmail ?: return
+        signInStep {
+            account.resetWithCode(email, code, password)
+            try {
+                account.login(email, password)
+            } catch (e: ApiException) {
+                // The password is set; only the sign-in after it failed. Sign in by hand.
+                _signIn.value = SignInState(mode = SignInMode.SIGN_IN, info = text(R.string.account_password_changed), error = describe(e))
+                return@signInStep
+            }
+            signedIn()
+        }
+    }
+
+    /** "Resend": another code (and link) for the step shown. Ignored while the countdown runs. */
+    fun resendCode() {
+        val s = _signIn.value
+        val email = s.codeEmail ?: return
+        if (SignInRules.resendWaitSeconds(s.codeSentAtMs, System.currentTimeMillis()) > 0) return
+        // Opened from Settings (no code sent from here yet), the step itself says a code is on its way.
+        val tapped = s.codeSentAtMs != null
+        _signIn.value = s.copy(codeSentAtMs = System.currentTimeMillis(), error = null, info = null)
+        viewModelScope.launch {
+            val sent = runCatching {
+                if (s.mode == SignInMode.RESET_CODE) account.forgotPassword(email) else account.resendVerification(email)
+            }
+            val error = (sent.exceptionOrNull() as? ApiException)?.let(::describe)
+            if (tapped || error != null) {
+                _signIn.value = _signIn.value.copy(info = if (error == null) text(R.string.account_verification_resent) else null, error = error)
+            }
+        }
     }
 
     fun google(idToken: String) = signInStep {
@@ -124,25 +241,13 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun googleFailed(message: String) {
-        _signIn.value = SignInState(error = message)
+        _signIn.value = _signIn.value.copy(busy = false, error = message, info = null)
     }
 
-    fun resendVerification(email: String) {
-        viewModelScope.launch {
-            runCatching { account.resendVerification(email) }
-            _signIn.value = SignInState(info = text(R.string.account_verification_resent))
-        }
-    }
-
-    fun forgotPassword(email: String) {
-        viewModelScope.launch {
-            _signIn.value = try {
-                account.forgotPassword(email)
-                SignInState(info = text(R.string.account_reset_sent))
-            } catch (e: ApiException) {
-                SignInState(error = describe(e))
-            }
-        }
+    /** Mails a reset code (and link) to [email], then shows the code step. */
+    fun forgotPassword(email: String) = signInStep {
+        account.forgotPassword(email)
+        _signIn.value = codeStep(email, from = SignInMode.FORGOT, mode = SignInMode.RESET_CODE)
     }
 
     /** [keepLog] false clears this phone's log (it's still in the account). */
@@ -233,26 +338,9 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
     private fun describe(e: ApiException): String = describe(getApplication(), e)
 
     companion object {
-        /** Friendly text for the server's error codes. */
-        fun describe(context: Context, e: ApiException): String = when (e.code) {
-            "offline" -> context.str(R.string.account_error_offline)
-            "invalid_credentials" -> context.str(R.string.account_error_invalid_credentials)
-            "email_not_verified" -> context.str(R.string.account_error_email_not_verified)
-            "locked" -> context.str(R.string.account_error_locked)
-            "empty_password" -> context.str(R.string.account_error_empty_password)
-            "weak_password" -> context.str(R.string.account_error_weak_password)
-            "email_taken" -> context.str(R.string.account_error_email_taken)
-            "use_google" -> context.str(R.string.account_error_use_google)
-            "nickname_taken" -> context.str(R.string.account_error_nickname_taken)
-            "nickname_not_allowed" -> context.str(R.string.account_error_nickname_not_allowed)
-            "token_reused", "invalid_refresh" -> context.str(R.string.account_error_signed_out)
-            "sign_in_required" -> context.str(R.string.account_error_sign_in_required)
-            else -> when {
-                e.http == 429 -> context.str(R.string.account_error_rate_limited)
-                e.http >= 500 -> context.str(R.string.account_error_server)
-                else -> e.message
-            }
-        }
+        /** Friendly text for the server's error codes ([SignInRules.errorText]), else the server's own message. */
+        fun describe(context: Context, e: ApiException): String =
+            SignInRules.errorText(e.code, e.http)?.let { context.str(it) } ?: e.message
     }
 }
 

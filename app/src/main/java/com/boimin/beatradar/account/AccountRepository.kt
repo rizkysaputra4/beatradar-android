@@ -5,6 +5,8 @@ import com.boimin.beatradar.BuildConfig
 import com.boimin.beatradar.net.ApiClient
 import com.boimin.beatradar.net.ApiException
 import com.boimin.beatradar.net.ApiJson
+import com.boimin.beatradar.net.CodeReset
+import com.boimin.beatradar.net.CodeVerify
 import com.boimin.beatradar.net.Credentials
 import com.boimin.beatradar.net.EmailOnly
 import com.boimin.beatradar.net.GoogleSignIn
@@ -13,6 +15,7 @@ import com.boimin.beatradar.net.Me
 import com.boimin.beatradar.net.ProfileUpdate
 import com.boimin.beatradar.net.RefreshRequest
 import com.boimin.beatradar.net.RegisterInstall
+import com.boimin.beatradar.net.RegisterResult
 import com.boimin.beatradar.net.Session
 import com.boimin.beatradar.net.TokenSource
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -22,6 +25,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import java.security.SecureRandom
 import java.util.Base64
 import java.util.UUID
@@ -131,9 +135,30 @@ class AccountRepository(context: Context) : TokenSource {
 
     // Account actions (all throw ApiException with the server's code on failure)
 
-    /** Creates the account and signs in straight away (no verification email, any password). */
-    suspend fun register(email: String, password: String): Me =
-        signedInWith(api.post("v1/auth/register", Credentials(email.trim(), password)))
+    /**
+     * Creates the account. No session yet: the server mails a 6-digit code (and a link), and [verifyCode] signs in.
+     * A server from before codes signed in straight away; that answer is still taken (verificationRequired = false).
+     */
+    suspend fun register(email: String, password: String): RegisterResult {
+        val body: JsonObject = api.post("v1/auth/register", Credentials(email.trim(), password))
+        if ("accessToken" in body) {
+            signedInWith(ApiJson.decodeFromJsonElement(Session.serializer(), body))
+            return RegisterResult(verificationRequired = false, email = email.trim())
+        }
+        return ApiJson.decodeFromJsonElement(RegisterResult.serializer(), body)
+    }
+
+    /**
+     * Confirms [email] with the code from the email and signs in (also when already signed in, to an unverified
+     * account). [password] is required for a registration never confirmed, null for an older account.
+     */
+    suspend fun verifyCode(email: String, code: String, password: String?): Me =
+        signedInWith(api.post("v1/auth/verify-code", CodeVerify(email.trim(), code, password)))
+
+    /** Sets a new password with the code from the reset email. Doesn't sign in; [login] with it next. */
+    suspend fun resetWithCode(email: String, code: String, password: String) {
+        api.post<CodeReset, Unit>("v1/auth/reset-password-code", CodeReset(email.trim(), code, password), auth = false)
+    }
 
     suspend fun resendVerification(email: String) {
         api.post<EmailOnly, Unit>("v1/auth/resend-verification", EmailOnly(email.trim()), auth = false)

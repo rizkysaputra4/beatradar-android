@@ -23,6 +23,22 @@ class ApiModelsTest {
         assertTrue(s.user.googleLinked)
     }
 
+    @Test fun registerAndCodes() {
+        val r = ApiJson.decodeFromString(RegisterResult.serializer(), """{"verificationRequired":true,"email":"x@y.z"}""")
+        assertTrue(r.verificationRequired)
+        assertEquals("x@y.z", r.email)
+        // The password goes with a new registration's code, and is left out for an older account.
+        assertEquals(
+            """{"email":"x@y.z","code":"482913","password":"pw"}""",
+            ApiJson.encodeToString(CodeVerify.serializer(), CodeVerify("x@y.z", "482913", "pw")),
+        )
+        assertEquals("""{"email":"x@y.z","code":"482913"}""", ApiJson.encodeToString(CodeVerify.serializer(), CodeVerify("x@y.z", "482913")))
+        assertEquals(
+            """{"email":"x@y.z","code":"482913","password":"new password"}""",
+            ApiJson.encodeToString(CodeReset.serializer(), CodeReset("x@y.z", "482913", "new password")),
+        )
+    }
+
     @Test fun songPageAndDetail() {
         val page = ApiJson.decodeFromString(
             SongPage.serializer(),

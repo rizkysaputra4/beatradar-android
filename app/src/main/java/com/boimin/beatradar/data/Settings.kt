@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.boimin.beatradar.ui.setup.QuickSetupRules
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -45,6 +46,11 @@ data class Settings(
      * (A new key: phones that only saw the earlier one-line notice are asked once too.)
      */
     val sharingConsentAsked: Boolean = false,
+    /**
+     * Quick Setup was finished or skipped (ui/setup). Phones from before it count as set up once they answered the
+     * sharing questions ([QuickSetupRules.setupDone]), so only new installs see it.
+     */
+    val setupDone: Boolean = false,
     val theme: ThemeMode = ThemeMode.SYSTEM,
     /** The app sets play in: "youtube" (the whole set as one queue) or "spotify" (a song at a time). */
     val playApp: String = "youtube",
@@ -101,6 +107,7 @@ class SettingsRepository(private val context: Context) {
         val CONTRIBUTE = booleanPreferencesKey("contribute")
         val SHARE_CLIPS = booleanPreferencesKey("share_clips")
         val SHARING_CONSENT = booleanPreferencesKey("sharing_consent_asked")
+        val SETUP_DONE = booleanPreferencesKey("setup_done")
         val THEME = stringPreferencesKey("theme")
         val PLAY_APP = stringPreferencesKey("play_app")
     }
@@ -126,6 +133,7 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.CONTRIBUTE] = s.contribute
             prefs[Keys.SHARE_CLIPS] = s.shareClips
             prefs[Keys.SHARING_CONSENT] = s.sharingConsentAsked
+            prefs[Keys.SETUP_DONE] = s.setupDone
             prefs[Keys.THEME] = s.theme.name
             prefs[Keys.PLAY_APP] = s.playApp
         }
@@ -147,6 +155,7 @@ class SettingsRepository(private val context: Context) {
             contribute = this[Keys.CONTRIBUTE] ?: d.contribute,
             shareClips = this[Keys.SHARE_CLIPS] ?: d.shareClips,
             sharingConsentAsked = this[Keys.SHARING_CONSENT] ?: d.sharingConsentAsked,
+            setupDone = QuickSetupRules.setupDone(this[Keys.SETUP_DONE], this[Keys.SHARING_CONSENT] ?: d.sharingConsentAsked),
             theme = enumOrDefault(this[Keys.THEME], d.theme),
             playApp = this[Keys.PLAY_APP]?.takeIf { it == "youtube" || it == "spotify" } ?: d.playApp,
         )

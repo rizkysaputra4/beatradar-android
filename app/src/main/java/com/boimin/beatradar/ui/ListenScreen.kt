@@ -20,6 +20,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.boimin.beatradar.BuildConfig
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -244,7 +247,13 @@ private fun Dial(state: MonitorState, settings: Settings, inTarget: Boolean, hei
                     // A small dial (a very short screen) has no room for the confidence line.
                     if (k >= 0.6f) {
                         Spacer(Modifier.height(4.dp))
-                        Text(str(R.string.listen_confidence_percent, (sure * 100).roundToInt()), fontSize = 13.sp, color = Tone.text3)
+                        val percent = (sure * 100).roundToInt()
+                        // Release builds show signal bars; the exact share helps when tuning the detector.
+                        if (BuildConfig.DEBUG) {
+                            Text(str(R.string.listen_confidence_percent, percent), fontSize = 13.sp, color = Tone.text3)
+                        } else {
+                            ConfidenceBars(confidenceBars(percent), str(R.string.listen_confidence_bars, confidenceBars(percent), CONFIDENCE_BARS))
+                        }
                     }
                 } else {
                     Icon(
@@ -274,6 +283,40 @@ internal fun confidencePercent(confidence: Float?): Int =
     ((confidence ?: 0f) / FULL_CONFIDENCE * 100).roundToInt().coerceIn(0, 100)
 
 private const val FULL_CONFIDENCE = 1f
+
+internal const val CONFIDENCE_BARS = 4
+
+/** How many of [CONFIDENCE_BARS] signal bars a confidence of [percent] (0..100) lights. */
+internal fun confidenceBars(percent: Int): Int = when {
+    percent <= 0 -> 0
+    percent < 30 -> 1
+    percent < 55 -> 2
+    percent < 80 -> 3
+    else -> CONFIDENCE_BARS
+}
+
+/**
+ * The reading's confidence as signal bars, quiet enough to sit under the number: lit bars in the dial's caption colour,
+ * the rest a faint trace of it.
+ */
+@Composable
+private fun ConfidenceBars(lit: Int, description: String) {
+    val color = Tone.text3
+    Canvas(Modifier.size(width = 15.dp, height = 11.dp).semantics { contentDescription = description }) {
+        val gap = 1.5.dp.toPx()
+        val barWidth = (size.width - gap * (CONFIDENCE_BARS - 1)) / CONFIDENCE_BARS
+        val radius = CornerRadius(barWidth / 3, barWidth / 3)
+        for (i in 0 until CONFIDENCE_BARS) {
+            val barHeight = size.height * (i + 1) / CONFIDENCE_BARS
+            drawRoundRect(
+                color = if (i < lit) color else color.copy(alpha = color.alpha * 0.3f),
+                topLeft = Offset(i * (barWidth + gap), size.height - barHeight),
+                size = Size(barWidth, barHeight),
+                cornerRadius = radius,
+            )
+        }
+    }
+}
 
 /** Under the number, in plain words: "56 below target", "✓ In target · 8 s", or how sure the reading is. */
 @Composable
