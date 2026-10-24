@@ -150,7 +150,7 @@ fun ProfileScreen(page: ProfilePage, signedIn: Boolean, a: ProfileActions, modif
 @Composable
 private fun GuestProfile(a: ProfileActions) {
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 100.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(28.dp))
@@ -197,7 +197,7 @@ private fun ProfileBody(p: PublicProfile, mine: MyProfile?, sets: List<ProfileSe
         }
     }
     Column(
-        Modifier.fillMaxSize().verticalScroll(scroll).padding(horizontal = 18.dp).padding(bottom = 100.dp),
+        Modifier.fillMaxSize().verticalScroll(scroll).padding(horizontal = 18.dp).padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Hero(p, onRename = if (mine != null) ({ renaming = true }) else null, onPictures = if (mine != null) ({ choosing = true }) else null)

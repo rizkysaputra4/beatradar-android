@@ -48,8 +48,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val query = MutableStateFlow("")
     /** The log's BPM filter is on. */
     val onlyInRange = MutableStateFlow(false)
-    /** The log's own BPM range; null follows the Listen tab's target range. */
-    val logBpmRange = MutableStateFlow<IntRange?>(null)
+    /** The log's own tempo range (either end may be open); null follows the Listen tab's target range. */
+    val logBpmRange = MutableStateFlow<LogTempo?>(null)
     val onlyIdentified = MutableStateFlow(false)
     /** Only unnamed songs that still have a clip to identify. */
     val onlyUnnamed = MutableStateFlow(false)
@@ -63,8 +63,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         .flatMapLatest { f -> dao.observe(f.query, false, f.identified, f.unnamed) }
         .combine(
             combine(onlyInRange, settings, logBpmRange) { on, s, custom ->
-                // The Listen target itself goes through inTarget, which knows an open end; a range set here is closed.
-                s?.takeIf { on }?.let { set -> { bpm: Float -> if (custom != null) Settings.bpmIn(bpm, custom, set.halfDoubleMatch) else set.inTarget(bpm) } }
+                s?.takeIf { on }?.let { set -> { bpm: Float -> if (custom != null) Settings.bpmIn(bpm, custom.bounds, set.halfDoubleMatch) else set.inTarget(bpm) } }
             },
         ) { entries, inRange ->
             if (inRange == null) entries else entries.filter { inRange(it.bpm) }
@@ -214,4 +213,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun forgetClip(entry: BeatLogEntry) = ClipStore.delete(entry.clipPath)
 
     fun hasNotificationAccess(): Boolean = NowPlayingListener.hasAccess(getApplication())
+}
+
+/** The Log's own tempo filter; a null end is open. */
+data class LogTempo(val low: Int?, val high: Int?) {
+    val bounds: IntRange get() = (low ?: 0)..(high ?: Int.MAX_VALUE)
 }

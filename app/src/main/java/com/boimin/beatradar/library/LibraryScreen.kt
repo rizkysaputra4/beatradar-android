@@ -1,9 +1,7 @@
 package com.boimin.beatradar.library
 
+import com.boimin.beatradar.ui.TempoSheet
 import androidx.compose.ui.draw.alpha
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,7 +16,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,7 +30,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -43,7 +39,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,8 +53,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.em
-import androidx.compose.foundation.text.TextAutoSize
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.boimin.beatradar.R
@@ -70,15 +63,8 @@ import com.boimin.beatradar.net.Facets
 import com.boimin.beatradar.net.SongSummary
 import com.boimin.beatradar.ui.BpmBadge
 import com.boimin.beatradar.ui.LogFilterPill
-import com.boimin.beatradar.ui.CalmBottomSheet
-import com.boimin.beatradar.ui.TEMPO_PRESETS
-import com.boimin.beatradar.ui.TempoRangeEditor
 import com.boimin.beatradar.ui.tempoRangeLabel
-import com.boimin.beatradar.ui.tempoRangeShort
-import com.boimin.beatradar.ui.rememberCalmSheetState
 import com.boimin.beatradar.ui.theme.Brand
-import com.boimin.beatradar.ui.theme.Tone
-import com.boimin.beatradar.ui.theme.brandSwitchColors
 import kotlin.math.roundToInt
 import com.boimin.beatradar.ui.SkeletonSongList
 
@@ -395,110 +381,17 @@ private fun Filters(
         selectionBar?.invoke(Modifier.matchParentSize().padding(start = 18.dp, end = 18.dp, bottom = 6.dp))
     }
 
-    if (tempoOpen) TempoSheet(query, settings, onChange, onDismiss = { tempoOpen = false })
-}
-
-/**
- * The tempo filter: Any / Between / At least / Up to with steppers, presets (the user's own target first) and
- * half/double. Changes apply as they are made (the list reloads after a short pause); swipe down, tap outside or Done
- * closes it.
- */
-@Composable
-private fun TempoSheet(query: SongQuery, settings: Settings, onChange: (SongQuery) -> Unit, onDismiss: () -> Unit) {
-    val lo = query.bpmMin
-    val hi = query.bpmMax
-    fun set(a: Int?, b: Int?) = onChange(query.copy(bpmMin = a, bpmMax = b))
-    CalmBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberCalmSheetState(skipPartiallyExpanded = true),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = Tone.sheet,
-        // Tone.sheet isn't a theme colour, so untinted text would not follow dark mode without this.
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        dragHandle = {
-            Box(Modifier.padding(top = 10.dp, bottom = 16.dp).size(36.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(Tone.sheetLine))
-        },
-    ) {
-        // A short screen or an open keyboard leaves less room than the sheet needs: it scrolls rather than squeezing
-        // fixed-height parts (Done, the steppers, the name field) out of shape.
-        Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 28.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(str(R.string.library_tempo_title), fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Text(
-                    tempoRangeLabel(lo, hi),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (lo != null || hi != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(Modifier.height(16.dp))
-            TempoRangeEditor(
-                low = lo,
-                high = hi,
-                fallbackLow = settings.minBpm,
-                fallbackHigh = settings.maxBpm,
-                allowAny = true,
-                onChange = ::set,
-            )
-            Spacer(Modifier.height(16.dp))
-            val mine = Triple(str(R.string.library_tempo_my_range), settings.targetLow, settings.targetHigh)
-            val presets = listOf(mine) + TEMPO_PRESETS
-                .filter { it.min != settings.targetLow || it.max != settings.targetHigh }
-                .map { Triple(str(it.label), it.min, it.max) }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                presets.forEach { (name, a, b) ->
-                    TempoPresetTile(name, tempoRangeShort(a, b), selected = lo == a && hi == b, Modifier.weight(1f)) { set(a, b) }
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { onChange(query.copy(halfDouble = !query.halfDouble)) }
-                    .padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(str(R.string.settings_half_double_title), fontSize = 15.sp)
-                    Text(str(R.string.settings_half_double_desc), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(
-                    checked = query.halfDouble,
-                    onCheckedChange = { on -> onChange(query.copy(halfDouble = on)) },
-                    colors = brandSwitchColors(),
-                )
-            }
-            Spacer(Modifier.height(16.dp))
-            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(str(R.string.library_done)) }
-        }
-    }
-}
-
-/** A preset in [TempoSheet]: name over range, like the Listen screen's target presets. */
-@Composable
-private fun TempoPresetTile(name: String, range: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(12.dp)
-    Column(
-        modifier
-            .height(52.dp)
-            .clip(shape)
-            .background(if (selected) Tone.selected else Tone.track)
-            .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
-            .clickable(onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            name,
-            lineHeight = 1.15.em,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Ellipsis,
-            autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 13.sp),
+    if (tempoOpen) {
+        TempoSheet(
+            low = query.bpmMin,
+            high = query.bpmMax,
+            settings = settings,
+            allowAny = true,
+            onRange = { a, b -> onChange(query.copy(bpmMin = a, bpmMax = b)) },
+            onDismiss = { tempoOpen = false },
+            halfDouble = query.halfDouble,
+            onHalfDouble = { on -> onChange(query.copy(halfDouble = on)) },
         )
-        Text(range, fontSize = 11.sp, lineHeight = 13.sp, color = if (selected) Tone.text2 else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

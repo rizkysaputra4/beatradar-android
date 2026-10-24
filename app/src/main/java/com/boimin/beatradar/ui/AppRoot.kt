@@ -344,14 +344,24 @@ fun AppRoot(vm: MainViewModel, accountVm: AccountViewModel, libraryVm: LibraryVi
                 entries = log,
                 query = query,
                 onQueryChange = { vm.query.value = it },
+                settings = settings,
                 onlyInRange = onlyInRange,
-                bpmRange = logBpmRange ?: settings.targetRange,
+                // The log's own range keeps its open end ("up to 110"); only no range at all follows the target.
+                bpmLow = logBpmRange.let { r -> if (r != null) r.low else settings.targetLow },
+                bpmHigh = logBpmRange.let { r -> if (r != null) r.high else settings.targetHigh },
                 bpmCustom = logBpmRange != null,
-                onBpmRange = { vm.logBpmRange.value = it },
-                onResetBpm = { vm.logBpmRange.value = null },
+                onBpmRange = { lo, hi ->
+                    // "Any" turns the filter off; a range turns it on.
+                    if (lo == null && hi == null) {
+                        vm.onlyInRange.value = false
+                    } else {
+                        vm.logBpmRange.value = LogTempo(lo, hi)
+                        vm.onlyInRange.value = true
+                    }
+                },
+                onResetBpm = { vm.logBpmRange.value = null; vm.onlyInRange.value = true },
                 inTarget = settings::inTarget,
                 onlyIdentified = onlyIdentified,
-                onToggleInRange = { vm.onlyInRange.value = !onlyInRange },
                 onToggleIdentified = { vm.onlyIdentified.value = !onlyIdentified },
                 unnamedWithClip = unnamedWithClip,
                 suggested = suggested,

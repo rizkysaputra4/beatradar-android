@@ -79,10 +79,14 @@ class Undoable(val text: String, val undo: () -> Unit)
 /** A set someone shared (`/set/<slug>`), opened to view and copy. */
 data class SharedSetState(val slug: String, val set: SharedSet? = null, val error: String? = null)
 
-/** "Build me a Set": the request and what came back. */
+/** The tempo a set is built at: either end may be open (null). */
+data class BuildRange(val low: Int?, val high: Int?, val halfDouble: Boolean)
+
+/** "Build me a Set": the request and what came back. [range] is null until one is built (the screen starts at the target). */
 data class BuildState(
     val minutes: Int = 30,
     val onlyMine: Boolean = false,
+    val range: BuildRange? = null,
     val loading: Boolean = false,
     val result: BuiltSet? = null,
     val error: String? = null,
@@ -309,12 +313,14 @@ class LibraryViewModel(application: Application, private val saved: SavedStateHa
     }
 
     /** Builds a set in [range]; [again] mixes other equally good songs in. */
-    fun runBuild(range: IntRange, halfDouble: Boolean, minutes: Int, onlyMine: Boolean, again: Boolean = false) {
+    fun runBuild(range: BuildRange, minutes: Int, onlyMine: Boolean, again: Boolean = false) {
         val seed = if (again) (_build.value?.seed ?: 0) + 1 else 0
-        _build.value = BuildState(minutes, onlyMine, loading = true, seed = seed)
+        _build.value = BuildState(minutes, onlyMine, range, loading = true, seed = seed)
         viewModelScope.launch {
             try {
-                val result = repo.buildSet(BuildIn(range.first, range.last, halfDouble, minutes, onlyMine, seed = seed))
+                // An open end stands at the edge of what BeatRadar measures.
+                val request = BuildIn(range.low ?: Settings.BPM_FLOOR, range.high ?: Settings.BPM_CEILING, range.halfDouble, minutes, onlyMine, seed = seed)
+                val result = repo.buildSet(request)
                 _build.update { it?.copy(loading = false, result = result) }
             } catch (e: ApiException) {
                 _build.update { it?.copy(loading = false, error = describe(e)) }

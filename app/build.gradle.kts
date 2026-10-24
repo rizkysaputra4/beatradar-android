@@ -13,10 +13,10 @@ android {
 
     defaultConfig {
         applicationId = "com.boimin.beatradar"
-        minSdk = 29
+        minSdk = 26
         targetSdk = 37
-        versionCode = 6
-        versionName = "0.3.1"
+        versionCode = 7
+        versionName = "0.3.2"
         // The Web OAuth client id (Google Cloud): sign-in asks for tokens for it, and the server checks them against it.
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"1073093330874-h92fun5sei8rcitlf67jv2s5s9ip7if8.apps.googleusercontent.com\"")
         // The public site: share links (/s/…, /set/…), also used for App Links.

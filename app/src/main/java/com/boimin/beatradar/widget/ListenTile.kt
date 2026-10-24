@@ -60,12 +60,13 @@ class ListenTile : TileService() {
         val s = Monitor.state.value
         tile.state = if (s.active) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         tile.label = str(R.string.tile_label)
-        tile.icon = Icon.createWithResource(this, R.drawable.ic_stat_beat)
-        tile.subtitle = when {
-            s.status == MonitorStatus.LISTENING && s.bpm != null -> str(R.string.tile_bpm, s.bpm.roundToInt())
-            s.status == MonitorStatus.LISTENING -> str(R.string.tile_listening)
-            s.status == MonitorStatus.PAUSED -> str(R.string.tile_paused)
-            else -> str(R.string.tile_off)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            tile.subtitle = when {
+                s.status == MonitorStatus.LISTENING && s.bpm != null -> str(R.string.tile_bpm, s.bpm.roundToInt())
+                s.status == MonitorStatus.LISTENING -> str(R.string.tile_listening)
+                s.status == MonitorStatus.PAUSED -> str(R.string.tile_paused)
+                else -> str(R.string.tile_off)
+            }
         }
         tile.updateTile()
     }

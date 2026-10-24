@@ -1,5 +1,13 @@
 package com.boimin.beatradar.ui
 
+import androidx.compose.ui.unit.em
+import com.boimin.beatradar.ui.theme.brandSwitchColors
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Button
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -326,5 +334,145 @@ private fun RepeatStepButton(icon: Int, description: String, size: Dp, onHold: (
         contentAlignment = Alignment.Center,
     ) {
         Icon(painterResource(icon), contentDescription = description, tint = Tone.text2, modifier = Modifier.size(22.dp))
+    }
+}
+
+/**
+ * A tempo range to pick in a bottom sheet: the range editor, then the Listen tab's presets. Discover's filter, Build me a
+ * set and the Log's filter use it; [allowAny] adds "Any" (no tempo filter). [onHalfDouble] adds the half/double switch,
+ * [onUseTarget] a way back to the Listen tab's target. Changes apply as they are made; swipe down, tap outside or Done
+ * closes it.
+ */
+@Composable
+internal fun TempoSheet(
+    low: Int?,
+    high: Int?,
+    settings: Settings,
+    allowAny: Boolean,
+    onRange: (low: Int?, high: Int?) -> Unit,
+    onDismiss: () -> Unit,
+    halfDouble: Boolean = false,
+    onHalfDouble: ((Boolean) -> Unit)? = null,
+    onUseTarget: (() -> Unit)? = null,
+) {
+    CalmBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberCalmSheetState(skipPartiallyExpanded = true),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = Tone.sheet,
+        // Tone.sheet isn't a theme colour, so untinted text would not follow dark mode without this.
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        dragHandle = {
+            Box(Modifier.padding(top = 10.dp, bottom = 16.dp).size(36.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(Tone.sheetLine))
+        },
+    ) {
+        // A short screen or an open keyboard leaves less room than the sheet needs: it scrolls rather than squeezing
+        // fixed-height parts (Done, the steppers) out of shape.
+        Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 28.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(str(R.string.library_tempo_title), fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text(
+                    tempoRangeLabel(low, high),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (low != null || high != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+            TempoRangeEditor(
+                low = low,
+                high = high,
+                fallbackLow = settings.minBpm,
+                fallbackHigh = settings.maxBpm,
+                allowAny = allowAny,
+                onChange = onRange,
+            )
+            Spacer(Modifier.height(16.dp))
+            TempoPresets(low, high, onRange)
+            if (onUseTarget != null) {
+                TextButton(onClick = onUseTarget, modifier = Modifier.padding(top = 4.dp)) {
+                    Text("${str(R.string.log_use_target)} · ${tempoRangeShort(settings.targetLow, settings.targetHigh)}")
+                }
+            }
+            if (onHalfDouble != null) {
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onHalfDouble(!halfDouble) }
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(str(R.string.settings_half_double_title), fontSize = 15.sp)
+                        Text(str(R.string.settings_half_double_desc), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = halfDouble, onCheckedChange = onHalfDouble, colors = brandSwitchColors())
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(str(R.string.library_done)) }
+        }
+    }
+}
+
+/**
+ * The tempo presets, as on the Listen tab: Groove, House, Run, then "Custom" showing what the editor holds when no preset
+ * matches (there is nothing more to open, so it can't be tapped).
+ */
+@Composable
+internal fun TempoPresets(low: Int?, high: Int?, onPick: (low: Int?, high: Int?) -> Unit) {
+    val preset = TEMPO_PRESETS.firstOrNull { it.min == low && it.max == high }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TEMPO_PRESETS.forEach { p ->
+            PresetTile(str(p.label), "${p.min}–${p.max}", selected = p == preset, Modifier.weight(1f)) { onPick(p.min, p.max) }
+        }
+        PresetTile(
+            str(R.string.listen_preset_custom),
+            tempoRangeShort(low, high),
+            selected = preset == null && (low != null || high != null),
+            Modifier.weight(1f),
+            onClick = null,
+        )
+    }
+}
+
+/** A preset: 52 dp tall, name over range; the selected one filled violet-dark with a violet outline. */
+@Composable
+private fun PresetTile(name: String, range: String, selected: Boolean, modifier: Modifier, onClick: (() -> Unit)?) {
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier
+            .height(52.dp)
+            .clip(shape)
+            .background(if (selected) Tone.selected else Tone.track)
+            .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        // Four tiles across a 320 dp sheet with a large font or a long word ("Benutzerdefiniert"): the text shrinks
+        // instead of running into the tile's edge.
+        Text(
+            name,
+            lineHeight = 1.15.em,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 13.sp),
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        Text(
+            range,
+            lineHeight = 1.15.em,
+            color = if (selected) Tone.text2 else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            softWrap = false,
+            autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 11.sp),
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
     }
 }

@@ -21,7 +21,11 @@ class Haptics(context: Context) {
     /** One light tick, e.g. for a new badge. Follows the phone's touch-feedback setting. */
     fun light() {
         val v = vibrator?.takeIf { it.hasVibrator() } ?: return
-        v.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            v.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+        } else {
+            v.vibrate(VibrationEffect.createOneShot(20, VibrationEffect.DEFAULT_AMPLITUDE))
+        }
     }
 
     /** Three short pulses. Uses alarm usage so it still buzzes when the phone is on silent. */

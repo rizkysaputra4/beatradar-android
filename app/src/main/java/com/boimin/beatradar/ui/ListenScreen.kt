@@ -2,7 +2,6 @@ package com.boimin.beatradar.ui
 
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.text.font.FontFamily
 import com.boimin.beatradar.ui.theme.Tone
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -22,11 +21,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import com.boimin.beatradar.BuildConfig
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -73,6 +70,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
@@ -247,13 +245,13 @@ private fun Dial(state: MonitorState, settings: Settings, inTarget: Boolean, hei
                     // A small dial (a very short screen) has no room for the confidence line.
                     if (k >= 0.6f) {
                         Spacer(Modifier.height(4.dp))
-                        val percent = (sure * 100).roundToInt()
-                        // Release builds show signal bars; the exact share helps when tuning the detector.
-                        if (BuildConfig.DEBUG) {
-                            Text(str(R.string.listen_confidence_percent, percent), fontSize = 13.sp, color = Tone.text3)
-                        } else {
-                            ConfidenceBars(confidenceBars(percent), str(R.string.listen_confidence_bars, confidenceBars(percent), CONFIDENCE_BARS))
-                        }
+                        val lit = confidenceDots((sure * 100).roundToInt())
+                        ConfidenceDots(
+                            lit,
+                            beat,
+                            tint = if (inTarget) inTargetColor() else null,
+                            description = str(R.string.listen_confidence_bars, lit, CONFIDENCE_DOTS),
+                        )
                     }
                 } else {
                     Icon(
@@ -284,35 +282,47 @@ internal fun confidencePercent(confidence: Float?): Int =
 
 private const val FULL_CONFIDENCE = 1f
 
-internal const val CONFIDENCE_BARS = 4
+internal const val CONFIDENCE_DOTS = 4
 
-/** How many of [CONFIDENCE_BARS] signal bars a confidence of [percent] (0..100) lights. */
-internal fun confidenceBars(percent: Int): Int = when {
+/** How many of [CONFIDENCE_DOTS] dots a confidence of [percent] (0..100) lights. */
+internal fun confidenceDots(percent: Int): Int = when {
     percent <= 0 -> 0
     percent < 30 -> 1
     percent < 55 -> 2
     percent < 80 -> 3
-    else -> CONFIDENCE_BARS
+    else -> CONFIDENCE_DOTS
 }
 
+/** The dot an unsure reading's beat lands on: it skips around instead of counting 1-2-3-4. */
+internal fun skippedDot(beatIndex: Int): Int = ((beatIndex.toLong() * 0x9E3779B1L) ushr 28).toInt() and (CONFIDENCE_DOTS - 1)
+
 /**
- * The reading's confidence as signal bars, quiet enough to sit under the number: lit bars in the dial's caption colour,
- * the rest a faint trace of it.
+ * The reading's confidence as metronome dots under the status line: they count 1-2-3-4 with the beat, and how many are
+ * lit is how sure the reading is (all of them turn the accent colour; [tint] overrides it, e.g. in target). A barely
+ * sure reading's beat skips around instead of counting. The row keeps one size whatever it shows, so nothing moves.
  */
 @Composable
-private fun ConfidenceBars(lit: Int, description: String) {
-    val color = Tone.text3
-    Canvas(Modifier.size(width = 15.dp, height = 11.dp).semantics { contentDescription = description }) {
-        val gap = 1.5.dp.toPx()
-        val barWidth = (size.width - gap * (CONFIDENCE_BARS - 1)) / CONFIDENCE_BARS
-        val radius = CornerRadius(barWidth / 3, barWidth / 3)
-        for (i in 0 until CONFIDENCE_BARS) {
-            val barHeight = size.height * (i + 1) / CONFIDENCE_BARS
-            drawRoundRect(
-                color = if (i < lit) color else color.copy(alpha = color.alpha * 0.3f),
-                topLeft = Offset(i * (barWidth + gap), size.height - barHeight),
-                size = Size(barWidth, barHeight),
-                cornerRadius = radius,
+private fun ConfidenceDots(lit: Int, beat: BeatClock, tint: Color?, description: String) {
+    val color = tint ?: if (lit == CONFIDENCE_DOTS) MaterialTheme.colorScheme.primary else Tone.text3
+    Canvas(Modifier.size(width = 40.dp, height = 12.dp).semantics { contentDescription = description }) {
+        val slot = size.width / CONFIDENCE_DOTS
+        val radius = 2.5.dp.toPx()
+        // The beat's dot grows inside its own slot.
+        val grow = 1.3.dp.toPx()
+        val pulse = beat.pulse
+        val counting = beat.anchorMs != null && lit > 0
+        val onBeat = if (lit == 1) skippedDot(beat.beatIndex) else beat.beatIndex.mod(CONFIDENCE_DOTS)
+        for (i in 0 until CONFIDENCE_DOTS) {
+            val beating = counting && i == onBeat
+            val alpha = when {
+                beating -> 0.4f + 0.6f * maxOf(pulse, if (i < lit) 0.45f else 0f)
+                i < lit -> 0.6f
+                else -> 0.2f
+            }
+            drawCircle(
+                color = color.copy(alpha = color.alpha * alpha),
+                radius = radius + if (beating) grow * pulse else 0f,
+                center = Offset(slot * (i + 0.5f), size.height / 2),
             )
         }
     }
@@ -350,6 +360,8 @@ private fun DialStatusBadge(state: MonitorState, settings: Settings, inTarget: B
 private class BeatClock {
     /** 1 right on a beat, decaying to 0 before the next. */
     var pulse by mutableFloatStateOf(0f)
+    /** Counts beats on the grid, so something can step with them (the confidence dots count 1-2-3-4). */
+    var beatIndex by mutableIntStateOf(0)
     /** A time a beat landed and the beat length; null while no beat is heard. */
     var anchorMs: Long? = null
     var periodMs = 0.0
@@ -395,6 +407,7 @@ private fun rememberBeatClock(bpm: Float?, lastBeatAtMs: Long?): BeatClock {
                 val beats = since / period
                 val phase = beats - floor(beats)
                 clock.pulse = (1 - phase).pow(3).toFloat()
+                clock.beatIndex = floor(beats).toInt()
             }
         }
     }
@@ -639,20 +652,7 @@ private fun TargetSheet(settings: Settings, onSettingsChange: ((Settings) -> Set
                 onChange = ::setRange,
             )
             Spacer(Modifier.height(16.dp))
-            val preset = TEMPO_PRESETS.firstOrNull { it.min == settings.targetLow && it.max == settings.targetHigh }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TEMPO_PRESETS.forEach { p ->
-                    PresetTile(str(p.label), "${p.min}–${p.max}", selected = p == preset, Modifier.weight(1f)) { setRange(p.min, p.max) }
-                }
-                // Shows what the editor above holds when no preset matches; there is nothing more to open.
-                PresetTile(
-                    str(R.string.listen_preset_custom),
-                    tempoRangeShort(settings.targetLow, settings.targetHigh),
-                    selected = preset == null,
-                    Modifier.weight(1f),
-                    onClick = null,
-                )
-            }
+            TempoPresets(settings.targetLow, settings.targetHigh, ::setRange)
             Spacer(Modifier.height(20.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(str(R.string.listen_range_alerts), fontSize = 15.sp, modifier = Modifier.weight(1f))
@@ -663,25 +663,6 @@ private fun TargetSheet(settings: Settings, onSettingsChange: ((Settings) -> Set
                 )
             }
         }
-    }
-}
-
-/** A preset: 52 dp tall, name over range; the selected one filled violet-dark with a violet outline. */
-@Composable
-private fun PresetTile(name: String, range: String, selected: Boolean, modifier: Modifier, onClick: (() -> Unit)?) {
-    val shape = RoundedCornerShape(12.dp)
-    Column(
-        modifier
-            .height(52.dp)
-            .clip(shape)
-            .background(if (selected) Tone.selected else Tone.track)
-            .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(name, fontSize = 13.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-        Text(range, fontSize = 11.sp, lineHeight = 13.sp, color = if (selected) Tone.text2 else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

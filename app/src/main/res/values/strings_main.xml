@@ -4,8 +4,7 @@
     <string name="listen_stop_listening">Stop listening</string>
     <string name="listen_start_listening">Start listening</string>
     <string name="listen_bpm_label">BPM</string>
-    <string name="listen_confidence_percent">%1$d%%</string>
-    <string name="listen_confidence_bars">Confidence: %1$d of %2$d bars</string>
+    <string name="listen_confidence_bars">Confidence: %1$d of %2$d</string>
     <string name="listen_listening">Listening…</string>
     <string name="listen_paused">Paused</string>
     <string name="listen_tap_to_listen">Tap to listen</string>

@@ -47,7 +47,6 @@
     <string name="library_any_decade">Any decade</string>
     <string name="library_loved">♥ Loved</string>
     <string name="library_tempo_title">Tempo</string>
-    <string name="library_tempo_my_range">My range</string>
     <string name="library_done">Done</string>
     <string name="library_sort_popular">Popular</string>
     <string name="library_sort_confirmed">Confirmed</string>
@@ -176,7 +175,7 @@
     <string name="sets_shared_missing">This shared set doesn\'t exist anymore</string>
     <string name="sets_shared_by">shared by %1$s</string>
     <string name="sets_copy">Copy this set</string>
-    <string name="sets_build_body">Well-confirmed songs at your target %1$s BPM. Change the target on the Listen tab.</string>
+    <string name="sets_build_body">Well-confirmed songs at the tempo below. It starts at your target.</string>
     <string name="sets_only_heard">Only songs I\'ve heard</string>
     <string name="sets_only_heard_body">Songs this phone measured</string>
     <string name="sets_building">Building…</string>

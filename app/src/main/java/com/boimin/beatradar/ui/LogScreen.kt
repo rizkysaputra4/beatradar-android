@@ -60,7 +60,6 @@ import com.boimin.beatradar.data.Settings
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
@@ -86,18 +85,20 @@ fun LogScreen(
     entries: List<BeatLogEntry>,
     query: String,
     onQueryChange: (String) -> Unit,
+    settings: Settings,
     /** The BPM filter is on. */
     onlyInRange: Boolean,
-    /** The BPM filter's range: the log's own, or the Listen tab's target until it's changed here. */
-    bpmRange: IntRange,
+    /** The BPM filter's range (a null end is open): the log's own, or the Listen tab's target until it's changed here. */
+    bpmLow: Int?,
+    bpmHigh: Int?,
     /** The log has its own range (not following the Listen tab). */
     bpmCustom: Boolean,
-    onBpmRange: (IntRange) -> Unit,
+    /** A range picked in the tempo sheet; both null ("Any") turns the filter off. */
+    onBpmRange: (low: Int?, high: Int?) -> Unit,
     onResetBpm: () -> Unit,
     /** Whether a tempo is in the current target range (the coral badge). */
     inTarget: (Float) -> Boolean,
     onlyIdentified: Boolean,
-    onToggleInRange: () -> Unit,
     onToggleIdentified: () -> Unit,
     unnamedWithClip: Int,
     /** Unnamed songs with a suggested name (PLAN §5c). */
@@ -123,6 +124,7 @@ fun LogScreen(
 ) {
     var confirmClear by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<BeatLogEntry?>(null) }
+    var tempoOpen by remember { mutableStateOf(false) }
 
     Column(modifier.fillMaxSize()) {
         // Low-profile Search Bar + Clear action
@@ -209,10 +211,10 @@ fun LogScreen(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             LogFilterPill(
-                label = str(R.string.log_filter_bpm_range, bpmRange.first, bpmRange.last),
+                label = "${if (onlyInRange) tempoRangeLabel(bpmLow, bpmHigh) else tempoRangeLabel(null, null)} ▾",
                 selected = onlyInRange,
                 activeColor = inTargetColor(),
-                onClick = onToggleInRange,
+                onClick = { tempoOpen = true },
             )
             LogFilterPill(
                 label = str(R.string.log_filter_named),
@@ -235,7 +237,6 @@ fun LogScreen(
             }
         }
 
-        if (onlyInRange) BpmRangeRow(bpmRange, bpmCustom, onBpmRange, onResetBpm)
 
         // Pull down to sync: uploads, and brings in entries from the user's other phones when signed in.
         PullToRefreshBox(isRefreshing = refreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
@@ -281,6 +282,18 @@ fun LogScreen(
         )
     }
 
+    if (tempoOpen) {
+        TempoSheet(
+            low = if (onlyInRange) bpmLow else null,
+            high = if (onlyInRange) bpmHigh else null,
+            settings = settings,
+            allowAny = true,
+            onRange = onBpmRange,
+            onDismiss = { tempoOpen = false },
+            onUseTarget = onResetBpm.takeIf { bpmCustom || !onlyInRange },
+        )
+    }
+
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
@@ -290,67 +303,6 @@ fun LogScreen(
                 TextButton(onClick = { confirmClear = false; onClear() }) { Text(str(R.string.log_clear_confirm)) }
             },
             dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(str(R.string.log_cancel)) } },
-        )
-    }
-}
-
-/** Min – Max boxes for the log's BPM filter. A range is applied once both numbers make sense. */
-@Composable
-private fun BpmRangeRow(range: IntRange, custom: Boolean, onChange: (IntRange) -> Unit, onReset: () -> Unit) {
-    var minText by remember(range) { mutableStateOf(range.first.toString()) }
-    var maxText by remember(range) { mutableStateOf(range.last.toString()) }
-    fun apply(minT: String, maxT: String) {
-        val lo = minT.toIntOrNull() ?: return
-        val hi = maxT.toIntOrNull() ?: return
-        if (lo in Settings.BPM_FLOOR..Settings.BPM_CEILING && hi in Settings.BPM_FLOOR..Settings.BPM_CEILING && lo <= hi && (lo..hi) != range) {
-            onChange(lo..hi)
-        }
-    }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(start = 18.dp, end = 18.dp, bottom = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        BpmBox(minText, str(R.string.log_min_bpm)) { minText = it; apply(it, maxText) }
-        Text("–", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        BpmBox(maxText, str(R.string.log_max_bpm)) { maxText = it; apply(minText, it) }
-        Spacer(Modifier.weight(1f))
-        if (custom) {
-            Text(
-                str(R.string.log_use_target),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onReset).padding(horizontal = 8.dp, vertical = 6.dp),
-            )
-        } else {
-            Text(str(R.string.log_listen_target), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-private fun BpmBox(text: String, label: String, onChange: (String) -> Unit) {
-    Box(
-        Modifier
-            .width(76.dp)
-            .height(38.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        BasicTextField(
-            value = text,
-            onValueChange = { v -> onChange(v.filter(Char::isDigit).take(3)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold),
-            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            modifier = Modifier.fillMaxWidth().semantics { contentDescription = label },
         )
     }
 }

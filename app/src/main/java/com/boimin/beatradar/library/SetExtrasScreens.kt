@@ -1,7 +1,12 @@
 package com.boimin.beatradar.library
 
+import androidx.compose.ui.text.style.TextAlign
+import com.boimin.beatradar.ui.TempoSheet
 import androidx.compose.foundation.background
+import com.boimin.beatradar.ui.tempoRangeLabel
 import com.boimin.beatradar.ui.tempoRangeShort
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -113,7 +118,15 @@ internal fun SharedSetScreen(state: SharedSetState, vm: LibraryViewModel, settin
 internal fun BuildSetScreen(state: BuildState, vm: LibraryViewModel, settings: Settings, onSaved: (Long) -> Unit, modifier: Modifier) {
     var minutes by rememberSaveable { mutableIntStateOf(state.minutes) }
     var onlyMine by rememberSaveable { mutableStateOf(state.onlyMine) }
-    val range = settings.targetRange
+    // The tempo starts at the user's target and can be changed here without touching it.
+    var low by rememberSaveable { mutableStateOf(state.range?.low ?: settings.targetLow) }
+    var high by rememberSaveable { mutableStateOf(state.range?.high ?: settings.targetHigh) }
+    var halfDouble by rememberSaveable { mutableStateOf(state.range?.halfDouble ?: settings.halfDoubleMatch) }
+    var tempoOpen by rememberSaveable { mutableStateOf(false) }
+    val range = BuildRange(low, high, halfDouble)
+    // The result is shown against the tempo it was built at, even once the picker has moved on.
+    val built = state.range ?: range
+    val builtBounds = (built.low ?: Settings.BPM_FLOOR)..(built.high ?: Settings.BPM_CEILING)
     val scope = rememberCoroutineScope()
     val result = state.result
     val list = rememberLazyListState()
@@ -134,9 +147,13 @@ internal fun BuildSetScreen(state: BuildState, vm: LibraryViewModel, settings: S
             Card {
                 Text(str(R.string.sets_build_me_a_set), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(
-                    str(R.string.sets_build_body, tempoRangeShort(settings.targetLow, settings.targetHigh)),
+                    str(R.string.sets_build_body),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TempoButton(
+                    if (halfDouble) "${tempoRangeLabel(low, high)} · ½×/2×" else tempoRangeLabel(low, high),
+                    onClick = { tempoOpen = true },
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (m in listOf(15, 30, 45, 60)) {
@@ -151,11 +168,11 @@ internal fun BuildSetScreen(state: BuildState, vm: LibraryViewModel, settings: S
                     Switch(checked = onlyMine, onCheckedChange = { onlyMine = it }, colors = brandSwitchColors())
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { vm.runBuild(range, settings.halfDoubleMatch, minutes, onlyMine) }, enabled = !state.loading) {
+                    Button(onClick = { vm.runBuild(range, minutes, onlyMine) }, enabled = !state.loading) {
                         Text(if (state.loading) str(R.string.sets_building) else str(R.string.sets_build))
                     }
                     if (result != null && result.songs.isNotEmpty()) {
-                        TextButton(onClick = { vm.runBuild(range, settings.halfDoubleMatch, minutes, onlyMine, again = true) }) { Text(str(R.string.sets_try_another)) }
+                        TextButton(onClick = { vm.runBuild(range, minutes, onlyMine, again = true) }) { Text(str(R.string.sets_try_another)) }
                     }
                 }
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
@@ -181,7 +198,11 @@ internal fun BuildSetScreen(state: BuildState, vm: LibraryViewModel, settings: S
                         Text(str(R.string.sets_estimated), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     if (result.songs.isNotEmpty()) {
-                        val setName = str(R.string.sets_build_name, minutes, tempoRangeShort(settings.targetLow, settings.targetHigh))
+                        val setName = if (built.low == null && built.high == null) {
+                            str(R.string.sets_minutes, state.minutes)
+                        } else {
+                            str(R.string.sets_build_name, state.minutes, tempoRangeShort(built.low, built.high))
+                        }
                         Button(onClick = {
                             scope.launch { vm.createSetWith(setName, result.songs.map { it.summary() })?.let(onSaved) }
                         }) { Text(str(R.string.sets_save_as_set)) }
@@ -189,14 +210,65 @@ internal fun BuildSetScreen(state: BuildState, vm: LibraryViewModel, settings: S
                 }
             }
             items(result.songs, key = { it.slug }) { s ->
-                SongRow(s.summary(), settings.inTarget(s.bpm), onClick = { vm.open(s.slug) }, trailing = "%d:%02d".format(s.durationMs / 60_000, s.durationMs / 1000 % 60))
+                SongRow(s.summary(), Settings.bpmIn(s.bpm, builtBounds, built.halfDouble), onClick = { vm.open(s.slug) }, trailing = "%d:%02d".format(s.durationMs / 60_000, s.durationMs / 1000 % 60))
             }
         }
+    }
+    if (tempoOpen) {
+        TempoSheet(
+            low = low,
+            high = high,
+            settings = settings,
+            // "Any" builds from every tempo.
+            allowAny = true,
+            onRange = { a, b -> low = a; high = b },
+            onDismiss = { tempoOpen = false },
+            halfDouble = halfDouble,
+            onHalfDouble = { halfDouble = it },
+        )
     }
 }
 
 /** The result's header in [BuildSetScreen]'s list, after the back button and the options card. */
 private const val RESULT_ITEM = 2
+
+/**
+ * The tempo a set is built at, as a full-width row that opens [TempoSheet]: styled as a field (not a picked chip), the
+ * label kept on one line and the range shrinking to fit a narrow card or a large font.
+ */
+@Composable
+private fun TempoButton(label: String, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            str(R.string.library_tempo_title),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            softWrap = false,
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            "$label ▾",
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = 14.sp),
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
 
 @Composable
 private fun Card(content: @Composable () -> Unit) {
